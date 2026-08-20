@@ -1,0 +1,263 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-white mb-0">Profit <span class="text-warning">Reports</span></h2>
+        <p class="text-white-50 mb-0">Analyze gross profit/loss by item, client, and date range.</p>
+    </div>
+    <a href="/" class="btn btn-outline-light rounded-pill px-4">
+        <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-body p-4">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">Start Date</label>
+                <input type="date" name="start_date" class="form-control bg-dark text-white border-secondary datepicker" value="{{ start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">End Date</label>
+                <input type="date" name="end_date" class="form-control bg-dark text-white border-secondary datepicker" value="{{ end_date }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">Client</label>
+                <div class="position-relative">
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            name="client"
+                            id="profitClientFilter"
+                            class="form-control bg-dark text-white border-secondary"
+                            value="{{ client }}"
+                            placeholder="Client name or code"
+                            autocomplete="off"
+                            onfocus="showCombobox('profitClientFilter', 'profitClientList')"
+                            oninput="filterCombobox('profitClientFilter', 'profitClientList', 'profitClientDisplay')">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('profitClientFilter', 'profitClientList')">
+                            <i class="bi bi-chevron-down text-warning"></i>
+                        </button>
+                    </div>
+                    <div id="profitClientList" class="combobox-list shadow-lg" style="display: none;">
+                        <div class="combobox-item" data-combo-code="" data-combo-name="" data-combo-input="profitClientFilter" data-combo-display="profitClientDisplay">
+                            <span class="fw-bold text-danger">All Clients</span>
+                        </div>
+                        {% for c in clients %}
+                        <div class="combobox-item" data-combo-code="{{ c.code }}" data-combo-name="{{ c.name }}" data-combo-input="profitClientFilter" data-combo-display="profitClientDisplay">
+                            <span class="fw-bold text-warning code-span">{{ c.code }}</span>
+                            <span class="ms-2 text-white-50 small name-span">{{ c.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="profitClientDisplay" class="text-info small mt-1 fw-bold"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">Item Material</label>
+                <div class="position-relative">
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            name="material"
+                            id="profitMaterialFilter"
+                            class="form-control bg-dark text-white border-secondary"
+                            value="{{ material }}"
+                            placeholder="Type material..."
+                            autocomplete="off"
+                            onfocus="showCombobox('profitMaterialFilter', 'profitMaterialList')"
+                            oninput="filterCombobox('profitMaterialFilter', 'profitMaterialList', 'profitMaterialDisplay')">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('profitMaterialFilter', 'profitMaterialList')">
+                            <i class="bi bi-chevron-down text-warning"></i>
+                        </button>
+                    </div>
+                    <div id="profitMaterialList" class="combobox-list shadow-lg" style="display: none;">
+                        <div class="combobox-item" data-combo-code="" data-combo-name="" data-combo-input="profitMaterialFilter" data-combo-display="profitMaterialDisplay">
+                            <span class="fw-bold text-danger">All Materials</span>
+                        </div>
+                        {% for mat in materials %}
+                        <div class="combobox-item" data-combo-code="{{ mat.name }}" data-combo-name="{{ mat.name }}" data-combo-input="profitMaterialFilter" data-combo-display="profitMaterialDisplay">
+                            <span class="fw-bold text-warning code-span">{{ mat.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="profitMaterialDisplay" class="text-info small mt-1 fw-bold"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">GRN (Optional)</label>
+                <select name="grn_id" class="form-select bg-dark text-white border-secondary">
+                    <option value="">All GRNs</option>
+                    {% for g in (grn_filter_options or []) %}
+                    <option value="{{ g.id }}" {% if grn_id and (grn_id|string) == (g.id|string) %}selected{% endif %}>
+                        {{ g.manual_bill_no or g.auto_bill_no or ('GRN-' ~ g.id) }}{% if g.supplier %} - {{ g.supplier }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="small text-white-50 mt-1">Pick material first to narrow the GRN list.</div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-warning w-100 fw-bold">
+                    <i class="bi bi-funnel me-2"></i>Apply Filters
+                </button>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <a href="{{ url_for('profit_reports') }}" class="btn btn-outline-secondary w-100 fw-bold">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Reset
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <a class="text-decoration-none d-block h-100"
+           href="{{ url_for('profit_reports', view='entries', metric='revenue', start_date=start_date, end_date=end_date, client=client, material=material, grn_id=grn_id) }}">
+            <div class="card border-0 h-100" style="background: #0f172a; border: 1px solid #334155 !important;">
+                <div class="card-body">
+                    <div class="text-white-50 small">Total Revenue</div>
+                    <div class="h4 fw-bold text-white mb-0">Rs. {{ "{:,.2f}".format(total_revenue) }}</div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a class="text-decoration-none d-block h-100"
+           href="{{ url_for('profit_reports', view='entries', metric='discount_loss', start_date=start_date, end_date=end_date, client=client, material=material, grn_id=grn_id) }}">
+            <div class="card border-0 h-100" style="background: #0f172a; border: 1px solid #334155 !important;">
+                <div class="card-body">
+                    <div class="text-white-50 small">Total Discount/Loss</div>
+                    <div class="h4 fw-bold text-danger mb-0">Rs. {{ "{:,.2f}".format(total_discount_loss or 0) }}</div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a class="text-decoration-none d-block h-100"
+           href="{{ url_for('profit_reports', view='entries', metric='cogs', start_date=start_date, end_date=end_date, client=client, material=material, grn_id=grn_id) }}">
+            <div class="card border-0 h-100" style="background: #0f172a; border: 1px solid #334155 !important;">
+                <div class="card-body">
+                    <div class="text-white-50 small">Estimated COGS (Known Cost)</div>
+                    <div class="h4 fw-bold text-info mb-0">Rs. {{ "{:,.2f}".format(total_cogs) }}</div>
+                    {% if unknown_cost_rows > 0 %}
+                    <div class="small text-warning mt-1">
+                        Unknown cost rows:
+                        <span class="text-decoration-underline">{{ unknown_cost_rows }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a class="text-decoration-none d-block h-100"
+           href="{{ url_for('profit_reports', view='entries', metric='net_profit', start_date=start_date, end_date=end_date, client=client, material=material, grn_id=grn_id) }}">
+            <div class="card border-0 h-100" style="background: #0f172a; border: 1px solid #334155 !important;">
+                <div class="card-body">
+                    <div class="text-white-50 small">Net Profit / Loss (Known Cost)</div>
+                    <div class="h4 fw-bold {{ 'text-success' if total_profit >= 0 else 'text-danger' }} mb-0">
+                        Rs. {{ "{:,.2f}".format(total_profit) }}
+                    </div>
+                    {% if unknown_cost_revenue > 0 %}
+                    <div class="small text-warning mt-1">Revenue with unknown cost: Rs. {{ "{:,.2f}".format(unknown_cost_revenue) }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 h-100" style="background: #0f172a; border: 1px solid #334155 !important;">
+            <div class="card-body">
+                <div class="text-white-50 small">Margin % (on Revenue)</div>
+                <div class="h4 fw-bold {{ 'text-success' if margin_pct >= 0 else 'text-danger' }} mb-0">
+                    {{ "{:,.2f}".format(margin_pct) }}%
+                </div>
+                <div class="text-white-50 small mt-2">Markup % (on Cost)</div>
+                <div class="h5 fw-bold {{ 'text-success' if markup_pct >= 0 else 'text-danger' }} mb-0">
+                    {{ "{:,.2f}".format(markup_pct) }}%
+                </div>
+                <div class="small text-white-50 mt-1">Profit rows: {{ profit_rows }} | Loss rows: {{ loss_rows }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <div class="text-white-50 small">Profit/Loss Entries</div>
+            <div class="h5 text-white mb-0">{{ entries_count }} entries available for selected filters</div>
+            <div class="small text-white-50">View complete date/client/material-wise entries on separate page.</div>
+        </div>
+        <a class="btn btn-warning fw-bold"
+           href="{{ url_for('profit_reports', view='entries', start_date=start_date, end_date=end_date, client=client, material=material, grn_id=grn_id) }}">
+            <i class="bi bi-table me-2"></i>Open All Entries Page
+        </a>
+    </div>
+</div>
+
+{% if grn_sales_summary and grn_sales_summary|length > 0 %}
+<div class="card border-0 shadow-sm mt-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <div class="h5 text-white mb-0">GRN-wise <span class="text-warning">Sales Profit</span></div>
+                <div class="small text-white-50">Direct sale items linked to a GRN item. Unknown-cost rows are excluded from profit.</div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead style="background: #0f172a;">
+                    <tr>
+                        <th class="ps-4 py-3 text-white-50">GRN</th>
+                        <th class="py-3 text-white-50">Supplier</th>
+                        <th class="py-3 text-end pe-4 text-white-50">Sold Qty</th>
+                        <th class="py-3 text-end pe-4 text-white-50">Revenue</th>
+                        <th class="py-3 text-end pe-4 text-white-50">Discount/Loss</th>
+                        <th class="py-3 text-end pe-4 text-white-50">COGS (Known)</th>
+                        <th class="py-3 text-end pe-4 text-white-50">Profit (Known)</th>
+                        <th class="py-3 text-end pe-4 text-white-50">Margin %</th>
+                        <th class="py-3 text-end pe-4 text-white-50">Markup %</th>
+                    </tr>
+                </thead>
+                <tbody style="background: #1e293b;">
+                    {% for r in grn_sales_summary %}
+                    <tr style="border-bottom: 1px solid #334155;">
+                        <td class="ps-4 py-3 text-warning fw-bold">{{ r.grn_bill }}</td>
+                        <td class="py-3">{{ r.supplier }}</td>
+                        <td class="text-end pe-4 py-3">{{ "{:,.2f}".format(r.sold_qty or 0) }}</td>
+                        <td class="text-end pe-4 py-3">Rs. {{ "{:,.2f}".format(r.revenue or 0) }}</td>
+                        <td class="text-end pe-4 py-3 text-danger">Rs. {{ "{:,.2f}".format(r.discount_loss or 0) }}</td>
+                        <td class="text-end pe-4 py-3">Rs. {{ "{:,.2f}".format(r.cogs_known or 0) }}</td>
+                        <td class="text-end pe-4 py-3 fw-bold {{ 'text-success' if (r.profit_known or 0) >= 0 else 'text-danger' }}">
+                            Rs. {{ "{:,.2f}".format(r.profit_known or 0) }}
+                            {% if r.unknown_rows and r.unknown_rows > 0 %}
+                            <div class="small text-warning">Unknown rows: {{ r.unknown_rows }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4 py-3">{{ "{:,.2f}".format(r.margin_pct_known or 0) }}%</td>
+                        <td class="text-end pe-4 py-3">{{ "{:,.2f}".format(r.markup_pct_known or 0) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('profitMaterialFilter');
+    const display = document.getElementById('profitMaterialDisplay');
+    if (input && display && input.value.trim()) {
+        display.innerText = 'Name: ' + input.value.trim();
+    }
+    const clientInput = document.getElementById('profitClientFilter');
+    const clientDisplay = document.getElementById('profitClientDisplay');
+    if (clientInput && clientDisplay && clientInput.value.trim()) {
+        clientDisplay.innerText = 'Client: ' + clientInput.value.trim();
+    }
+});
+</script>
+{% endblock %}

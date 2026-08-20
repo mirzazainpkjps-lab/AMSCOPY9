@@ -1,0 +1,100 @@
+{
+  "database_copy": "isolated",
+  "warm_samples_per_page": 3,
+  "startup_ms": 678.3,
+  "login_status": 302,
+  "login_ms": 116.23,
+  "route_rules": 469,
+  "pages": {
+    "/": {
+      "status": 200,
+      "response_bytes": 117063,
+      "median_total_ms": 341.2,
+      "median_server_ms": 340.37,
+      "median_db_ms": 5.71,
+      "median_template_ms": 1.75,
+      "median_query_count": 22
+    },
+    "/clients": {
+      "status": 200,
+      "response_bytes": 264367,
+      "median_total_ms": 15.53,
+      "median_server_ms": 14.88,
+      "median_db_ms": 4.79,
+      "median_template_ms": 2.28,
+      "median_query_count": 9
+    },
+    "/materials": {
+      "status": 200,
+      "response_bytes": 174851,
+      "median_total_ms": 6.15,
+      "median_server_ms": 5.62,
+      "median_db_ms": 0.21,
+      "median_template_ms": 2.07,
+      "median_query_count": 6
+    },
+    "/bookings": {
+      "status": 200,
+      "response_bytes": 421142,
+      "median_total_ms": 15.03,
+      "median_server_ms": 14.36,
+      "median_db_ms": 0.62,
+      "median_template_ms": 4.48,
+      "median_query_count": 9
+    },
+    "/direct_sales": {
+      "status": 200,
+      "response_bytes": 866942,
+      "median_total_ms": 51.96,
+      "median_server_ms": 51.16,
+      "median_db_ms": 8.13,
+      "median_template_ms": 9.0,
+      "median_query_count": 21
+    },
+    "/pending_bills": {
+      "status": 200,
+      "response_bytes": 429947,
+      "median_total_ms": 16.01,
+      "median_server_ms": 15.35,
+      "median_db_ms": 1.28,
+      "median_template_ms": 7.87,
+      "median_query_count": 5
+    },
+    "/inventory/stock_summary": {
+      "status": 200,
+      "response_bytes": 134392,
+      "median_total_ms": 19.44,
+      "median_server_ms": 18.66,
+      "median_db_ms": 6.89,
+      "median_template_ms": 1.71,
+      "median_query_count": 21
+    },
+    "/accounts/": {
+      "status": 200,
+      "response_bytes": 535907,
+      "median_total_ms": 361.62,
+      "median_server_ms": 360.78,
+      "median_db_ms": 1.67,
+      "median_template_ms": 9.0,
+      "median_query_count": 28
+    },
+    "/profit_reports": {
+      "status": 200,
+      "response_bytes": 261802,
+      "median_total_ms": 79.96,
+      "median_server_ms": 79.21,
+      "median_db_ms": 6.64,
+      "median_template_ms": 2.07,
+      "median_query_count": 39
+    },
+    "/api/clients/search?q=ahm": {
+      "status": 200,
+      "response_bytes": 506,
+      "median_total_ms": 2.29,
+      "median_server_ms": 1.7,
+      "median_db_ms": 0.29,
+      "median_template_ms": 0.0,
+      "median_query_count": 2
+    }
+  }
+}

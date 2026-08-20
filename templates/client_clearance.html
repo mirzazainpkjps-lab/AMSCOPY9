@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Clearance Statement — {{ client.name }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #111; margin: 28px; }
+        h1 { margin: 0 0 4px; font-size: 22px; }
+        .muted { color: #555; font-size: 13px; }
+        .box { border: 1px solid #222; padding: 12px 14px; margin: 16px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
+        th { background: #eee; }
+        .num { text-align: right; }
+        .due { font-size: 20px; font-weight: 700; }
+        .stamp { margin-top: 28px; border: 2px dashed #333; display: inline-block; padding: 10px 18px; font-weight: 700; }
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+{% if auto_print %}<script>window.onload = function(){ window.print(); }</script>{% endif %}
+<div class="no-print" style="margin-bottom:12px;">
+    <button onclick="window.print()">Print</button>
+</div>
+<h1>Client Clearance / Outstanding Statement</h1>
+<div class="muted">{{ settings.company_name if settings and settings.company_name else 'Ahmed Cement / AMS' }}</div>
+<div class="muted">Generated {{ generated_at.strftime('%Y-%m-%d %H:%M') if generated_at else '' }}</div>
+
+<div class="box">
+    <div><strong>Client:</strong> {{ client.name }}</div>
+    <div><strong>Code:</strong> {{ client.code or '—' }}</div>
+    <div><strong>Phone:</strong> {{ client.phone or '—' }}</div>
+    <div class="due" style="margin-top:8px;">
+        Outstanding: Rs {{ "{:,.2f}".format(total_balance or 0) }}
+        {% if (total_balance or 0) > 0 %}(Please pay){% elif (total_balance or 0) < 0 %}(Advance with us){% else %}(Cleared){% endif %}
+    </div>
+</div>
+
+<h3>Unpaid bills</h3>
+<table>
+    <thead>
+        <tr><th>Bill #</th><th>Reason</th><th class="num">Amount</th></tr>
+    </thead>
+    <tbody>
+    {% for b in pending_bills %}
+        <tr>
+            <td>{{ b.bill_no or '—' }}</td>
+            <td>{{ b.reason or '' }}</td>
+            <td class="num">{{ "{:,.2f}".format(b.amount or 0) }}</td>
+        </tr>
+    {% else %}
+        <tr><td colspan="3">No unpaid bills.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<h3>Recent financial activity</h3>
+<table>
+    <thead>
+        <tr><th>Date</th><th>Description</th><th>Bill</th><th class="num">Due</th><th class="num">Paid</th><th class="num">Balance</th></tr>
+    </thead>
+    <tbody>
+    {% for t in financial_history[-25:] %}
+        <tr>
+            <td>{{ (t.date_display or t.date)[:16] }}</td>
+            <td>{{ t.description }}</td>
+            <td>{{ t.bill_no or '' }}</td>
+            <td class="num">{{ "{:,.2f}".format(t.debit or 0) if t.debit else '' }}</td>
+            <td class="num">{{ "{:,.2f}".format(t.credit or 0) if t.credit else '' }}</td>
+            <td class="num">{{ "{:,.2f}".format(t.balance or 0) }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div class="stamp">Please settle the outstanding amount to clear this account.</div>
+</body>
+</html>

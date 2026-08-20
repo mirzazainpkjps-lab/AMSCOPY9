@@ -1,0 +1,18 @@
+{# Shared page header.
+   Args:
+     icon      — bootstrap icon class (e.g. 'bi-speedometer2')
+     title     — string
+     subtitle  — optional string (single line)
+     toolbar   — optional caller block providing right-side buttons #}
+{% macro render(icon, title, subtitle=None, toolbar=None) -%}
+<div class="ui-page-header">
+  <div>
+    <h1 class="ui-title">
+      <span class="ui-title-icon"><i class="bi {{ icon }}"></i></span>
+      {{ title }}
+    </h1>
+    {% if subtitle %}<div class="ui-subtitle">{{ subtitle }}</div>{% endif %}
+  </div>
+  {% if toolbar %}<div class="ui-toolbar">{{ toolbar }}</div>{% endif %}
+</div>
+{%- endmacro %}

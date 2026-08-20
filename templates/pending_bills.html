@@ -1,0 +1,518 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .combobox-list {
+        position: fixed;
+        background: #0f172a;
+        border: 1px solid #334155;
+        max-height: 280px;
+        overflow-y: auto;
+        z-index: 1200;
+        border-radius: 8px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+        min-width: 180px;
+    }
+    .combobox-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #1e293b;
+    }
+    .combobox-item:hover {
+        background: #1e293b;
+    }
+    .combobox-item:last-child {
+        border-bottom: none;
+    }
+</style>
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0 d-flex align-items-center gap-2">
+        <span><i class="bi bi-receipt me-2"></i>Pending Bills</span>
+        <span class="badge bg-warning text-dark">Filtered: {{ pagination.total if pagination else (bills|length) }}</span>
+    </h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        <button class="btn btn-warning btn-sm text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#addBillModal">
+            <i class="bi bi-plus-lg"></i> Add Bill
+        </button>
+        <button class="btn btn-outline-success btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#exportModal">
+            <i class="bi bi-download"></i> Export
+        </button>
+        <button class="btn btn-outline-info btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#importModal">
+            <i class="bi bi-upload"></i> Import
+        </button>
+    </div>
+</div>
+
+<div class="card-custom mb-4" style="background: #1e293b;">
+    <form method="GET" action="{{ url_for('pending_bills') }}" class="row g-2 align-items-end">
+        <div class="col-md-3 position-relative">
+            <label class="text-white-50 small fw-bold mb-1">CLIENT</label>
+            <div class="input-group input-group-sm">
+                <input type="text" name="client_code" id="pbFilterClient" class="form-control bg-dark text-white border-secondary" placeholder="Search name or code..." value="{{ filters.client_code or '' }}" autocomplete="off" onfocus="showCombobox('pbFilterClient', 'pbFilterClientList')" oninput="filterCombobox('pbFilterClient', 'pbFilterClientList', 'pbFilterClientDisplay')">
+                <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('pbFilterClient', 'pbFilterClientList')"><i class="bi bi-chevron-down text-warning"></i></button>
+            </div>
+            <div id="pbFilterClientList" class="combobox-list shadow-lg" style="display:none;">
+                {% for client in clients %}
+                <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="pbFilterClient" data-combo-display="pbFilterClientDisplay">
+                    <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                    <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div id="pbFilterClientDisplay" class="text-info small mt-1 fw-bold"></div>
+        </div>
+        <div class="col-md-3">
+            <label class="text-white-50 small fw-bold mb-1">BILL NO</label>
+            <input type="text" name="bill_no" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Type Bill No..." value="{{ filters.bill_no or '' }}" autocomplete="off">
+        </div>
+        <div class="col-md-2">
+            <label class="text-white-50 small fw-bold mb-1">BILL MODE</label>
+            <select name="bill_kind" class="form-select form-select-sm bg-dark text-white border-secondary">
+                <option value="">All (SB/MB)</option>
+                <option value="SB" {% if filters.bill_kind == 'SB' %}selected{% endif %}>SB (Auto)</option>
+                <option value="MB" {% if filters.bill_kind == 'MB' %}selected{% endif %}>MB (Manual)</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="text-white-50 small fw-bold mb-1">BILL TYPE</label>
+            <select name="is_manual" class="form-select form-select-sm bg-dark text-white border-secondary">
+                <option value="">All Types</option>
+                <option value="1" {% if filters.is_manual == '1' %}selected{% endif %}>Manual Bill No</option>
+                <option value="0" {% if filters.is_manual == '0' %}selected{% endif %}>System/Auto Bill</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="text-white-50 small fw-bold mb-1">CATEGORY</label>
+            <select name="category" class="form-select form-select-sm bg-dark text-white border-secondary">
+                <option value="">All Categories</option>
+                <option value="Booking Delivery" {% if filters.category == 'Booking Delivery' %}selected{% endif %}>Booked Sale</option>
+                <option value="Mixed Transaction" {% if filters.category == 'Mixed Transaction' %}selected{% endif %}>Booked + Due</option>
+                <option value="Credit Customer" {% if filters.category == 'Credit Customer' %}selected{% endif %}>Due Sale</option>
+                <option value="Open Khata" {% if filters.category == 'Open Khata' %}selected{% endif %}>Open Khata</option>
+                <option value="Cash" {% if filters.category == 'Cash' %}selected{% endif %}>Cash Sale</option>
+                <option value="Cash Paid" {% if filters.category == 'Cash Paid' %}selected{% endif %}>Cash Paid (Open Khata)</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="text-white-50 small fw-bold mb-1">BILL RANGE FROM</label>
+            <input type="number" name="bill_from" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="From..." value="{{ filters.bill_from or '' }}">
+        </div>
+        <div class="col-md-3">
+            <label class="text-white-50 small fw-bold mb-1">BILL RANGE TO</label>
+            <input type="number" name="bill_to" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="To..." value="{{ filters.bill_to or '' }}">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-outline-warning btn-sm w-100">Search</button>
+        </div>
+    </form>
+</div>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50">Client Code</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Bill Ref</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Client Name</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Reason</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Amount</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Status</th>
+                    <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
+                </tr>
+            </thead>
+            <tbody style="background: #1e293b;">
+                {% for bill in bills %}
+                {% set client = clients|selectattr('code', 'equalto', bill.client_code)|first %}
+                <tr style="border-bottom: 1px solid #334155; background: {{ '#3b2f0d' if (bill.client_code == 'OPEN-KHATA' or (bill.client_name or '')|upper == 'OPEN KHATA') else '#1e293b' }};">
+                    <td class="ps-4 py-3">
+                        <span class="badge bg-dark border border-secondary text-warning">{{ bill.client_code or '---' }}</span>
+                    </td>
+                    <td class="text-white fw-bold">
+                        {% if bill.bill_no %}
+                        {% set _bk = bill.bill_kind or ('MB' if bill.is_manual else 'SB') %}
+                        <a href="{{ url_for('view_bill', bill_no=bill.bill_no) }}" class="text-warning text-decoration-none">{{ bill.bill_no }}</a>
+                        <span class="badge ms-1 {{ 'bg-info' if _bk == 'SB' else 'bg-warning text-dark' }}">{{ _bk }}</span>
+                        {% else %}---{% endif %}
+                    </td>
+                    <td class="text-white">
+                        {{ bill.client_name or '---' }}
+                        {% if bill.client_code == 'OPEN-KHATA' or (bill.client_name or '')|upper == 'OPEN KHATA' %}
+                        <span class="badge bg-warning text-dark ms-1">Open Khata</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-white-50 small">{{ bill.reason or '---' }}</td>
+                    <td class="text-danger fw-bold">{{ "%.2f"|format(bill.amount or 0) }}</td>
+                    <td>
+                        {% if not client or client.category == 'Walking-Customer' or client.category == 'Cash' or client.category == 'Open Khata' %}
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="paidSwitch{{ bill.id }}" 
+                                   {% if bill.is_paid %}checked{% endif %} 
+                                   onchange="togglePaid({{ bill.id }})">
+                            <label class="form-check-label small {% if bill.is_paid %}text-success{% else %}text-danger{% endif %}" 
+                                   id="paidLabel{{ bill.id }}" for="paidSwitch{{ bill.id }}">
+                                {{ 'Paid' if bill.is_paid else 'Unpaid' }}
+                            </label>
+                        </div>
+                        {% else %}
+                        <span class="text-white-50 small">---</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4">
+                        <button class="btn btn-outline-info btn-sm border-2 rounded-pill shadow-sm me-1" data-pending-bill-modal-url="{{ url_for('pending_bill_modals', bill_id=bill.id) }}" data-pending-bill-modal="view">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" data-pending-bill-modal-url="{{ url_for('pending_bill_modals', bill_id=bill.id) }}" data-pending-bill-modal="edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form action="{{ url_for('delete_pending_bill', id=bill.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this bill?')">
+                            <button type="submit" class="btn btn-outline-danger btn-sm border-2 rounded-pill shadow-sm">
+                                <i class="bi bi-x-circle"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not bills %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-white-50">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        No pending bills found
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination and pagination.pages > 1 %}
+    <div class="card-footer bg-transparent border-0 py-3">
+        <nav>
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                {% if pagination.has_prev %}
+                <li class="page-item"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('pending_bills', page=pagination.prev_num, **filters) }}">Previous</a></li>
+                {% endif %}
+                <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ pagination.page }}</span></li>
+                {% if pagination.has_next %}
+                <li class="page-item"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('pending_bills', page=pagination.next_num, **filters) }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<div id="lazyPendingBillModalHost"></div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title fw-bold text-warning">Export Pending Bills</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Download all pending bills as Excel or CSV.</p>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('export_pending_bills', format='excel') }}" class="btn btn-outline-success fw-bold">
+                        <i class="bi bi-file-earmark-excel me-2"></i> Export Excel
+                    </a>
+                    <a href="{{ url_for('export_pending_bills', format='csv') }}" class="btn btn-outline-info fw-bold">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('import_pending_bills') }}" method="POST" enctype="multipart/form-data" class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title fw-bold text-warning">Import Pending Bills</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 small">
+                    <i class="bi bi-info-circle me-1"></i> Row must have: <strong>BillNo</strong> AND (<strong>ClientCode</strong> OR <strong>ClientName</strong>).
+                    <br>Blanks are accepted. Missing clients auto-created.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Select File (Excel/CSV)</label>
+                    <input type="file" name="file" class="form-control bg-dark text-white border-secondary" required>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark">Import Now</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="modal fade" id="addBillModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="/add_pending_bill" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Add New Pending Bill</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 position-relative">
+                    <label class="text-white-50 small fw-bold mb-1">CLIENT (NAME OR CODE)</label>
+                    <div class="input-group">
+                        <input type="text" name="client_code" id="addClientCodeInput" class="form-control bg-dark text-white border-secondary" placeholder="Search by name or code..." autocomplete="off" required onfocus="showCombobox('addClientCodeInput', 'addComboboxList')" oninput="filterCombobox('addClientCodeInput', 'addComboboxList', 'addClientNameDisplay')">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('addClientCodeInput', 'addComboboxList')">
+                            <i class="bi bi-chevron-down text-warning"></i>
+                        </button>
+                    </div>
+                    <div id="addComboboxList" class="combobox-list shadow-lg" style="display: none;">
+                        {% for client in clients %}
+                        <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="addClientCodeInput" data-combo-display="addClientNameDisplay">
+                            <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                            <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="addClientNameDisplay" class="text-info small mt-1 fw-bold"></div>
+                </div>
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="isCashSale" onchange="toggleCashSale(this)">
+                        <label class="form-check-label text-warning fw-bold" for="isCashSale">CASH SALE (General Code)</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">BILL NO</label>
+                        <input type="text" name="bill_no" class="form-control bg-dark text-white border-secondary" placeholder="Bill number" required>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">NIMBUS NO</label>
+                        <input type="text" name="nimbus_no" class="form-control bg-dark text-white border-secondary" placeholder="Nimbus number">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">AMOUNT</label>
+                    <input type="number" step="0.01" name="amount" class="form-control bg-dark text-white border-secondary" placeholder="0.00">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">REASON</label>
+                    <textarea name="reason" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Reason for pending bill"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">PHOTO URL (Google Drive)</label>
+                    <input type="url" name="photo_url" class="form-control bg-dark text-white border-secondary" placeholder="https://drive.google.com/...">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">UPLOAD PHOTO</label>
+                    <input type="file" name="photo" class="form-control bg-dark text-white border-secondary" accept="image/*">
+                </div>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2">
+                <button type="reset" class="btn btn-outline-secondary flex-grow-1 py-2 rounded-pill fw-bold">Reset</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold flex-grow-1 py-2 rounded-pill">Add Bill</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<datalist id="clientsList">
+    {% for client in clients %}
+    <option value="{{ client.code }}">{{ client.name }}</option>
+    {% endfor %}
+</datalist>
+
+<script>
+    function checkBill(billNo, billId = null) {
+        if (!billNo || billNo === '---') return;
+        fetch(`/api/check_bill/${encodeURIComponent(billNo)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.exists) {
+                    if (billId) {
+                        const contentDiv = document.getElementById('cement-content-' + billId);
+                        const infoDiv = document.getElementById('cement-info-' + billId);
+                        if (contentDiv && infoDiv) {
+                            infoDiv.innerText = "Cement: " + data.material + " (" + data.qty + " Bags)";
+                            contentDiv.style.display = 'block';
+                        }
+                    } else {
+                        window.location.href = data.url;
+                    }
+                } else {
+                    if (!billId) alert('This bill dont have cement');
+                }
+            });
+    }
+
+    function loadPendingBillModal(url, mode) {
+        const isEdit = mode === 'edit';
+        AMSLazyModal.load({
+            hostId: 'lazyPendingBillModalHost',
+            url: url,
+            selector: `[id^="${isEdit ? 'editBillModal' : 'viewBillModal'}"]`,
+            label: isEdit ? 'Loading bill form…' : 'Loading bill details…',
+            onReady: function (modalEl) {
+                if (!isEdit) {
+                    modalEl.addEventListener('shown.bs.modal', () => {
+                        const billId = modalEl.id.replace('viewBillModal', '');
+                        const billLink = modalEl.querySelector('.modal-body a.text-warning');
+                        if (billId && billLink) checkBill(billLink.textContent.trim(), billId);
+                    }, {once: true});
+                } else {
+                    // Show global loading overlay on save for lazy-loaded edit forms
+                    const editForm = modalEl.querySelector('form');
+                    if (editForm) {
+                        editForm.addEventListener('submit', function () {
+                            if (typeof window.showLoading === 'function') window.showLoading();
+                        });
+                    }
+                }
+            },
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('click', function(event) {
+            const button = event.target.closest('[data-pending-bill-modal-url]');
+            if (!button) return;
+            event.preventDefault();
+            loadPendingBillModal(button.dataset.pendingBillModalUrl, button.dataset.pendingBillModal);
+        });
+    });
+
+    function toggleCashSale(checkbox) {
+        const billInput = checkbox.closest('form').querySelector('input[name="bill_no"]');
+        if (checkbox.checked) {
+            billInput.value = 'CASH';
+            billInput.readOnly = true;
+        } else {
+            billInput.value = '';
+            billInput.readOnly = false;
+        }
+    }
+
+    function toggleCombobox(inputId, listId) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        const isOpen = list.style.display === 'block';
+        document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+        list.style.display = isOpen ? 'none' : 'block';
+        if (list.style.display === 'block') {
+            positionCombobox(inputId, listId);
+            document.getElementById(inputId).focus();
+        }
+    }
+
+    function positionCombobox(inputId, listId) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        if (!input || !list) return;
+        const rect = input.getBoundingClientRect();
+        const top = rect.bottom + 2;
+        const left = rect.left;
+        const width = rect.width;
+        list.style.top = `${top}px`;
+        list.style.left = `${left}px`;
+        list.style.width = `${width}px`;
+    }
+
+    function showCombobox(inputId, listId) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+        list.style.display = 'block';
+        positionCombobox(inputId, listId);
+    }
+
+    function filterCombobox(inputId, listId, displayId) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        const display = document.getElementById(displayId);
+        if (!input || !list) return;
+        if (input.dataset.comboSuppress === '1') {
+            input.dataset.comboSuppress = '';
+            return;
+        }
+        document.querySelectorAll('.combobox-list').forEach(l => {
+            if (l.id !== listId) l.style.display = 'none';
+        });
+        const filter = input.value.toLowerCase();
+        const items = list.getElementsByClassName('combobox-item');
+        
+        list.style.display = 'block';
+        positionCombobox(inputId, listId);
+        let foundName = "";
+
+        for (let i = 0; i < items.length; i++) {
+            const code = items[i].querySelector('.code-span')?.innerText || items[i].querySelector('.text-warning')?.innerText;
+            const name = items[i].querySelector('.name-span')?.innerText || items[i].querySelector('.text-white-50')?.innerText;
+            const combinedText = (code + " " + name).toLowerCase();
+            
+            if (combinedText.includes(filter)) {
+                items[i].style.display = "";
+                if (code.toLowerCase() === filter.toLowerCase() || name.toLowerCase() === filter.toLowerCase()) {
+                    foundName = name;
+                }
+            } else {
+                items[i].style.display = "none";
+            }
+        }
+        
+        if (display) display.innerText = foundName ? "Name: " + foundName : "";
+    }
+
+    function selectComboboxItem(inputId, listId, code, name, displayId) {
+        const input = document.getElementById(inputId);
+        if (input) input.value = code;
+        const list = document.getElementById(listId);
+        if (list) list.style.display = 'none';
+        if (displayId && document.getElementById(displayId)) {
+            document.getElementById(displayId).innerText = "Name: " + name;
+        }
+        if (input) input.dataset.comboSuppress = '1';
+        document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+    }
+
+    function togglePaid(billId) {
+        fetch('/toggle_bill_paid/' + billId, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const label = document.getElementById('paidLabel' + billId);
+                    if (data.is_paid) {
+                        label.innerText = 'Paid';
+                        label.classList.remove('text-danger');
+                        label.classList.add('text-success');
+                    } else {
+                        label.innerText = 'Unpaid';
+                        label.classList.remove('text-success');
+                        label.classList.add('text-danger');
+                    }
+                }
+            });
+    }
+
+    // Close on click outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.position-relative') && !e.target.closest('.combobox-list')) {
+            document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+        }
+    });
+
+    window.addEventListener('scroll', function() {
+        document.querySelectorAll('.combobox-list').forEach(l => {
+            if (l.style.display === 'block') l.style.display = 'none';
+        });
+    }, true);
+
+    window.addEventListener('resize', function() {
+        document.querySelectorAll('.combobox-list').forEach(l => {
+            if (l.style.display === 'block') l.style.display = 'none';
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,401 @@
+{% extends "layout.html" %}
+{% from "_ui/page_header.html" import render as ui_header %}
+{% from "_ui/kpi_tile.html" import tile as ui_tile %}
+{% from "_ui/filter_bar.html" import bar as ui_filter_bar %}
+{% from "_ui/data_table_card.html" import card as ui_table_card %}
+{% block content %}
+<div class="ui-v2">
+  {% set _toolbar %}
+    <a href="{{ url_for('inventory.stock_summary', date_from=date_from, date_to=date_to, material=material_filter, material_category=material_category_filter) }}" class="btn btn-warning btn-pill fw-bold">
+      <i class="bi bi-graph-up me-1"></i> Stock Summary
+    </a>
+    <a href="/" class="btn btn-outline-secondary btn-pill fw-bold">
+      <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+  {% endset %}
+  {{ ui_header('bi-list-check', 'Daily Breakdown', subtitle=(date_from ~ ' → ' ~ date_to), toolbar=_toolbar) }}
+
+  {% call ui_filter_bar(action=url_for('inventory.daily_transactions')) %}
+    <div class="ui-field ui-col-3">
+      <label class="ui-label">From</label>
+      <input type="date" name="date_from" value="{{ date_from or sel_date }}" class="form-control">
+    </div>
+    <div class="ui-field ui-col-3">
+      <label class="ui-label">To</label>
+      <input type="date" name="date_to" value="{{ date_to or sel_date }}" class="form-control">
+    </div>
+    <div class="ui-field ui-col-2">
+      <label class="ui-label">Client Cat</label>
+      <select name="category" class="form-select">
+        <option value="">All</option>
+        {% for cat in categories %}
+          <option value="{{ cat }}" {{ 'selected' if cat == category_filter }}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ui-field ui-col-2">
+      <label class="ui-label">Trans Cat</label>
+      <select name="transaction_category" class="form-select">
+        <option value="">All</option>
+        {% for tcat in transaction_categories %}
+          <option value="{{ tcat }}" {{ 'selected' if tcat == transaction_category_filter }}>{{ tcat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ui-field ui-col-2">
+      <label class="ui-label">Material Cat</label>
+      <select name="material_category" class="form-select">
+        <option value="">All</option>
+        {% for mcat in material_categories %}
+          <option value="{{ mcat.id }}" {{ 'selected' if material_category_filter|int == mcat.id }}>{{ mcat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ui-field ui-col-3">
+      <label class="ui-label">Material</label>
+      <select name="material" class="form-select">
+        <option value="">All</option>
+        {% for m in materials %}
+          <option value="{{ m.name }}" {{ 'selected' if material_filter == m.name }}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ui-field ui-col-3 position-relative">
+      <label class="ui-label">Client</label>
+      <div class="input-group">
+        <input type="text" name="client" id="dailyFilterClient" value="{{ client_filter or '' }}" class="form-control" placeholder="Search name or code..." autocomplete="off" onfocus="showCombobox('dailyFilterClient', 'dailyFilterClientList')" oninput="filterCombobox('dailyFilterClient', 'dailyFilterClientList', 'dailyFilterClientDisplay')">
+        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('dailyFilterClient', 'dailyFilterClientList')"><i class="bi bi-chevron-down text-warning"></i></button>
+      </div>
+      <div id="dailyFilterClientList" class="combobox-list shadow-lg" style="display:none;">
+        {% for client in clients %}
+        <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="dailyFilterClient" data-combo-display="dailyFilterClientDisplay">
+          <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+          <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div id="dailyFilterClientDisplay" class="text-info small mt-1 fw-bold"></div>
+    </div>
+    <div class="ui-field ui-col-3">
+      <label class="ui-label">Bill #</label>
+      <input type="text" name="bill_no" value="{{ bill_no_filter or '' }}" class="form-control" placeholder="Manual/auto bill...">
+    </div>
+    <div class="ui-field ui-col-2">
+      <label class="ui-label">Show</label>
+      <select name="show" class="form-select">
+        <option value="active" {{ 'selected' if show_mode == 'active' }}>Active</option>
+        <option value="voided" {{ 'selected' if show_mode == 'voided' }}>Deleted</option>
+        <option value="all" {{ 'selected' if show_mode == 'all' }}>All</option>
+      </select>
+    </div>
+    <div class="ui-actions ui-col-1">
+      <label class="ui-label">&nbsp;</label>
+      <button class="btn btn-warning w-100"><i class="bi bi-funnel me-1"></i> Apply</button>
+    </div>
+    <div class="ui-actions ui-col-12">
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('inventory.daily_transactions') }}">
+        <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+      </a>
+    </div>
+  {% endcall %}
+
+  <div class="ui-kpi-grid">
+    {{ ui_tile(
+      href=url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to, category=category_filter, transaction_category=transaction_category_filter, material=material_filter, material_category=material_category_filter, bill_no=bill_no_filter, client=client_filter, show=show_mode),
+      label='Stock In Qty',
+      value=("{:,.2f}".format(entry_in_qty|default(0, true))),
+      icon='bi-box-arrow-in-down',
+      colour='green',
+      sub='Filtered range (entries only)',
+      cta='Same filters'
+    ) }}
+    {{ ui_tile(
+      href=url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to, category=category_filter, transaction_category=transaction_category_filter, material=material_filter, material_category=material_category_filter, bill_no=bill_no_filter, client=client_filter, show=show_mode),
+      label='Stock Out Qty',
+      value=("{:,.2f}".format(entry_out_qty|default(0, true))),
+      icon='bi-box-arrow-up-right',
+      colour='cyan',
+      sub='Filtered range (entries only)',
+      cta='Same filters'
+    ) }}
+    {{ ui_tile(
+      href=url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to, category=category_filter, transaction_category=transaction_category_filter, bill_no=bill_no_filter, client=client_filter, show=show_mode),
+      label='Payments',
+      value=("Rs. " ~ "{:,.2f}".format(payments_total|default(0, true))),
+      icon='bi-cash-stack',
+      colour=('violet' if include_payments else 'slate'),
+      sub=('Included' if include_payments else 'Hidden when material filter active'),
+      cta='Same filters'
+    ) }}
+    {% set _net = (entry_in_qty|default(0, true)|float) - (entry_out_qty|default(0, true)|float) %}
+    {{ ui_tile(
+      href=url_for('inventory.stock_summary', date_from=date_from, date_to=date_to, material=material_filter, material_category=material_category_filter),
+      label='Net Qty',
+      value=("{:,.2f}".format(_net)),
+      icon='bi-graph-up-arrow',
+      colour=('amber' if _net >= 0 else 'rose'),
+      sub='In − Out',
+      cta='Open stock summary'
+    ) }}
+  </div>
+
+{% call ui_table_card('Transactions', icon='bi-table') %}
+        <table class="ui-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Client</th>
+                    <th>Material</th>
+                    <th>Category</th>
+                    <th class="num">Qty</th>
+                    <th>Bill No</th>
+                    <th>Nimbus No</th>
+                    <th>By</th>
+                    <th class="num">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in entries %}
+                {% set row_key = (e.source_type or 'Entry') ~ '-' ~ e.id %}
+                <tr class="{% if e.is_void %}opacity-50{% endif %}">
+                    <td class="text-muted">{{ e.time }}</td>
+                    <td>
+                        {% if e.is_void %}
+                        <span class="badge bg-danger text-white px-2 py-1 rounded-pill fw-bold me-1">DELETED</span>
+                        {% else %}
+                            {% if e.type == 'IN' %}
+                            <span class="badge bg-success px-3 py-2 rounded-pill fw-bold">IN</span>
+                            {% elif e.type == 'OUT' %}
+                            <span class="badge bg-info text-dark px-3 py-2 rounded-pill fw-bold">OUT</span>
+                            {% elif e.type == 'PAYMENT' %}
+                            <span class="badge bg-primary px-3 py-2 rounded-pill fw-bold">PAYMENT</span>
+                            {% else %}
+                            <span class="badge bg-secondary px-3 py-2 rounded-pill fw-bold">{{ e.type }}</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td class="fw-bold">{{ e.client or '---' }} <br><small class="text-muted">{{ e.client_code or '' }}</small></td>
+                    <td class="fw-bold">{{ e.material or '-' }}</td>
+                    <td class="text-muted small">{{ 'Payment' if e.type == 'PAYMENT' else (material_category_map.get(e.material, '') or 'General') }}</td>
+                    <td class="num fw-bold">
+                        {% if e.type == 'PAYMENT' %}
+                        Rs. {{ "{:,.0f}".format(e.qty or 0) }}
+                        {% else %}
+                        {{ '+' if e.type == 'IN' else '-' }}{{ e.qty|int }}
+                        {% endif %}
+                    </td>
+                    <td class="text-muted">
+                        {% set bill_ref = e.bill_ref or e.bill_no or e.auto_bill_no %}
+                        {% if bill_ref %}
+                            {% if e.source_type == 'Payment' %}
+                        <a href="{{ url_for('view_bill', bill_no=bill_ref, src='payment', src_id=e.id, client_name=e.client, client_code=e.client_code) }}" class="text-warning text-decoration-none">{{ bill_ref }}</a>
+                            {% else %}
+                        <a href="{{ url_for('view_bill', bill_no=bill_ref, src='entry', entry_id=e.id, client_name=e.client, client_code=e.client_code) }}" class="text-warning text-decoration-none">{{ bill_ref }}</a>
+                            {% endif %}
+                        {% else %}
+                        ---
+                        {% endif %}
+                    </td>
+                    <td class="text-muted">{{ e.nimbus_no or '---' }}</td>
+                    <td class="text-muted small fw-bold">{{ e.created_by or 'System' }}</td>
+                    <td class="num">
+                        {% if not e.is_void %}
+                            {% if current_user.role == 'admin' or e.date == sel_date %}
+                                {% if e.source_type != 'Payment' %}
+                        <button class="btn btn-warning btn-sm text-dark fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#editLog{{ row_key }}">
+                            Edit
+                        </button>
+                                {% else %}
+                        <a href="/payments?search={{ e.bill_no or e.auto_bill_no or '' }}" class="btn btn-outline-info btn-sm fw-bold rounded-pill">View Payment</a>
+                                {% endif %}
+                            {% else %}
+                        <span class="badge bg-secondary opacity-50"><i class="bi bi-lock"></i> Locked</span>
+                            {% endif %}
+                            {% if current_user.role == 'admin' %}
+                                {% if e.source_type == 'Payment' %}
+                            <button class="btn btn-outline-danger btn-sm fw-bold rounded-pill ms-1" onclick="if(confirm('Permanently delete this payment?')) { document.getElementById('voidForm{{ row_key }}').submit(); }">Delete</button>
+                            <form id="voidForm{{ row_key }}" action="/delete_transaction/Payment/{{ e.id }}" method="POST" style="display:none;"></form>
+                                {% else %}
+                            <button class="btn btn-outline-danger btn-sm fw-bold rounded-pill ms-1" onclick="if(confirm('Permanently delete this transaction? Stock will be reversed.')) { document.getElementById('voidForm{{ row_key }}').submit(); }">Delete</button>
+                            <form id="voidForm{{ row_key }}" action="/delete_transaction/Entry/{{ e.id }}" method="POST" style="display:none;"></form>
+                                {% endif %}
+                            {% endif %}
+                            
+                            <!-- 3 Eyes View Options -->
+                            <div class="btn-group ms-2" role="group">
+                                {% if (e.bill_ref or e.bill_no or e.auto_bill_no) %}
+                                {% set bill_ref = e.bill_ref or e.bill_no or e.auto_bill_no %}
+                                <a href="{{ url_for('view_bill', bill_no=bill_ref, src=('payment' if e.source_type == 'Payment' else 'entry'), src_id=(e.id if e.source_type == 'Payment' else None), entry_id=(e.id if e.source_type != 'Payment' else None), client_name=e.client, client_code=e.client_code) }}" class="btn btn-sm btn-outline-info" title="View Invoice (i)">
+                                    <i class="bi bi-receipt"></i>
+                                </a>
+                                {% set meta = (bill_meta|default({})).get(e.bill_no) or (bill_meta|default({})).get(e.auto_bill_no) %}
+                                {% if meta and meta.photo_path %}
+                                <a href="{{ url_for('uploaded_file', filename=meta.photo_path) }}" target="_blank" class="btn btn-sm btn-outline-light" title="View Photo (p)">
+                                    <i class="bi bi-file-image"></i>
+                                </a>
+                                {% endif %}
+                                {% if meta and meta.photo_url %}
+                                <a href="{{ meta.photo_url }}" target="_blank" class="btn btn-sm btn-outline-light" title="View URL (u)">
+                                    <i class="bi bi-link-45deg"></i>
+                                </a>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        {% else %}
+                        {% if e.void_reason_label %}
+                        <span class="badge bg-warning text-dark">{{ e.void_reason_label|upper }}</span>
+                        {% else %}
+                        <span class="badge bg-danger">DELETED</span>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <!-- Edit Modal -->
+                {% if e.source_type != 'Payment' %}
+                <div class="modal fade" id="editLog{{ row_key }}" tabindex="-1">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content border-secondary shadow-lg" style="background: #1e293b; border-radius: 15px;">
+                            <form action="/edit_entry/{{ e.id }}" method="POST">
+                                <input type="hidden" name="redirect_to" value="daily_transactions">
+                                <div class="modal-header border-0">
+                                    <h5 class="text-warning fw-bold">Modify Record</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body pt-0">
+                                    <div class="row g-3">
+                                        <div class="col-md-4 col-6">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Date</label>
+                                            <input type="date" name="date" value="{{ e.date }}" class="form-control bg-dark text-white border-secondary" required>
+                                        </div>
+                                        <div class="col-md-4 col-6">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Time</label>
+                                            <input type="time" name="time" value="{{ e.time }}" class="form-control bg-dark text-white border-secondary">
+                                        </div>
+                                        <div class="col-md-4 col-12">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Type</label>
+                                            <select name="type" class="form-select bg-dark text-white border-secondary">
+                                                <option value="IN" {{ 'selected' if e.type == 'IN' }}>IN (Receiving)</option>
+                                                <option value="OUT" {{ 'selected' if e.type == 'OUT' }}>OUT (Dispatch)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-md-6 position-relative">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Material Brand</label>
+                                            <div class="input-group">
+                                                <input type="text"
+                                                       name="material"
+                                                       id="editDailyMaterial{{ e.id }}"
+                                                       value="{{ e.material or '' }}"
+                                                       class="form-control bg-dark text-white border-secondary"
+                                                       placeholder="Search by material name..."
+                                                       autocomplete="off"
+                                                       required
+                                                       onfocus="showCombobox('editDailyMaterial{{ e.id }}', 'editDailyMaterialList{{ e.id }}')"
+                                                       oninput="filterCombobox('editDailyMaterial{{ e.id }}', 'editDailyMaterialList{{ e.id }}', 'editDailyMaterialDisplay{{ e.id }}')">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('editDailyMaterial{{ e.id }}', 'editDailyMaterialList{{ e.id }}')">
+                                                    <i class="bi bi-chevron-down text-warning"></i>
+                                                </button>
+                                            </div>
+                                            <div id="editDailyMaterialList{{ e.id }}" class="combobox-list shadow-lg" style="display: none;">
+                                                {% for mat in materials %}
+                                                <div class="combobox-item" data-combo-code="{{ mat.name }}" data-combo-name="{{ mat.name }}" data-combo-input="editDailyMaterial{{ e.id }}" data-combo-display="editDailyMaterialDisplay{{ e.id }}">
+                                                    <span class="fw-bold text-warning code-span">{{ mat.name }}</span>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                            <div id="editDailyMaterialDisplay{{ e.id }}" class="text-info small mt-1 fw-bold"></div>
+                                        </div>
+                                        <div class="col-md-6 position-relative">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Client</label>
+                                            <div class="input-group">
+                                                <input type="text"
+                                                       name="client"
+                                                       id="editDailyClient{{ e.id }}"
+                                                       value="{{ e.client_code or e.client or '' }}"
+                                                       class="form-control bg-dark text-white border-secondary"
+                                                       placeholder="Search by name or code..."
+                                                       autocomplete="off"
+                                                       onfocus="showCombobox('editDailyClient{{ e.id }}', 'editDailyClientList{{ e.id }}')"
+                                                       oninput="filterCombobox('editDailyClient{{ e.id }}', 'editDailyClientList{{ e.id }}', 'editDailyClientDisplay{{ e.id }}')">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('editDailyClient{{ e.id }}', 'editDailyClientList{{ e.id }}')">
+                                                    <i class="bi bi-chevron-down text-warning"></i>
+                                                </button>
+                                            </div>
+                                            <div id="editDailyClientList{{ e.id }}" class="combobox-list shadow-lg" style="display: none;">
+                                                <div class="combobox-item" data-combo-code="" data-combo-name="" data-combo-input="editDailyClient{{ e.id }}" data-combo-display="editDailyClientDisplay{{ e.id }}">
+                                                    <span class="fw-bold text-danger">No Client</span>
+                                                    <span class="ms-2 text-white-50 small">Use for receiving</span>
+                                                </div>
+                                                {% for c in clients %}
+                                                <div class="combobox-item" data-combo-code="{{ c.code }}" data-combo-name="{{ c.name }}" data-combo-input="editDailyClient{{ e.id }}" data-combo-display="editDailyClientDisplay{{ e.id }}">
+                                                    <span class="fw-bold text-warning code-span">{{ c.code }}</span>
+                                                    <span class="ms-2 text-white-50 small name-span">{{ c.name }}</span>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                            <div id="editDailyClientDisplay{{ e.id }}" class="text-info small mt-1 fw-bold">
+                                                {{ ('Name: ' + e.client) if e.client else '' }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-md-4 col-6">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Quantity</label>
+                                            <input type="number" name="qty" value="{{ e.qty|int }}" class="form-control bg-dark text-white border-secondary fs-5 fw-bold" required>
+                                        </div>
+                                        <div class="col-md-4 col-6">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Bill No</label>
+                                            <input type="text" name="bill_no" value="{{ e.bill_no or '' }}" class="form-control bg-dark text-white border-secondary">
+                                        </div>
+                                        <div class="col-md-4 col-12">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Nimbus No</label>
+                                            <input type="text" name="nimbus_no" value="{{ e.nimbus_no or '' }}" class="form-control bg-dark text-white border-secondary">
+                                        </div>
+                                    </div>
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Driver Name</label>
+                                            <input type="text" name="driver_name" value="{{ e.driver_name or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Required for OUT dispatch">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer border-0 pt-0 d-flex {{ 'justify-content-between' if current_user.role == 'admin' else 'justify-content-end' }}">
+                                    {% if current_user.role == 'admin' %}
+                                    <form action="{{ url_for('delete_entry', id=e.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this transaction?')">
+                                        <button type="submit" class="btn btn-outline-danger px-4 fw-bold rounded-pill">Delete</button>
+                                    </form>
+                                    {% endif %}
+                                    <button type="submit" class="btn btn-warning px-5 fw-bold rounded-pill text-dark">Update</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+                {% if not entries %}
+                <tr><td colspan="10" class="ui-empty">No transactions for this date.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        {% if pagination %}
+        <div class="p-3">
+            <nav>
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if pagination.has_prev %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to, category=category_filter, transaction_category=transaction_category_filter, material_category=material_category_filter, show=show_mode, page=pagination.prev_num) }}">Previous</a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link">{{ pagination.page }}</span></li>
+                    {% if pagination.has_next %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to, category=category_filter, transaction_category=transaction_category_filter, material_category=material_category_filter, show=show_mode, page=pagination.next_num) }}">Next</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+{% endcall %}
+</div>
+{% endblock %}

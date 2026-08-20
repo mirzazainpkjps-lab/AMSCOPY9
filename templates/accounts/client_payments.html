@@ -1,0 +1,200 @@
+{% extends "layout.html" %}
+
+{% block title %}Client Payments{% endblock %}
+
+{% block content %}
+{% include 'accounts/_acc_styles.html' %}
+{% from 'accounts/_entity_combobox.html' import entity_combobox %}
+<style>
+.acc-page-header{ background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(56,189,248,0.18)); }
+</style>
+
+<div class="container-fluid">
+    <div class="acc-page-header">
+        <div>
+            <h2><i class="bi bi-people-fill me-2 text-success"></i>Client Payments</h2>
+            <div class="subtitle">Money received from clients.</div>
+        </div>
+        <div class="acc-toolbar">
+            <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+            {% if not payments_readonly %}
+            <button type="button" class="btn btn-success btn-sm" onclick="openClientPaymentModal()"><i class="bi bi-plus-lg me-1"></i>New Payment</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6"><div class="card kpi-card kpi-emerald"><div class="card-body"><div class="kpi-label">Total Received</div><div class="kpi-value">Rs. {{ "%.2f"|format(total_amount) }}</div></div><i class="bi bi-cash-stack kpi-icon"></i></div></div>
+        <div class="col-md-6"><div class="card kpi-card kpi-cyan"><div class="card-body"><div class="kpi-label">Payments in Period</div><div class="kpi-value">{{ total_count }}</div></div><i class="bi bi-list-ol kpi-icon"></i></div></div>
+    </div>
+
+    <div class="acc-section-card">
+        <form class="filter-bar align-items-end" method="get">
+            <input type="hidden" name="show" value="{{ show_mode }}">
+            <div><label>From</label><input type="date" name="from" class="form-control form-control-sm" value="{{ date_from.strftime('%Y-%m-%d') }}"></div>
+            <div><label>To</label><input type="date" name="to" class="form-control form-control-sm" value="{{ date_to.strftime('%Y-%m-%d') }}"></div>
+            <div style="min-width:210px">{{ entity_combobox('cpFilterClient', filter_party_options, code_attr='id', name_attr='label', value_input_id='party_id', label='Client', selected_code=party_id_f or '', selected_name=filter_party_name, placeholder='All clients…') }}</div>
+            <div style="min-width:240px">{{ entity_combobox('cpFilterAccount', filter_account_options, code_attr='id', name_attr='label', value_input_id='account_id', label='Account', selected_code=account_id_f or '', selected_name=filter_account_name, placeholder='All accounts…') }}</div>
+            <div><label>Method</label>
+                <select name="method" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for m in ['Cash','Bank','Check','Card','Online'] %}<option value="{{ m }}" {% if m==method_f %}selected{% endif %}>{{ m }}</option>{% endfor %}
+                </select>
+            </div>
+            <div><label>Rows</label><select name="per_page" class="form-select form-select-sm">{% for n in [10,25,50,100] %}<option value="{{ n }}" {% if per_page==n %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+            <div class="flex-grow-1"><label>Search</label><input type="search" name="q" class="form-control form-control-sm" placeholder="Name, bill, reference, account, note…" value="{{ search }}"></div>
+            <div><button class="btn btn-sm btn-success"><i class="bi bi-funnel me-1"></i>Apply</button></div>
+            <div><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('accounts.client_payments') }}">Reset</a></div>
+        </form>
+
+        <div class="filter-bar">
+            <div><label>Status</label>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('accounts.client_payments', show='active', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'active' %}btn-success text-dark{% else %}btn-outline-success{% endif %}">Active</a>
+                    <a href="{{ url_for('accounts.client_payments', show='voided', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'voided' %}btn-danger{% else %}btn-outline-danger{% endif %}">Deleted</a>
+                    <a href="{{ url_for('accounts.client_payments', show='all', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'all' %}btn-info text-dark{% else %}btn-outline-info{% endif %}">All</a>
+                </div>
+            </div>
+            {% if payments_readonly %}
+            <div class="ms-auto small text-muted align-self-end">Payment controls disabled for your role.</div>
+            {% endif %}
+        </div>
+
+        <div class="table-responsive">
+            <table class="table acc-table align-middle mb-0">
+                <thead><tr>
+                    <th style="width:140px">Date</th><th>Client</th><th>Type</th><th>Account</th>
+                    <th class="text-end">Amount</th><th>Method</th><th>Bill #</th><th>Note</th><th class="text-end">Actions</th>
+                </tr></thead>
+                <tbody>
+                {% for p in payments.items %}
+                <tr class="{% if p.is_void %}table-danger{% endif %}">
+                    <td class="small">{{ p.date_posted.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><strong>{{ p.client_name }}</strong>{% if p.is_void %} <span class="badge bg-danger ms-1">VOIDED</span>{% endif %}</td>
+                    {% set meta = payment_meta.get(p.id, {}) %}
+                    <td><span class="tiny-pill {% if meta.kind == 'Refund' %}badge-soft-rose{% elif meta.kind == 'Material Return' %}badge-soft-amber{% else %}badge-soft-emerald{% endif %}">{{ meta.kind or 'Receipt' }}</span>{% if meta.source_type %}<div class="small text-muted">{{ meta.source_type }} #{{ meta.source_id }}</div>{% endif %}</td>
+                    <td>{{ p.payment_account.name if p.payment_account else (p.account_name or '—') }}</td>
+                    <td class="text-end fw-bold {% if p.amount < 0 or p.is_void %}text-danger{% else %}text-success{% endif %}">Rs. {{ "%+.2f"|format(p.amount) }}</td>
+                    <td><span class="badge bg-secondary">{{ p.method }}</span></td>
+                    <td class="small">{{ p.manual_bill_no or p.auto_bill_no or '' }}</td>
+                    <td class="small text-muted">{{ p.note or '' }}</td>
+                    <td class="text-end text-nowrap">
+                        <a href="{{ url_for('view_bill_detail', type='Payment', id=p.id) }}" class="btn btn-outline-info btn-sm me-1" title="View"><i class="bi bi-eye"></i></a>
+                        {% if meta.source_type == 'MaterialReturn' %}
+                            <a href="{{ url_for('material_returns_page', edit_id=meta.source_id) }}" class="btn btn-outline-warning btn-sm" title="Open the controlling material return"><i class="bi bi-box-arrow-up-right"></i></a>
+                        {% elif not payments_readonly and not p.is_void %}
+                            <button type="button" class="btn btn-outline-warning btn-sm me-1" title="Edit in the shared payment form" onclick="openClientPaymentModal({{ p.id }})"><i class="bi bi-pencil-square"></i></button>
+                            <form id="voidPaymentForm{{ p.id }}" action="{{ url_for('accounts.client_payment_void', id=p.id) }}" method="POST" class="d-inline"></form>
+                            <button type="button" class="btn btn-outline-danger btn-sm me-1" title="Delete / reverse" onclick="if(confirm('Delete this payment? Its accounting effects will be reversed and its audit history retained.')) { document.getElementById('voidPaymentForm{{ p.id }}').submit(); }"><i class="bi bi-trash"></i></button>
+                        {% elif not payments_readonly and p.is_void %}
+                            <form action="{{ url_for('accounts.client_payment_restore', id=p.id) }}" method="POST" class="d-inline">
+                                <button class="btn btn-outline-success btn-sm me-1" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="empty-state"><i class="bi bi-inbox"></i><div class="mt-2">No payments in this range.</div></td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if payments.pages > 1 %}
+        {% set page_args = {'show':show_mode,'from':date_from.strftime('%Y-%m-%d'),'to':date_to.strftime('%Y-%m-%d'),'q':search,'method':method_f,'party_id':party_id_f or '','account_id':account_id_f or '','per_page':per_page} %}
+        <nav class="p-3" aria-label="Client payment pages"><ul class="pagination pagination-sm justify-content-center mb-0">
+            <li class="page-item {% if not payments.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.client_payments', page=1, **page_args) }}" aria-label="First">«</a></li>
+            <li class="page-item {% if not payments.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.client_payments', page=payments.prev_num or 1, **page_args) }}">Previous</a></li>
+            {% for n in payments.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}{% if n %}<li class="page-item {% if n==payments.page %}active{% endif %}"><a class="page-link" href="{{ url_for('accounts.client_payments', page=n, **page_args) }}">{{ n }}</a></li>{% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+            <li class="page-item {% if not payments.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.client_payments', page=payments.next_num or payments.pages, **page_args) }}">Next</a></li>
+            <li class="page-item {% if not payments.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.client_payments', page=payments.pages, **page_args) }}" aria-label="Last">»</a></li>
+        </ul></nav>
+        {% endif %}
+    </div>
+</div>
+
+{% if not payments_readonly %}
+<!-- Single shared Create/Edit modal -->
+<div class="modal fade" id="clientPaymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        {% include 'accounts/_client_payment_form.html' %}
+    </div>
+</div>
+
+<script>
+function newSubmissionKey(prefix) {
+    if (window.crypto && window.crypto.randomUUID) return prefix + ':' + window.crypto.randomUUID();
+    return prefix + ':' + Date.now() + ':' + Math.random().toString(36).slice(2);
+}
+function updateClientPaymentType() {
+    var type = document.getElementById('cpPaymentType').value;
+    var amount = document.getElementById('cpAmount');
+    var discount = document.getElementById('cpDiscount');
+    var accountText = document.getElementById('cpAccount');
+    var isRefund = type === 'Refund';
+    var isWaive = type === 'Waive-Off';
+    document.getElementById('cpAmountLabel').textContent = isRefund ? 'Refund Amount' : 'Amount';
+    document.getElementById('cpAmountHelp').textContent = isRefund ? 'Enter a positive amount; it is posted as money out.' : (isWaive ? 'Amount is zero for a waive-off-only record.' : 'Enter a positive received amount.');
+    amount.required = !isWaive;
+    amount.readOnly = isWaive;
+    if (isWaive) amount.value = '0.00';
+    discount.required = isWaive;
+    document.querySelectorAll('.cp-discount-field').forEach(function (el) { el.style.display = isRefund ? 'none' : ''; });
+    if (isRefund) { discount.value = '0.00'; document.getElementById('cpDiscountReason').value = ''; }
+    accountText.required = !isWaive;
+}
+function resetClientPaymentForm() {
+    var f = document.getElementById('clientPaymentForm');
+    f.reset();
+    document.getElementById('cpPaymentId').value = '';
+    document.getElementById('cpRevision').value = '';
+    document.getElementById('cpIdempotencyKey').value = newSubmissionKey('client-payment');
+    document.getElementById('client_code').value = '';
+    document.getElementById('client_name').value = '';
+    document.getElementById('payment_account_id').value = '';
+    document.getElementById('cpExistingPhoto').textContent = '';
+    document.getElementById('clientPaymentModalTitle').innerHTML = '<i class="bi bi-receipt me-2"></i>New Client Payment';
+    document.getElementById('clientPaymentSubmitBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Payment';
+    updateClientPaymentType();
+}
+document.getElementById('cpPaymentType').addEventListener('change', updateClientPaymentType);
+
+function openClientPaymentModal(paymentId) {
+    if (!paymentId) {
+        resetClientPaymentForm();
+        new bootstrap.Modal(document.getElementById('clientPaymentModal')).show();
+        return;
+    }
+    fetch('/accounts/payments/clients/' + paymentId + '/data', {credentials: 'same-origin'})
+        .then(function (r) { if (!r.ok) throw new Error('Failed to load payment.'); return r.json(); })
+        .then(function (p) {
+            resetClientPaymentForm();
+            if (p.source_type) throw new Error('This payment is controlled by ' + p.source_type + ' #' + p.source_id + '.');
+            document.getElementById('cpPaymentId').value = p.id;
+            document.getElementById('cpRevision').value = p.revision || 1;
+            document.getElementById('cpIdempotencyKey').value = '';
+            document.getElementById('cpClient').value = p.client_name || '';
+            document.getElementById('client_code').value = p.client_code || '';
+            document.getElementById('client_name').value = p.client_name || '';
+            document.getElementById('cpPaymentType').value = p.payment_type || 'Receipt';
+            document.getElementById('cpAmount').value = Number(p.amount).toFixed(2);
+            document.getElementById('cpDiscount').value = Number(p.discount).toFixed(2);
+            document.getElementById('cpDiscountReason').value = p.discount_reason || '';
+            document.getElementById('cpMethod').value = p.method || 'Cash';
+            document.getElementById('cpAccount').value = p.account_label || p.account_name || '';
+            document.getElementById('payment_account_id').value = p.payment_account_id || '';
+            document.getElementById('cpManualBillNo').value = p.manual_bill_no || '';
+            document.getElementById('cpDate').value = p.date || '';
+            document.getElementById('cpNote').value = p.note || '';
+            document.getElementById('cpPhotoUrl').value = p.photo_url || '';
+            document.getElementById('cpExistingPhoto').textContent = p.photo_path ? 'Existing photo retained unless a new file is selected.' : '';
+            updateClientPaymentType();
+            document.getElementById('clientPaymentModalTitle').innerHTML = '<i class="bi bi-pencil-square me-2"></i>Edit Payment ' + (p.manual_bill_no || p.auto_bill_no || ('PAY-' + p.id));
+            document.getElementById('clientPaymentSubmitBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Payment';
+            new bootstrap.Modal(document.getElementById('clientPaymentModal')).show();
+        })
+        .catch(function (e) { alert(e.message || 'Could not load payment.'); });
+}
+</script>
+{% endif %}
+{% endblock %}

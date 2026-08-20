@@ -1,0 +1,81 @@
+<!doctype html>
+<html data-server-theme="{{ ui_theme_preference or '' }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='vendor/bootstrap/5.3.0/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/1.10.0/font/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <script>
+      (function () {
+        var saved = "";
+        try { saved = localStorage.getItem("ams_theme") || ""; } catch (_) {}
+        var serverTheme = "{{ ui_theme_preference or '' }}";
+        var t = (saved || serverTheme || "").toLowerCase();
+        if (t !== "light" && t !== "dark") {
+          t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+        document.documentElement.style.colorScheme = t;
+      })();
+    </script>
+    <title>Recon Basket</title>
+  </head>
+  <body class="p-4">
+    <div class="container">
+      <div class="d-flex justify-content-end mb-2">
+        <button type="button" class="theme-switch" data-theme-toggle>
+          <i class="bi bi-moon-stars-fill"></i>
+          <span class="theme-label">Dark</span>
+        </button>
+      </div>
+      <h1>Recon Basket</h1>
+      <a class="btn btn-secondary mb-3" href="/data_lab">Back to Upload</a>
+      {% for status, items in groups.items() %}
+        <h3>{{ status }} ({{ items|length }})</h3>
+        <table class="table table-sm table-bordered">
+          <thead><tr><th>Bill</th><th>Finance Client</th><th>Inv Client</th><th>Material</th><th>Qty</th><th>Score</th></tr></thead>
+          <tbody>
+          {% for it in items %}
+            <tr>
+              <td>{{ it.bill_no }}</td>
+              <td>{{ it.fin_client }}</td>
+              <td>{{ it.inv_client }}</td>
+              <td>{{ it.inv_material }}</td>
+              <td>{{ it.inv_qty }}</td>
+              <td>{{ it.match_score }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      {% endfor %}
+
+      {% if others %}
+        <h3>Other</h3>
+        <ul>
+        {% for o in others %}
+          <li>{{ o.bill_no }} - {{ o.status }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+
+      <h4>Correction Tools</h4>
+      <form method="post" action="/data_lab/correct_bill" class="row g-2">
+        <div class="col-auto"><input name="bill_no" class="form-control" placeholder="Bill #"></div>
+        <div class="col-auto"><input name="client_code" class="form-control" placeholder="Client Code"></div>
+        <div class="col-auto"><button class="btn btn-warning">Apply Corrector</button></div>
+      </form>
+
+      <form method="post" action="/data_lab/legacy_import" class="row g-2 mt-3">
+        <div class="col-auto"><input name="bill_no" class="form-control" placeholder="Bill # for legacy import"></div>
+        <div class="col-auto"><button class="btn btn-danger">Legacy Import (Finance wins)</button></div>
+      </form>
+    </div>
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+    <script>
+      if (window.AMSTheme) {
+        window.AMSTheme.init("{{ ui_theme_preference or '' }}");
+      }
+    </script>
+  </body>
+  </html>

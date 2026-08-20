@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mt-4 mb-4 text-warning fw-bold">Full Raw Import History</h2>
+
+    <div class="card border-secondary bg-dark text-white mb-4">
+        <div class="card-header border-secondary bg-transparent d-flex justify-content-between align-items-center">
+            <span class="text-white-50">Reports stored in instance/import_reports</span>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('import_export.full_raw_import_history_export') }}" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-filetype-csv me-1"></i>Export History
+                </a>
+                <form method="POST" class="d-inline">
+                    <input type="hidden" name="action" value="delete_all">
+                    <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete all import reports?');">
+                        <i class="bi bi-trash me-1"></i>Clean All
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                <input type="hidden" name="action" value="delete_selected">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;"></th>
+                                <th>Report</th>
+                                <th>Created</th>
+                                <th>Mode</th>
+                                <th>Tenant</th>
+                                <th>Status</th>
+                                <th>Inserted</th>
+                                <th>Updated</th>
+                                <th>Skipped</th>
+                                <th>Failed</th>
+                                <th>Warnings</th>
+                                <th>Tables</th>
+                                <th>Source File</th>
+                                <th>Rows</th>
+                                <th class="text-end">Download</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in reports %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="report" value="{{ r.name }}">
+                                </td>
+                                <td class="text-white">{{ r.name }}</td>
+                                <td class="text-white-50">{{ r.created_at }}</td>
+                                <td class="text-white-50">{{ r.mode }}</td>
+                                <td class="text-white-50">{{ r.tenant_name }}</td>
+                                <td><span class="badge {{ 'text-bg-success' if r.status == 'ok' else 'text-bg-warning' }}">{{ r.status or '-' }}</span></td>
+                                <td class="text-white-50">{{ r.inserted }}</td>
+                                <td class="text-white-50">{{ r.updated }}</td>
+                                <td class="text-white-50">{{ r.skipped }}</td>
+                                <td class="{{ 'text-danger fw-bold' if r.failed else 'text-white-50' }}">{{ r.failed or 0 }}</td>
+                                <td class="text-white-50">{{ r.warnings or 0 }}</td>
+                                <td class="text-white-50">{{ r.tables }}</td>
+                                <td class="text-white-50">{{ r.source_file }}</td>
+                                <td class="text-white-50">{{ r.row_count }}</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('import_export.full_raw_import_report', report_name=r.name) }}" class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-download me-1"></i>Download
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if reports|length == 0 %}
+                            <tr>
+                                <td colspan="15" class="text-center text-white-50">No reports found.</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-outline-warning btn-sm" onclick="return confirm('Delete selected reports?');">
+                        <i class="bi bi-trash me-1"></i>Clean Selected
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

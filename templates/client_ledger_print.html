@@ -1,0 +1,346 @@
+{% extends "layout.html" %}
+{% block content %}
+{% set co_name    = (settings.company_name    if settings and settings.company_name    else 'FAZAL BUILDING MATERIALS') %}
+{% set co_address = (settings.company_address if settings and settings.company_address else 'JALAL PUR SOBTIAN GUJRAT') %}
+{% set co_phone   = (settings.company_phone   if settings and settings.company_phone   else '+92331-0000993 | +92340-3872722') %}
+<style>
+/* ============================================================
+   CLIENT LEDGER PRINT – A5 Professional Layout
+   ============================================================ */
+.rcpt-wrapper {
+    max-width: 600px;
+    margin: 0 auto;
+    background: #fff;
+    color: #000;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+}
+.rcpt-wrapper, .rcpt-wrapper * { color: #000 !important; }
+
+/* ---- HEADER ---- */
+.rcpt-header {
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:14px 20px 10px; border-bottom:3px solid #000; gap:12px;
+}
+.rcpt-co-name  { font-size:22px; font-weight:900; letter-spacing:-0.5px; line-height:1.1; text-transform:uppercase; }
+.rcpt-co-sub   { font-size:11px; font-weight:600; margin-top:3px; color:#333 !important; }
+.rcpt-co-phone { font-size:11px; font-weight:700; margin-top:2px; }
+.rcpt-header-right { text-align:right; white-space:nowrap; }
+.rcpt-doc-type  { display:inline-block; font-size:15px; font-weight:900; text-transform:uppercase; letter-spacing:2px; border:2.5px solid #000; padding:4px 12px; }
+.rcpt-doc-no    { font-size:13px; font-weight:900; margin-top:5px; }
+.rcpt-doc-date  { font-size:10px; font-weight:600; margin-top:2px; color:#444 !important; }
+
+/* ---- BODY ---- */
+.rcpt-body { padding: 10px 20px 6px; }
+
+.rcpt-parties {
+    display:flex; justify-content:space-between; gap:12px;
+    margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #bbb;
+}
+.rcpt-party-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px; color:#555 !important; }
+.rcpt-party-name  { font-size:14px; font-weight:900; line-height:1.15; }
+.rcpt-party-sub   { font-size:10px; font-weight:600; margin-top:1px; color:#333 !important; }
+
+.rcpt-summary-box {
+    border:1.5px solid #000; font-size:11px; padding:0; min-width:200px;
+}
+.rcpt-summary-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:4px 10px; border-bottom:1px solid #ccc;
+}
+.rcpt-summary-row:last-child { border-bottom:none; }
+.rcpt-summary-label { color:#444 !important; font-weight:600; }
+.rcpt-summary-val   { font-weight:900; font-size:13px; }
+.rcpt-summary-row.total { background:#f0f0f0 !important; }
+
+.rcpt-section-title {
+    font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:1px;
+    border-bottom:1.5px solid #000; padding-bottom:2px; margin-bottom:5px;
+    margin-top:8px;
+}
+
+.rcpt-table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:6px; table-layout: auto; }
+    .rcpt-table th {
+        background:#f0f0f0 !important; border:1px solid #999;
+        padding:4px 5px; font-weight:900; font-size:9.5px; text-transform:uppercase; letter-spacing:0.3px;
+    }
+    .rcpt-table td { border:1px solid #bbb; padding:4px 5px; font-weight:700; }
+    .rcpt-table td:first-child, .rcpt-table td.bill-no { white-space: nowrap; }
+    .rcpt-table td:nth-child(2) { word-wrap: break-word; overflow-wrap: break-word; }
+    .rcpt-table tr { page-break-inside: avoid; }
+.rcpt-table tfoot td { border:1px solid #999; padding:4px 5px; font-weight:900; background:#f8f8f8 !important; }
+.rcpt-table .text-end    { text-align:right; }
+.rcpt-table .text-center { text-align:center; }
+.rcpt-table thead { display:table-header-group; }
+.rcpt-table tfoot { display:table-footer-group; }
+
+/* ---- FOOTER ---- */
+.rcpt-footer { border-top:3px solid #000; padding:8px 20px 12px; }
+.rcpt-sig-row { display:flex; justify-content:space-between; gap:20px; margin-bottom:8px; }
+.rcpt-sig-block { flex:1; padding-top:8px; }
+.rcpt-sig-block.right-align { text-align:right; }
+.rcpt-sig-label { font-size:10px; font-weight:900; text-transform:uppercase; }
+.rcpt-sig-sub   { font-size:9px; color:#555 !important; margin-top:1px; }
+.rcpt-credits   {
+    text-align:center; font-size:9.5px; font-weight:700; color:#333 !important;
+    border-top:1px dashed #aaa; padding-top:5px; margin-top:6px;
+}
+
+/* ============================================================
+   PRINT STYLES
+   ============================================================ */
+@media print {
+    @page { size: A5 portrait; margin: 10mm 8mm; }
+    html, body {
+        margin:0 !important; padding:0 !important; background:#fff !important;
+        -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
+        height:auto !important;
+    }
+    .d-print-none { display:none !important; }
+
+    .rcpt-wrapper { max-width:100% !important; width:auto !important; font-size:8pt !important; }
+
+    .rcpt-header {
+        position:static !important; top:auto !important; left:auto !important; right:auto !important;
+        padding:5.5mm 0 4.5mm !important; background:#fff !important;
+        border-bottom:2.5px solid #000 !important;
+        box-sizing:border-box;
+    }
+    .rcpt-footer {
+        position:static !important; bottom:auto !important; left:auto !important; right:auto !important;
+        padding:4mm 0 6mm !important; background:#fff !important;
+        border-top:2.5px solid #000 !important;
+        box-sizing:border-box;
+    }
+    .rcpt-body { margin:0 !important; padding:2mm 0 0 !important; }
+
+    .rcpt-co-name  { font-size:13pt !important; }
+    .rcpt-co-sub, .rcpt-co-phone { font-size:7pt !important; }
+    .rcpt-doc-type { font-size:11pt !important; padding:2px 8px !important; }
+    .rcpt-doc-no   { font-size:9.5pt !important; }
+    .rcpt-doc-date { font-size:7pt !important; }
+    .rcpt-party-name  { font-size:10pt !important; }
+    .rcpt-party-label, .rcpt-party-sub { font-size:6.5pt !important; }
+    .rcpt-summary-val   { font-size:9pt !important; }
+    .rcpt-summary-label { font-size:7pt !important; }
+    .rcpt-section-title { font-size:6.5pt !important; }
+    .rcpt-table  { font-size:7pt !important; }
+    .rcpt-table th { font-size:6pt !important; padding:1.5px 3px !important; }
+    .rcpt-table td, .rcpt-table tfoot td { padding:1.5px 3px !important; }
+    .rcpt-sig-label  { font-size:7pt !important; }
+    .rcpt-sig-sub    { font-size:6.5pt !important; }
+    .rcpt-credits    { font-size:6pt !important; }
+    .rcpt-sig-block  { padding-top:8px !important; }
+    .rcpt-sig-row    { margin-bottom:4px !important; }
+    .rcpt-wrapper, .rcpt-wrapper * { color:#000 !important; font-weight:700 !important; text-shadow:none !important; }
+    .rcpt-table th { background:#eee !important; }
+    .rcpt-table tfoot td { background:#f4f4f4 !important; }
+    .rcpt-summary-row.total { background:#e8e8e8 !important; }
+    .rcpt-table { page-break-inside:auto !important; break-inside:auto !important; }
+    .rcpt-table tbody { page-break-inside:auto !important; break-inside:auto !important; }
+    .rcpt-table tr { page-break-inside:avoid !important; break-inside:avoid !important; }
+}
+</style>
+
+<!-- Screen toolbar -->
+<div class="card shadow-sm mx-auto border-0 d-print-none" style="max-width:600px; background:#fff;">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Client Ledger: {{ client.name }}</h5>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('download_client_ledger', id=client.id) }}" class="btn btn-warning btn-sm fw-bold text-dark">
+                <i class="bi bi-file-earmark-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('download_client_ledger', id=client.id, action='print') }}" class="btn btn-success btn-sm fw-bold">
+                <i class="bi bi-printer"></i> Print
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- LEDGER PRINT AREA -->
+<div class="rcpt-wrapper mt-2">
+
+    {% if pdf_error %}
+    <div style="background:#ffecec;border:1px solid #f5c2c7;color:#a94442;padding:8px 10px;margin:0 20px 10px;border-radius:4px;font-size:10px;">
+        PDF generation is currently unavailable because the server is missing the <code>flask_weasyprint</code> package. The ledger has been returned as an HTML fallback.
+    </div>
+    {% endif %}
+
+    <!-- HEADER -->
+    <div class="rcpt-header">
+        <div>
+            <div class="rcpt-co-name">{{ co_name }}</div>
+            <div class="rcpt-co-sub">{{ co_address }}</div>
+            <div class="rcpt-co-phone">{{ co_phone }}</div>
+        </div>
+        <div class="rcpt-header-right">
+            <div class="rcpt-doc-type">LEDGER</div>
+            <div class="rcpt-doc-no">CL-{{ client.id }}-{{ generated_at.strftime('%Y%m%d') }}</div>
+            <div class="rcpt-doc-date">{{ generated_at.strftime('%d %b %Y  %I:%M %p') }}</div>
+        </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="rcpt-body">
+
+        <!-- Client + Summary -->
+        <div class="rcpt-parties">
+            <div>
+                <div class="rcpt-party-label">Account Statement For</div>
+                <div class="rcpt-party-name">{{ client.name }}</div>
+                {% if client.code %}
+                <div class="rcpt-party-sub">Code: {{ client.code }}</div>
+                {% endif %}
+                {% if client.address %}
+                <div class="rcpt-party-sub">{{ client.address }}</div>
+                {% endif %}
+                {% if client.phone %}
+                <div class="rcpt-party-sub">{{ client.phone }}</div>
+                {% endif %}
+            </div>
+            <div>
+                <div class="rcpt-summary-box">
+                    <div class="rcpt-summary-row">
+                        <span class="rcpt-summary-label">Total Due</span>
+                        <span class="rcpt-summary-val">{{ "{:,.2f}".format(total_debit or 0) }}</span>
+                    </div>
+                    <div class="rcpt-summary-row">
+                        <span class="rcpt-summary-label">Total Paid</span>
+                        <span class="rcpt-summary-val">{{ "{:,.2f}".format(total_credit or 0) }}</span>
+                    </div>
+                    <div class="rcpt-summary-row total">
+                        <span class="rcpt-summary-label" style="font-weight:900;">Net Pending</span>
+                        <span class="rcpt-summary-val">{{ "{:,.2f}".format(total_balance or 0) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Transactions -->
+        <div class="rcpt-section-title">Financial Transaction Ledger</div>
+        <table class="rcpt-table">
+            <thead>
+                <tr>
+                    <th class="text-start" style="width:55px;">Date</th>
+                    <th class="text-start">Description</th>
+                    <th class="text-start" style="width:65px;">Bill #</th>
+                    <th class="text-end" style="width:65px;">Due</th>
+                    <th class="text-end" style="width:65px;">Paid</th>
+                    <th class="text-end" style="width:70px;">Pending</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in financial_history %}
+                <tr>
+                    <td>{{ row.date_display or '' }}</td>
+                    <td>
+                        {{ row.description }}
+                        {% if row.is_cancel_entry %}
+                        <div style="font-size:9px; color:#555;">Audit row{% if row.cancel_amount is not none %}, Rs.{{ "{:,.2f}".format(row.cancel_amount) }}{% endif %}</div>
+                        {% endif %}
+                    </td>
+                    <td class="bill-no {{ '' if row.bill_no else 'text-center' }}">{{ row.bill_no or '-' }}</td>
+                    <td class="{{ 'text-end' if row.debit > 0 else 'text-center' }}">{{ "{:,.2f}".format(row.debit) if row.debit > 0 else '-' }}</td>
+                    <td class="{{ 'text-end' if row.credit > 0 else 'text-center' }}">{{ "{:,.2f}".format(row.credit) if row.credit > 0 else '-' }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(row.balance or 0) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center" style="padding:6px; font-style:italic;">No financial transactions found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pending Bills -->
+        {% if pending_bills %}
+        <div class="rcpt-section-title">Pending Bills</div>
+        <table class="rcpt-table">
+            <thead>
+                <tr>
+                    <th class="text-start">Bill #</th>
+                    <th class="text-end" style="width:85px;">Amount</th>
+                    <th class="text-start" style="width:55px;">Status</th>
+                    <th class="text-start">Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in pending_bills %}
+                <tr>
+                    <td class="{{ '' if b.bill_no else 'text-center' }}">{{ b.bill_no or '-' }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(b.amount or 0) }}</td>
+                    <td>{{ 'Paid' if b.is_paid else 'Pending' }}</td>
+                    <td>{{ b.reason or '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- Material Transactions -->
+        {% if material_history_grouped %}
+        <div class="rcpt-section-title">Material Transaction Ledger</div>
+        <table class="rcpt-table">
+            <thead>
+                <tr>
+                    <th class="text-start" style="width:55px;">Date</th>
+                    <th class="text-start" style="width:65px;">Bill #</th>
+                    <th class="text-start">Material</th>
+                    <th class="text-end" style="width:55px;">Added</th>
+                    <th class="text-end" style="width:65px;">Dispatched</th>
+                    <th class="text-end" style="width:65px;">Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for material_name, items in material_history_grouped.items() %}
+                    {% for m in items %}
+                    <tr>
+                        <td>{{ m.date or '' }}</td>
+                        <td class="bill-no {{ '' if m.bill_no else 'text-center' }}">{{ m.bill_no or '-' }}</td>
+                        <td>{{ m.material_display or material_name }}</td>
+                        <td class="{{ 'text-end' if (m.qty_added or 0) > 0 else 'text-center' }}">{{ "{:,.2f}".format(m.qty_added or 0) if (m.qty_added or 0) > 0 else '-' }}</td>
+                        <td class="{{ 'text-end' if (m.qty_dispatched or 0) > 0 else 'text-center' }}">{{ "{:,.2f}".format(m.qty_dispatched or 0) if (m.qty_dispatched or 0) > 0 else '-' }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(m.balance or 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+    </div><!-- /rcpt-body -->
+
+    <!-- FOOTER -->
+    <div class="rcpt-footer">
+        <div class="rcpt-sig-row">
+            <div class="rcpt-sig-block">
+                <div class="rcpt-sig-label">Receiver / Authorized Sign</div>
+                <div class="rcpt-sig-sub">(Sign Here)</div>
+            </div>
+            <div class="rcpt-sig-block right-align">
+                <div class="rcpt-sig-label">Company Stamp</div>
+                <div class="rcpt-sig-sub">(Stamp Here)</div>
+            </div>
+        </div>
+        <div class="rcpt-credits">
+            Thank you for your business! &nbsp;&bull;&nbsp; Software by AMS SYSTEM FOR EASE
+        </div>
+    </div>
+
+</div><!-- /rcpt-wrapper -->
+
+<!-- Screen bottom toolbar -->
+<div class="text-center mt-3 mb-4 d-print-none">
+    <a href="javascript:history.back()" class="btn btn-dark fw-bold me-2">Go Back</a>
+    <a href="{{ url_for('download_client_ledger', id=client.id, action='print') }}" class="btn btn-success fw-bold"><i class="bi bi-printer me-1"></i>Print</a>
+    <a href="{{ url_for('download_client_ledger', id=client.id) }}" class="btn btn-warning fw-bold text-dark ms-2"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+</div>
+
+{% if auto_print %}
+<script>
+    window.addEventListener('load', function () {
+        setTimeout(function () { window.print(); }, 150);
+    });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-server-theme="{{ ui_theme_preference or '' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AMS SYSTEM FOR EASE</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/5.3.0/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/1.10.0/font/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <script>
+        (function () {
+            var saved = "";
+            try { saved = localStorage.getItem("ams_theme") || ""; } catch (_) {}
+            var serverTheme = "{{ ui_theme_preference or '' }}";
+            var t = (saved || serverTheme || "").toLowerCase();
+            if (t !== "light" && t !== "dark") {
+                t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+            }
+            document.documentElement.setAttribute("data-theme", t);
+            document.documentElement.style.colorScheme = t;
+        })();
+    </script>
+    <style>
+        body {
+            background-color: var(--surface-0);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .login-card {
+            background: var(--surface-1);
+            border: 2px solid var(--accent);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            margin: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        @media (max-width: 576px) {
+            .login-card {
+                padding: 25px;
+                border-radius: 15px;
+            }
+            .form-control {
+                font-size: 16px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="d-flex justify-content-end mb-2">
+            <button type="button" class="theme-switch" data-theme-toggle>
+                <i class="bi bi-moon-stars-fill"></i>
+                <span class="theme-label">Dark</span>
+            </button>
+        </div>
+        <div class="text-center mb-4">
+            <h2 class="fw-bold text-white mb-0">AMS <span class="text-warning">SYSTEM</span></h2>
+            <p class="text-white-50 small text-uppercase tracking-wider">FOR EASE ACCESS</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-danger py-2 small fw-bold text-center border-0 shadow-sm" role="alert">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form action="" method="POST" autocomplete="on">
+            <div class="mb-3">
+                <label class="text-white-50 small fw-bold mb-1">USERNAME</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-dark border-secondary text-warning"><i class="bi bi-person"></i></span>
+                    <input type="text" name="username" class="form-control bg-dark text-white border-secondary" placeholder="Enter username" autocomplete="username" required>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="text-white-50 small fw-bold mb-1">PASSWORD</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-dark border-secondary text-warning"><i class="bi bi-lock"></i></span>
+                    <input type="password" name="password" id="loginPassword" class="form-control bg-dark text-white border-secondary" placeholder="Enter password" autocomplete="current-password" required>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="showPasswordToggle">
+                    <label class="form-check-label text-white-50 small" for="showPasswordToggle">Show password</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="rememberMe" name="remember_me" value="1">
+                    <label class="form-check-label text-white-50 small" for="rememberMe">Remember me</label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-warning w-100 py-2 fw-bold text-dark rounded-pill shadow">
+                SECURE LOGIN
+            </button>
+        </form>
+        <div class="text-center mt-4">
+            <p class="text-white-50 x-small mb-0" style="font-size: 0.7rem;">&copy; 2026 AMS SYSTEM FOR EASE</p>
+        </div>
+    </div>
+
+</body>
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+<script>
+    if (window.AMSTheme) {
+        window.AMSTheme.init("{{ ui_theme_preference or '' }}");
+    }
+    const toggle = document.getElementById('showPasswordToggle');
+    const passInput = document.getElementById('loginPassword');
+    if (toggle && passInput) {
+        toggle.addEventListener('change', () => {
+            passInput.type = toggle.checked ? 'text' : 'password';
+        });
+    }
+</script>
+</html>

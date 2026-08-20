@@ -1,0 +1,407 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .supplier-ledger-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+    .supplier-ledger-table th,
+    .supplier-ledger-table td {
+        white-space: nowrap;
+        vertical-align: middle;
+        line-height: 1.05;
+        padding-top: 0.38rem !important;
+        padding-bottom: 0.38rem !important;
+        font-size: 0.82rem;
+    }
+    .supplier-ledger-table td:not(.actions-cell),
+    .supplier-ledger-table th:not(.actions-head) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .actions-head,
+    .actions-cell {
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+    }
+    .actions-cell {
+        min-width: 205px;
+    }
+    .supplier-ledger-line {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+    /* Tablet / small desktop: fixed columns scroll instead of crushing together. */
+    @media (min-width: 768px) and (max-width: 1199.98px) {
+        .supplier-ledger-table {
+            min-width: 860px;
+        }
+    }
+    /* Mobile: stacked cards wrap long material lines instead of ellipsizing them. */
+    @media (max-width: 767.98px) {
+        .supplier-ledger-table .supplier-ledger-line {
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+        }
+        .supplier-ledger-table td {
+            font-size: 0.95rem;
+        }
+    }
+</style>
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold text-warning mb-0">Supplier Ledger: {{ supplier.name }}</h2>
+        <p class="text-white-50 mb-0">{{ supplier.phone or '' }} | {{ supplier.address or '' }}</p>
+        <p class="mb-0 small {{ 'text-danger' if (supplier.opening_balance or 0) > 0 else ('text-success' if (supplier.opening_balance or 0) < 0 else 'text-white-50') }}">
+            Opening Balance: {{ "{:,.2f}".format(supplier.opening_balance or 0) }}
+            {% set _obd = supplier.opening_balance_date or supplier.created_at %}
+            {% if _obd %} on {{ _obd.strftime('%Y-%m-%d') }}{% endif %}
+            {% if (supplier.opening_balance or 0) > 0 %}(Payable Due){% elif (supplier.opening_balance or 0) < 0 %}(Advance/Prepaid){% endif %}
+        </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap ledger-toolbar">
+        <button class="btn btn-outline-info fw-bold" data-bs-toggle="modal" data-bs-target="#supplierOpeningBalanceModal">
+            <i class="bi bi-wallet2 me-2"></i>Set Opening Balance
+        </button>
+        <a href="{{ url_for('download_supplier_ledger', id=supplier.id) }}?action=print" target="_blank" class="btn btn-outline-success fw-bold">
+            <i class="bi bi-printer me-2"></i>Print Ledger
+        </a>
+        {% if not payments_readonly %}
+        <button class="btn btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+            <i class="bi bi-cash-stack me-2"></i>Record Payment
+        </button>
+        {% else %}
+        <a class="btn btn-info fw-bold text-dark" href="{{ url_for('accounts.dashboard') }}">
+            <i class="bi bi-arrow-right-circle me-2"></i>Pay via Accounts
+        </a>
+        {% endif %}
+        <a href="{{ url_for('suppliers') }}" class="btn btn-outline-light fw-bold">Back</a>
+    </div>
+</div>
+
+{% if payments_readonly %}
+<div class="alert alert-warning border-0 shadow-sm" style="background:#1e293b;color:#e2e8f0;">
+    Supplier payments are <strong>read-only</strong>. Use <strong>Accounts → New Transaction</strong> for supplier payments.
+</div>
+{% endif %}
+
+<div class="modal fade" id="supplierOpeningBalanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form action="{{ url_for('supplier_opening_balance', id=supplier.id) }}" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold mb-0">Set Opening Balance</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="text-white-50 small fw-bold mb-1">OPENING BALANCE</label>
+                <input type="number" step="0.01" name="opening_balance" class="form-control bg-dark text-white border-secondary" value="{{ '%.2f'|format(supplier.opening_balance or 0) }}" required>
+                <small class="text-white-50">Use + for payable due, - for advance/prepaid.</small>
+                <label class="text-white-50 small fw-bold mb-1 mt-3">OPENING BALANCE DATE</label>
+                <input type="date" name="opening_balance_date" class="form-control bg-dark text-white border-secondary" value="{{ (supplier.opening_balance_date or supplier.created_at).strftime('%Y-%m-%d') if (supplier.opening_balance_date or supplier.created_at) else '' }}" required>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning text-dark fw-bold w-100">Update Opening Balance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-dark border-secondary">
+            <div class="card-body text-center">
+                <h6 class="text-white-50">OPENING</h6>
+                <h2 class="fw-bold {{ 'text-danger' if (supplier.opening_balance or 0) > 0 else ('text-success' if (supplier.opening_balance or 0) < 0 else 'text-white-50') }}">
+                    {{ "{:,.2f}".format(supplier.opening_balance or 0) }}
+                </h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-secondary">
+            <div class="card-body text-center">
+                <h6 class="text-white-50">TOTAL BILL</h6>
+                <h2 class="fw-bold text-warning">
+                    {{ "{:,.2f}".format(total_bill or 0) }}
+                </h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-secondary">
+            <div class="card-body text-center">
+                <h6 class="text-white-50">PAID</h6>
+                <h2 class="fw-bold text-success">
+                    {{ "{:,.2f}".format(total_paid or 0) }}
+                </h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-secondary">
+            <div class="card-body text-center">
+                <h6 class="text-white-50">BALANCE</h6>
+                <h2 class="fw-bold {{ 'text-danger' if final_balance > 0 else 'text-success' }}">
+                    {{ "{:,.2f}".format(final_balance or 0) }}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+    <div class="card-header border-bottom border-secondary py-3 d-flex justify-content-between align-items-center" style="background: #0f172a;">
+        <h5 class="mb-0 text-success fw-bold"><i class="bi bi-cash-coin me-2"></i>Financial Transaction Ledger</h5>
+        <span class="badge bg-success text-white">{{ ledger_total if ledger_total is defined else ledger|length }} Transactions</span>
+    </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0 supplier-ledger-table table-stack-cards">
+                    <thead style="background: #0f172a;">
+                        <tr>
+                            <th class="ps-4 py-3 text-white-50">Date</th>
+                            <th class="py-3 text-white-50">Material</th>
+                            <th class="py-3 text-white-50">Bill #</th>
+                            <th class="py-3 text-end text-white-50">Qty</th>
+                            <th class="py-3 text-end text-white-50">Rate/Unit</th>
+                            <th class="py-3 text-end text-white-50">Total Amount</th>
+                            <th class="py-3 text-end text-white-50">Paid Amount</th>
+                            <th class="py-3 text-end pe-4 text-white-50">Pending Amount</th>
+                            <th class="py-3 text-end pe-4 text-white-50 actions-head">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in ledger %}
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td class="ps-4" data-label="Date">{{ row.date.strftime('%Y-%m-%d') }}</td>
+                    <td data-label="Material">
+                        {% if row.type == 'GRN' and row.item_lines %}
+                        <span class="supplier-ledger-line text-info fw-bold">
+                            {% for li in row.item_lines %}{{ li.name }}{% if not loop.last %} | {% endif %}{% endfor %}
+                        </span>
+                        {% else %}
+                        <span class="supplier-ledger-line text-info fw-bold">{{ row.description }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="{{ 'text-center' if not row.bill_no else '' }}" data-label="Bill #">{{ row.bill_no or '-' }}</td>
+                    <td class="text-end" data-label="Qty">
+                        {% if row.type == 'GRN' and row.item_lines %}
+                        <span class="supplier-ledger-line">{% for li in row.item_lines %}{{ "{:,.2f}".format(li.qty or 0) }}{% if not loop.last %} | {% endif %}{% endfor %}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-end" data-label="Rate/Unit">
+                        {% if row.type == 'GRN' and row.item_lines %}
+                        <span class="supplier-ledger-line">{% for li in row.item_lines %}{{ "{:,.2f}".format(li.rate or 0) }}{% if not loop.last %} | {% endif %}{% endfor %}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-end text-warning fw-bold" data-label="Total Amount">{{ "{:,.2f}".format(row.credit) if row.credit > 0 else '-' }}</td>
+                    <td class="text-end text-success fw-bold" data-label="Paid Amount">{{ "{:,.2f}".format(row.debit) if row.debit > 0 else '-' }}</td>
+                    <td class="text-end pe-4 fw-bold" data-label="Pending">{{ "{:,.2f}".format(row.balance) }}</td>
+                    <td class="text-end pe-4 actions-cell stack-actions-cell" data-label="Actions">
+                        {% if row.type == 'GRN' and row.bill_no %}
+                        <a href="{{ url_for('view_bill', bill_no=row.bill_no, src='grn', src_id=row.id) }}" class="btn btn-sm btn-outline-light me-1" title="View Bill"><i class="bi bi-eye"></i></a>
+                        <a href="{{ url_for('download_invoice', bill_no=row.bill_no, src='grn', src_id=row.id) }}" class="btn btn-sm btn-outline-info me-1" title="Download GRN PDF"><i class="bi bi-download"></i></a>
+                        <a href="{{ url_for('download_invoice', bill_no=row.bill_no, src='grn', src_id=row.id, action='print') }}" target="_blank" class="btn btn-sm btn-outline-success me-1" title="Print GRN PDF"><i class="bi bi-printer"></i></a>
+                        <a href="{{ url_for('edit_grn', id=row.id) }}" class="btn btn-sm btn-outline-warning me-1" title="Edit GRN"><i class="bi bi-pencil"></i></a>
+                        <form action="{{ url_for('grn') }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this GRN? Stock will be reversed.');">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="{{ row.id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete GRN"><i class="bi bi-trash"></i></button>
+                        </form>
+                        {% endif %}
+                        {% if row.type == 'Payment' %}
+                        <a href="{{ url_for('download_supplier_payment', payment_id=row.id) }}?action=view" target="_blank" class="btn btn-sm btn-outline-light me-1" title="View Payment"><i class="bi bi-eye"></i></a>
+                        <a href="{{ url_for('download_supplier_payment', payment_id=row.id) }}" class="btn btn-sm btn-outline-info me-1" title="Download Payment PDF"><i class="bi bi-download"></i></a>
+                        <a href="{{ url_for('download_supplier_payment', payment_id=row.id) }}?action=print" target="_blank" class="btn btn-sm btn-outline-success me-1" title="Print Payment PDF"><i class="bi bi-printer"></i></a>
+                        {% if not payments_readonly %}
+                        <button class="btn btn-sm btn-outline-warning me-1" data-bs-toggle="modal" data-bs-target="#editPaymentModal{{ row.id }}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form action="{{ url_for('delete_supplier_payment', id=row.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this payment?');">
+                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+
+                        <div class="modal fade" id="editPaymentModal{{ row.id }}" tabindex="-1">
+                            <div class="modal-dialog text-start">
+                                <form action="{{ url_for('edit_supplier_payment', id=row.id) }}" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+                                    <div class="modal-header border-0">
+                                        <h5 class="text-warning fw-bold">Edit Payment</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="text-white-50 small fw-bold mb-1">Date</label>
+                                            <input type="date" name="date" class="form-control bg-dark text-white border-secondary" value="{{ row.date.strftime('%Y-%m-%d') }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="text-white-50 small fw-bold mb-1">Amount</label>
+                                            <input type="number" step="0.01" name="amount" class="form-control bg-dark text-white border-secondary" value="{{ row.payment_obj.amount }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="text-white-50 small fw-bold mb-1">Pay From Account</label>
+                                            <select name="payment_account_id" class="form-select bg-dark text-white border-secondary payment-account-select" required>
+                                                <option value="">— Select Cash/Bank Account —</option>
+                                                {% for a in accounts %}
+                                                <option value="{{ a.id }}"
+                                                        data-category="{{ a.category or '' }}"
+                                                        data-bank="{{ a.bank_name or '' }}"
+                                                        data-holder="{{ a.account_holder_name or a.name or '' }}"
+                                                        data-no="{{ a.account_number or '' }}"
+                                                        {{ 'selected' if row.payment_obj.payment_account_id == a.id }}>
+                                                    [{{ (a.category or 'cash')|upper }}] {{ a.name }}{% if a.bank_name %} — {{ a.bank_name }}{% endif %}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="text-white-50 small fw-bold mb-1">Method</label>
+                                            <select name="method" class="form-select bg-dark text-white border-secondary payment-method-select" data-target="#editBankDetails{{ row.id }}">
+                                                <option value="Cash" {{ 'selected' if row.payment_obj.method == 'Cash' }}>Cash</option>
+                                                <option value="Bank Transfer" {{ 'selected' if row.payment_obj.method == 'Bank Transfer' }}>Bank Transfer</option>
+                                                <option value="Check" {{ 'selected' if row.payment_obj.method == 'Check' }}>Check</option>
+                                            </select>
+                                        </div>
+                                        <div id="editBankDetails{{ row.id }}" style="display: {{ 'block' if row.payment_obj.method == 'Bank Transfer' else 'none' }};">
+                                            <div class="mb-3"><label class="text-white-50 small fw-bold mb-1">Bank Name</label><input type="text" name="bank_name" class="form-control bg-dark text-white border-secondary" value="{{ row.payment_obj.bank_name or '' }}"></div>
+                                            <div class="mb-3"><label class="text-white-50 small fw-bold mb-1">Account Name</label><input type="text" name="account_name" class="form-control bg-dark text-white border-secondary" value="{{ row.payment_obj.account_name or '' }}"></div>
+                                            <div class="mb-3"><label class="text-white-50 small fw-bold mb-1">Account No</label><input type="text" name="account_no" class="form-control bg-dark text-white border-secondary" value="{{ row.payment_obj.account_no or '' }}"></div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="text-white-50 small fw-bold mb-1">Note</label>
+                                            <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2">{{ row.payment_obj.note or '' }}</textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer border-0">
+                                        <button type="submit" class="btn btn-warning w-100 fw-bold text-dark">Update Payment</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-center py-5 text-white-50">No transactions found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if total_pages is defined and total_pages > 1 %}
+<nav aria-label="Supplier ledger pagination" class="d-flex justify-content-center mb-4">
+    <ul class="pagination pagination-sm mb-0">
+        <li class="page-item {{ 'disabled' if page <= 1 else '' }}">
+            <a class="page-link bg-dark text-white border-secondary" href="{{ url_for('supplier_ledger', id=supplier.id, page=page-1) if page > 1 else '#' }}">Previous</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link bg-dark text-white border-secondary">Page {{ page }} / {{ total_pages }}</span>
+        </li>
+        <li class="page-item {{ 'disabled' if page >= total_pages else '' }}">
+            <a class="page-link bg-dark text-white border-secondary" href="{{ url_for('supplier_ledger', id=supplier.id, page=page+1) if page < total_pages else '#' }}">Next</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+{% if not payments_readonly %}
+<div class="modal fade" id="addPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('add_supplier_payment') }}" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Record Payment to Supplier</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" name="supplier_id" value="{{ supplier.id }}">
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">Date</label>
+                    <input type="date" name="date" class="form-control bg-dark text-white border-secondary" value="{{ today_date }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">Amount</label>
+                    <input type="number" step="0.01" name="amount" class="form-control bg-dark text-white border-secondary" required>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">Pay From Account</label>
+                    <select name="payment_account_id" class="form-select bg-dark text-white border-secondary payment-account-select" required>
+                        <option value="">— Select Cash/Bank Account —</option>
+                        {% for a in accounts %}
+                        <option value="{{ a.id }}"
+                                data-category="{{ a.category or '' }}"
+                                data-bank="{{ a.bank_name or '' }}"
+                                data-holder="{{ a.account_holder_name or a.name or '' }}"
+                                data-no="{{ a.account_number or '' }}">
+                            [{{ (a.category or 'cash')|upper }}] {{ a.name }}{% if a.bank_name %} — {{ a.bank_name }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">Method</label>
+                    <select name="method" class="form-select bg-dark text-white border-secondary payment-method-select" data-target="#addBankDetails">
+                        <option value="Cash">Cash</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Check">Check</option>
+                    </select>
+                </div>
+                <div id="addBankDetails" style="display: none;">
+                    <div class="mb-3"><label class="text-white-50 small fw-bold mb-1">Bank Name</label><input type="text" name="bank_name" class="form-control bg-dark text-white border-secondary"></div>
+                    <div class="mb-3"><label class="text-white-50 small fw-bold mb-1">Account Name</label><input type="text" name="account_name" class="form-control bg-dark text-white border-secondary"></div>
+                    <div class="mb-3"><label class="text-white-50 small fw-bold mb-1">Account No</label><input type="text" name="account_no" class="form-control bg-dark text-white border-secondary"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">Note</label>
+                    <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-success w-100 fw-bold">Save Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentsReadonly = {{ 'true' if payments_readonly else 'false' }};
+    if (paymentsReadonly) {
+        return;
+    }
+    document.querySelectorAll('.payment-method-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const targetId = this.getAttribute('data-target');
+            document.querySelector(targetId).style.display = this.value === 'Bank Transfer' ? 'block' : 'none';
+        });
+    });
+
+    document.querySelectorAll('.payment-account-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const form = this.closest('form');
+            if (!form) return;
+            const opt = this.options[this.selectedIndex];
+            if (!opt || !opt.value) return;
+            const cat = (opt.dataset.category || '').trim().toLowerCase();
+            const methodSel = form.querySelector('select[name="method"]');
+            const bankName = form.querySelector('input[name="bank_name"]');
+            const accName = form.querySelector('input[name="account_name"]');
+            const accNo = form.querySelector('input[name="account_no"]');
+
+            if (methodSel) {
+                methodSel.value = (cat === 'bank') ? 'Bank Transfer' : 'Cash';
+                methodSel.dispatchEvent(new Event('change'));
+            }
+            if (bankName) bankName.value = opt.dataset.bank || '';
+            if (accName) accName.value = opt.dataset.holder || '';
+            if (accNo) accNo.value = opt.dataset.no || '';
+        });
+    });
+});
+</script>
+{% endblock %}

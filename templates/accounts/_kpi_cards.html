@@ -1,0 +1,106 @@
+{% macro kpi_filter_bar(back_url, date_from=None, date_to=None, search=None, method_f=None, method_label='Method') -%}
+<div class="led-card mb-3">
+  <form class="filter-bar" method="get">
+    {% if date_from is not none %}
+      <div><div class="form-label">From</div><input type="date" name="from" class="form-control form-control-sm" value="{{ date_from.strftime('%Y-%m-%d') }}"></div>
+      <div><div class="form-label">To</div><input type="date" name="to" class="form-control form-control-sm" value="{{ date_to.strftime('%Y-%m-%d') }}"></div>
+    {% endif %}
+    {% if method_f is not none %}
+      <div><div class="form-label">{{ method_label }}</div>
+        <select name="method" class="form-select form-select-sm">
+          <option value="">All</option>
+          {% for m in ['Cash','Bank','Bank Transfer','Check','Card','Online'] %}
+            <option value="{{ m }}" {% if m==method_f %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    {% if search is not none %}
+      <div class="flex-grow-1"><div class="form-label">Search</div><input type="text" name="q" class="form-control form-control-sm" placeholder="Search..." value="{{ search }}"></div>
+    {% endif %}
+    <div><button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Apply</button></div>
+    <div><a class="btn btn-sm btn-outline-secondary" href="{{ back_url }}">Reset</a></div>
+    <div class="ms-auto"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('accounts.dashboard') }}"><i class="bi bi-arrow-left me-1"></i>Accounts</a></div>
+  </form>
+</div>
+{%- endmacro %}
+
+
+{% macro kpi_summary(total_amount=None, total_count=None, left_label='Total', right_label='Count', left_color='s-emerald', right_color='s-cyan', left_icon='bi-cash-stack', right_icon='bi-list-ol') -%}
+<div class="row g-3 mb-3">
+  {% if total_amount is not none %}
+  <div class="col-md-6">
+    <div class="card kpi {{ left_color }}">
+      <div class="card-body">
+        <div class="lab">{{ left_label }}</div>
+        <div class="val">Rs. {{ "%.2f"|format(total_amount) }}</div>
+      </div>
+      <i class="bi {{ left_icon }} ico"></i>
+    </div>
+  </div>
+  {% endif %}
+  {% if total_count is not none %}
+  <div class="col-md-6">
+    <div class="card kpi {{ right_color }}">
+      <div class="card-body">
+        <div class="lab">{{ right_label }}</div>
+        <div class="val">{{ total_count }}</div>
+      </div>
+      <i class="bi {{ right_icon }} ico"></i>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+
+{% macro card_grid(items, kind='generic') -%}
+<div class="row g-3">
+  {% for it in items %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card data-card">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between gap-2">
+          <div class="fw-bold text-truncate">
+            {% if it.link %}
+              <a class="text-decoration-none" href="{{ it.link }}">{{ it.party or it.category or '—' }}</a>
+            {% else %}
+              {{ it.party or it.category or '—' }}
+            {% endif %}
+          </div>
+          {% if it.amount is not none %}
+            <div class="fw-bold {% if kind in ['client_payments','receipts'] %}text-success{% elif kind in ['supplier_payments','expenditures'] %}text-danger{% else %}text-primary{% endif %}">
+              Rs. {{ "%.2f"|format(it.amount) }}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="small text-muted mt-1">
+          {% if it.source %}<span class="badge bg-secondary me-1">{{ it.source }}</span>{% endif %}
+          {% if it.method %}<span class="badge bg-dark me-1">{{ it.method }}</span>{% endif %}
+          {% if it.date_posted %}{{ it.date_posted.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+        </div>
+
+        {% if it.account_name %}
+          <div class="small mt-2"><span class="text-muted">Account:</span> {{ it.account_name }}</div>
+        {% endif %}
+        {% if it.bill_no %}
+          <div class="small"><span class="text-muted">Bill:</span> {{ it.bill_no }}</div>
+        {% endif %}
+
+        {% if it.note %}
+          <details class="mt-2">
+            <summary class="small text-muted">More</summary>
+            <div class="small mt-2">{{ it.note }}</div>
+          </details>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="text-center text-muted py-4">No records found.</div>
+  </div>
+  {% endfor %}
+</div>
+{%- endmacro %}

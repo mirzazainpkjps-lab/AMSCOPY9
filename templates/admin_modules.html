@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="fw-bold text-warning mb-0"><i class="bi bi-puzzle me-2"></i>Loaded Modules</h2>
+        <p class="text-white-50 small mb-0">All registered blueprints and modules.</p>
+    </div>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<div class="card border-secondary bg-dark shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-dark table-hover mb-0 small">
+            <thead>
+                <tr>
+                    <th class="ps-3">Module Name</th>
+                    <th>Blueprints</th>
+                    <th>Blueprint Count</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for mod in modules %}
+            <tr>
+                <td class="ps-3 fw-bold text-white">{{ mod.name }}</td>
+                <td class="text-white-50">
+                    {% for bp in mod.blueprints %}
+                    <span class="badge bg-secondary me-1">{{ bp }}</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endfor %}
+                </td>
+                <td>{{ mod.blueprint_count }}</td>
+                <td><span class="badge bg-success">{{ mod.status }}</span></td>
+            </tr>
+            {% endfor %}
+            {% if not modules %}
+            <tr><td colspan="4" class="text-center text-white-50 py-3">No modules loaded.</td></tr>
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

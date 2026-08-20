@@ -1,0 +1,86 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold text-warning"><i class="bi bi-shield-check me-2"></i>Review Imported Data</h2>
+    <p class="text-white-50">Review and edit the imported entries before final saving to the database.</p>
+</div>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0" id="reviewTable">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50">Bill No</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Client Code</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Client Name</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Amount</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Reason</th>
+                    <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data %}
+                <tr class="import-row" data-index="{{ loop.index0 }}">
+                    <td class="ps-4">
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary bill-no" value="{{ item.bill_no }}">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary client-code" value="{{ item.client_code }}">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary client-name" value="{{ item.client_name }}">
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" class="form-control form-control-sm bg-dark text-white border-secondary amount" value="{{ item.amount }}">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary reason" value="{{ item.reason }}">
+                    </td>
+                    <td class="text-end pe-4">
+                        <button class="btn btn-outline-danger btn-sm rounded-pill" onclick="removeRow(this)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-transparent border-0 p-4">
+        <form id="confirmForm" action="{{ url_for('import_export.execute_import') }}" method="POST">
+            <input type="hidden" name="import_data" id="importDataInput">
+            <div class="d-flex gap-3">
+                <a href="/pending_bills" class="btn btn-outline-secondary rounded-pill px-4">Cancel Import</a>
+                <button type="button" class="btn btn-warning text-dark fw-bold rounded-pill px-5" onclick="submitImport()">
+                    <i class="bi bi-check-circle me-2"></i> Save All Entries
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function removeRow(btn) {
+        if (confirm('Remove this entry from import?')) {
+            btn.closest('tr').remove();
+        }
+    }
+
+    function submitImport() {
+        const rows = document.querySelectorAll('.import-row');
+        const data = [];
+        rows.forEach(row => {
+            data.push({
+                bill_no: row.querySelector('.bill-no').value,
+                client_code: row.querySelector('.client-code').value,
+                client_name: row.querySelector('.client-name').value,
+                amount: parseFloat(row.querySelector('.amount').value || 0),
+                reason: row.querySelector('.reason').value,
+                nimbus_no: "" 
+            });
+        });
+        document.getElementById('importDataInput').value = JSON.stringify(data);
+        document.getElementById('confirmForm').submit();
+    }
+</script>
+{% endblock %}

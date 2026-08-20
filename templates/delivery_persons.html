@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-people me-2"></i>Delivery Persons</h2>
+    <div class="d-flex gap-2">
+        <a href="/direct_sales" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Sales</a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('add_delivery_person') }}" class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="text-white-50 small fw-bold mb-1">DELIVERY PERSON NAME</label>
+                <input type="text" name="name" class="form-control bg-dark text-white border-secondary" placeholder="Enter driver name" required>
+            </div>
+            <div class="col-md-4">
+                <label class="text-white-50 small fw-bold mb-1">PHONE NUMBER</label>
+                <input type="text" name="phone" class="form-control bg-dark text-white border-secondary" placeholder="Optional phone number">
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-warning text-dark fw-bold">Add Driver</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="py-3 ps-4 text-white-50">Name</th>
+                    <th class="py-3 text-white-50">Phone</th>
+                    <th class="py-3 text-white-50">Status</th>
+                    <th class="py-3 pe-4 text-end text-white-50">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td class="ps-4 fw-bold text-info">{{ row.name }}</td>
+                    <td class="text-white-50">{{ row.phone or '-' }}</td>
+                    <td>
+                        <span class="badge {{ 'bg-success' if row.is_active else 'bg-secondary' }}">{{ 'Active' if row.is_active else 'Inactive' }}</span>
+                    </td>
+                    <td class="text-end pe-4">
+                        <a href="{{ url_for('delivery_person_ledger', id=row.id) }}" class="btn btn-outline-success btn-sm me-1" title="Open financial ledger"><i class="bi bi-journal-text me-1"></i>Ledger</a>
+                        <button type="button" class="btn btn-outline-info btn-sm me-1" data-bs-toggle="modal" data-bs-target="#editDeliveryPersonModal{{ row.id }}">Edit</button>
+                        <form method="POST" action="{{ url_for('toggle_delivery_person', id=row.id) }}" class="d-inline">
+                            <button class="btn btn-outline-warning btn-sm">{{ 'Deactivate' if row.is_active else 'Activate' }}</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center py-4 text-white-50">No delivery persons found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% for row in rows %}
+<div class="modal fade" id="editDeliveryPersonModal{{ row.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('edit_delivery_person', id=row.id) }}" class="modal-content border-secondary" style="background: #1e293b;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Edit Delivery Person</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="text-white-50 small fw-bold mb-1">NAME</label>
+                <input type="text" name="name" value="{{ row.name }}" class="form-control bg-dark text-white border-secondary" required>
+                <label class="text-white-50 small fw-bold mb-1 mt-3">PHONE NUMBER</label>
+                <input type="text" name="phone" value="{{ row.phone or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Optional phone number">
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-warning text-dark fw-bold w-100">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

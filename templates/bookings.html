@@ -1,0 +1,634 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-calendar-check me-2"></i>Bookings</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        <button class="btn btn-warning btn-sm text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#addBookingModal">
+            <i class="bi bi-plus-lg"></i> Add Booking
+        </button>
+    </div>
+</div>
+
+<div class="d-flex gap-2 flex-wrap mb-3">
+    <a href="{{ url_for('bookings_page', show='active', client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to, per_page=per_page) }}" class="btn btn-sm btn-warning text-dark fw-bold">All Bookings</a>
+</div>
+
+<form method="GET" action="{{ url_for('bookings_page') }}" class="card border-0 shadow-sm p-3 mb-3 ui-helper-form bookings-filter-form" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 12px;">
+    <input type="hidden" name="show" value="{{ show_mode }}">
+    <div class="row g-2 form-grid-top">
+        <div class="col-12 col-lg-4 position-relative">
+            <label class="text-white-50 small fw-bold mb-1">Client Name</label>
+            <div class="input-group">
+                <input type="text" name="client" id="filterBookingClientCode" class="form-control bg-dark text-white border-secondary" placeholder="Search by name or code..." autocomplete="off" value="{{ client_filter }}" onfocus="showCombobox('filterBookingClientCode', 'filterBookingCombobox')" oninput="filterCombobox('filterBookingClientCode', 'filterBookingCombobox', 'filterBookingClientNameDisplay')">
+                <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('filterBookingClientCode', 'filterBookingCombobox')">
+                    <i class="bi bi-chevron-down text-warning"></i>
+                </button>
+            </div>
+            <div id="filterBookingCombobox" class="combobox-list shadow-lg" style="display: none;">
+                {% for client in clients %}
+                <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="filterBookingClientCode" data-combo-display="filterBookingClientNameDisplay">
+                    <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                    <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div id="filterBookingClientNameDisplay" class="text-info small mt-1 fw-bold">
+                {% if client_filter_display %}Name: {{ client_filter_display }}{% endif %}
+            </div>
+        </div>
+        <div class="col-12 col-lg-3">
+            <label class="text-white-50 small fw-bold mb-1">Bill No</label>
+            <input type="text" name="bill_no" class="form-control bg-dark text-white border-secondary" placeholder="Manual / Auto bill no..." value="{{ bill_filter }}">
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="text-white-50 small fw-bold mb-1">Date From</label>
+            <input type="date" name="date_from" class="form-control bg-dark text-white border-secondary" value="{{ date_from }}">
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="text-white-50 small fw-bold mb-1">Date To</label>
+            <input type="date" name="date_to" class="form-control bg-dark text-white border-secondary" value="{{ date_to }}">
+        </div>
+        <div class="col-6 col-lg-1">
+            <label class="text-white-50 small fw-bold mb-1">Rows</label>
+            <select name="per_page" class="form-select bg-dark text-white border-secondary">
+                <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+            </select>
+        </div>
+        <div class="col-12 col-lg-1 d-grid ui-actions-col">
+            <button type="submit" class="btn btn-warning text-dark fw-bold">Filter</button>
+        </div>
+    </div>
+    <div class="d-flex justify-content-end mt-2">
+        <a href="{{ url_for('bookings_page', show=show_mode, per_page=per_page) }}" class="btn btn-sm btn-outline-light fw-bold">Reset</a>
+    </div>
+</form>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50">Manual Bill</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Auto Bill</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Client</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Material</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Qty</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Total Amount</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Actually Paid</th>
+                    <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
+                </tr>
+            </thead>
+            <tbody style="background: #1e293b;">
+                {% for booking in bookings %}
+                <tr style="border-bottom: 1px solid #334155; {% if booking.is_void %}opacity: 0.5; text-decoration: line-through;{% endif %}">
+                    <td class="ps-4">
+                        {% if booking.manual_bill_no %}
+                        <a href="{{ url_for('view_bill', bill_no=booking.manual_bill_no|replace('#', '%23'), src='booking', src_id=booking.id, client_name=booking.client_name) }}" class="badge bg-dark border border-secondary text-warning text-decoration-none">{{ booking.manual_bill_no }}</a>
+                        {% else %}
+                        <span class="text-white-50 small">No Bill</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if booking.auto_bill_no %}
+                        <a href="{{ url_for('view_bill', bill_no=booking.auto_bill_no|replace('#', '%23'), src='booking', src_id=booking.id, client_name=booking.client_name) }}" class="badge bg-dark border border-secondary text-info text-decoration-none">{{ booking.auto_bill_no }}</a>
+                        {% else %}
+                        <span class="text-white-50 small">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-white">{{ booking.client_name }}</td>
+                    <td class="text-white">
+                        {% if booking.items %}
+                            {{ booking.items[0].material_name }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-info fw-bold">
+                        {% if booking.items %}
+                            {{ booking.items[0].qty }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </td>
+                    <td class="text-danger fw-bold">{{ currency_symbol }}{{ "%.2f"|format(booking.amount) }}</td>
+                    <td class="text-success fw-bold">{{ currency_symbol }}{{ "%.2f"|format(booking.paid_amount) }}</td>
+                    <td class="text-end pe-4">
+                        {% set booking_bill_ref = (booking.manual_bill_no or booking.auto_bill_no or ('BK-' ~ booking.id)) %}
+                        <a href="{{ url_for('view_bill', bill_no=booking_bill_ref|replace('#', '%23'), src='booking', src_id=booking.id, client_name=booking.client_name) }}" class="btn btn-outline-info btn-sm border-2 rounded-pill shadow-sm me-1" title="View"><i class="bi bi-eye"></i></a>
+                        <a href="{{ url_for('download_invoice', bill_no=booking_bill_ref|replace('#', '%23'), src='booking', src_id=booking.id, client_name=booking.client_name) }}" class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" title="Download PDF"><i class="bi bi-download"></i></a>
+                        <a href="{{ url_for('download_invoice', bill_no=booking_bill_ref|replace('#', '%23'), action='print', src='booking', src_id=booking.id, client_name=booking.client_name) }}" target="_blank" class="btn btn-outline-success btn-sm border-2 rounded-pill shadow-sm me-1" title="Print PDF"><i class="bi bi-printer"></i></a>
+                        {% if booking.photo_path %}
+                        <a href="{{ url_for('uploaded_file', filename=booking.photo_path) }}" target="_blank" class="btn btn-outline-light btn-sm border-2 rounded-pill shadow-sm me-1" title="View Photo"><i class="bi bi-image"></i></a>
+                        {% endif %}
+                        {% if booking.photo_url %}
+                        <a href="{{ booking.photo_url }}" target="_blank" class="btn btn-outline-light btn-sm border-2 rounded-pill shadow-sm me-1" title="View URL"><i class="bi bi-link-45deg"></i></a>
+                        {% endif %}
+                        <button type="button" class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" data-edit-booking-url="{{ url_for('booking_edit_modal', booking_id=booking.id) }}" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        {% if current_user.role == 'admin' %}
+                        <form action="{{ url_for('delete_transaction', type='Booking', id=booking.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this booking and reverse related accounts?')">
+                            <button type="submit" class="btn btn-outline-danger btn-sm border-2 rounded-pill shadow-sm">Delete</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if pagination and pagination.pages > 1 %}
+<nav aria-label="Bookings pagination" class="d-flex justify-content-center mt-3">
+    <ul class="pagination pagination-sm mb-0">
+        {% if pagination.has_prev %}
+        <li class="page-item">
+            <a class="page-link bg-dark border-secondary text-warning"
+               href="{{ url_for('bookings_page', page=pagination.prev_num, per_page=per_page, show=show_mode, client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to) }}">
+               Previous
+            </a>
+        </li>
+        {% endif %}
+        <li class="page-item active">
+            <span class="page-link bg-warning border-warning text-dark">
+                {{ pagination.page }} / {{ pagination.pages }}
+            </span>
+        </li>
+        {% if pagination.has_next %}
+        <li class="page-item">
+            <a class="page-link bg-dark border-secondary text-warning"
+               href="{{ url_for('bookings_page', page=pagination.next_num, per_page=per_page, show=show_mode, client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to) }}">
+               Next
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<div class="modal fade" id="addBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered booking-modal-dialog">
+        <form class="modal-content border-secondary ui-helper-form" style="background: #1e293b;" action="/add_booking" method="POST" enctype="multipart/form-data">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">New Booking</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 position-relative">
+                    <label class="text-white-50 small fw-bold mb-1">CLIENT (NAME OR CODE)</label>
+                    <div class="input-group">
+                        <input type="text" name="client_code" id="addBookingClientCode" class="form-control bg-dark text-white border-secondary" placeholder="Search by name or code..." autocomplete="off" required onfocus="showCombobox('addBookingClientCode', 'addBookingCombobox')" oninput="filterCombobox('addBookingClientCode', 'addBookingCombobox', 'addBookingClientNameDisplay')">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('addBookingClientCode', 'addBookingCombobox')">
+                            <i class="bi bi-chevron-down text-warning"></i>
+                        </button>
+                    </div>
+                    <div id="addBookingCombobox" class="combobox-list shadow-lg" style="display: none;">
+                        {% for client in clients %}
+                        <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="addBookingClientCode" data-combo-display="addBookingClientNameDisplay">
+                            <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                            <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="addBookingClientNameDisplay" class="text-info small mt-1 fw-bold"></div>
+                </div>
+                <div class="booking-item-header d-none d-md-grid mb-2 px-2 text-white-50 small fw-bold">
+                    <div class="text-center">MATERIAL</div>
+                    <div class="text-center">QTY</div>
+                    <div class="text-center">UNIT PRICE</div>
+                    <div class="text-center">ITEM TOTAL</div>
+                    <div class="text-center">REMOVE</div>
+                </div>
+                <div id="items-container">
+                    <div class="compact-item-row mb-3 p-2 rounded border border-secondary bg-dark">
+                        <div class="booking-item-grid">
+                            <div class="position-relative">
+                                <input type="hidden" name="material_id[]" class="material-id-input" value="">
+                                <input type="text" name="material_name[]" class="form-control form-control-sm bg-dark text-white border-secondary price-trigger" placeholder="Search material..." autocomplete="off" required>
+                            </div>
+                            <div>
+                                <div class="input-group input-group-sm">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="changeQty(this, -1)">-</button>
+                                    <input type="number" step="any" name="qty[]" value="1" class="form-control bg-dark text-white border-secondary text-center qty-input" required>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="changeQty(this, 1)">+</button>
+                                </div>
+                            </div>
+                            <div>
+                                <input type="number" step="any" name="unit_rate[]" class="form-control form-control-sm bg-dark text-white border-secondary rate-input" placeholder="Rate" required>
+                            </div>
+                            <div>
+                                <input type="number" step="any" class="form-control form-control-sm bg-dark text-info border-secondary text-center line-total" placeholder="Item Total" readonly tabindex="-1">
+                            </div>
+                            <div class="text-center">
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeItemRow(this)" title="Remove item">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-warning mb-3 w-100" onclick="addItemRow()">+ Add More Items</button>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">TOTAL AMOUNT</label>
+                        <input type="number" step="any" name="amount" class="form-control bg-dark text-white border-secondary total-amount" required readonly>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">PAID NOW</label>
+                        <input type="number" step="0.01" name="paid_amount" class="form-control bg-dark text-white border-secondary booking-paid-now" value="0">
+                    </div>
+                </div>
+                <div class="row booking-account-row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">RECEIVE METHOD</label>
+                        <select name="payment_method" class="form-select bg-dark text-white border-secondary booking-pay-method">
+                            <option value="Cash" selected>Cash</option>
+                            <option value="Bank">Bank</option>
+                        </select>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">RECEIVE INTO ACCOUNT</label>
+                        <select name="payment_account_id" class="form-select bg-dark text-white border-secondary booking-pay-account">
+                            <option value="">Select account...</option>
+                            {% for account in accounts %}
+                            <option value="{{ account.id }}" data-cat="{{ account.category or '' }}">{{ account.name }}{% if account.bank_name %} ({{ account.bank_name }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-white-50">Required when Paid Now is greater than 0.</small>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">BOOKING DATE & TIME</label>
+                    <input type="datetime-local" name="date" id="addBookingDate" class="form-control bg-dark text-white border-secondary">
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">DISCOUNT (LOSS)</label>
+                        <input type="number" step="any" min="0" name="discount" class="form-control bg-dark text-white border-secondary" value="0">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">DISCOUNT REASON</label>
+                        <input type="text" name="discount_reason" class="form-control bg-dark text-white border-secondary" placeholder="Optional reason">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">AUTO BILL NO</label>
+                    <input type="text" class="form-control bg-dark text-white border-secondary" value="{{ next_auto }}" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">MANUAL BILL NO</label>
+                    <input type="text" name="manual_bill_no" class="form-control bg-dark text-white border-secondary">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">BILL PHOTO</label>
+                    <input type="file" name="photo" class="form-control bg-dark text-white border-secondary" accept="image/*">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">PHOTO URL (Optional)</label>
+                    <input type="url" name="photo_url" class="form-control bg-dark text-white border-secondary" placeholder="https://...">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">NOTES</label>
+                    <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Add booking notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2">
+                <button type="reset" class="btn btn-outline-secondary flex-grow-1 py-2 rounded-pill fw-bold">Reset</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold flex-grow-1 py-2 rounded-pill">Save Booking</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="lazyEditBookingModalHost"></div>
+
+<div id="bookingMaterialCombobox" class="combobox-list shadow-lg" style="display: none;"></div>
+
+<style>
+.booking-modal-dialog {
+    max-width: min(1120px, 96vw);
+}
+
+.booking-item-header {
+    display: grid;
+    grid-template-columns: 3.4fr 2.2fr 2.2fr 2.2fr auto;
+    column-gap: 0.5rem;
+}
+
+.booking-item-grid {
+    display: grid;
+    grid-template-columns: 3.4fr 2.2fr 2.2fr 2.2fr auto;
+    column-gap: 0.5rem;
+    row-gap: 0.5rem;
+    align-items: center;
+}
+
+@media (max-width: 767.98px) {
+    .booking-item-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .bookings-filter-form {
+        padding: 0.6rem !important;
+    }
+    .bookings-filter-form .row.form-grid-top {
+        row-gap: 0.4rem !important;
+    }
+    .booking-modal-dialog {
+        max-width: 100vw;
+        margin: 0;
+    }
+    .booking-item-grid {
+        grid-template-columns: 1fr;
+        row-gap: 0.4rem;
+    }
+    .compact-item-row {
+        padding: 0.4rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    .booking-item-grid .btn,
+    .booking-item-grid .form-control,
+    .booking-item-grid .input-group-text {
+        min-height: 32px;
+    }
+}
+</style>
+
+<script>
+const MATERIALS = [
+    {% for mat in materials %}
+    { id: {{ mat.id }}, name: {{ mat.name|tojson }}, price: {{ (mat.unit_price or 0)|float }} },
+    {% endfor %}
+];
+window.AMS_KNOWN_MATERIAL_NAMES = new Set(MATERIALS.map((m) => m.name).concat(MATERIALS.map((m) => String(m.name || '').toLowerCase())));
+const MATERIAL_PRICE_MAP = {};
+MATERIALS.forEach(m => {
+    const key = String(m.name || '').trim().toLowerCase();
+    if (key) MATERIAL_PRICE_MAP[key] = Number(m.price || 0);
+});
+let bookingMaterialInputCounter = 0;
+let activeBookingMaterialInput = null;
+const BOOKING_MATERIAL_LIST_ID = 'bookingMaterialCombobox';
+
+function ensureBookingMaterialInputId(input) {
+    if (!input) return;
+    if (!input.id) {
+        bookingMaterialInputCounter += 1;
+        input.id = `bookingMaterialInput${bookingMaterialInputCounter}`;
+    }
+}
+
+function buildBookingMaterialCombobox() {
+    const list = document.getElementById(BOOKING_MATERIAL_LIST_ID);
+    if (!list) return;
+    list.innerHTML = '';
+    MATERIALS.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'combobox-item';
+        div.dataset.value = m.name;
+        div.dataset.materialId = m.id;
+        div.textContent = m.name;
+        div.addEventListener('click', () => selectBookingMaterial(m.name, m.id));
+        list.appendChild(div);
+    });
+}
+
+function openBookingMaterialCombobox(input) {
+    if (!input) return;
+    ensureBookingMaterialInputId(input);
+    activeBookingMaterialInput = input;
+    const list = document.getElementById(BOOKING_MATERIAL_LIST_ID);
+    if (!list) return;
+    document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+    list.style.display = 'block';
+    if (typeof positionCombobox === 'function') {
+        positionCombobox(input.id, BOOKING_MATERIAL_LIST_ID);
+    }
+}
+
+function filterBookingMaterialCombobox(input) {
+    if (!input) return;
+    if (input.dataset.comboSuppress === '1') {
+        input.dataset.comboSuppress = '';
+        return;
+    }
+    openBookingMaterialCombobox(input);
+    const list = document.getElementById(BOOKING_MATERIAL_LIST_ID);
+    if (!list) return;
+    const filter = (input.value || '').toLowerCase();
+    const items = list.getElementsByClassName('combobox-item');
+    for (let i = 0; i < items.length; i++) {
+        const text = (items[i].dataset.value || items[i].innerText || '').toLowerCase();
+        items[i].style.display = text.includes(filter) ? '' : 'none';
+    }
+}
+
+function selectBookingMaterial(value, materialId) {
+    if (!activeBookingMaterialInput) return;
+    activeBookingMaterialInput.value = value;
+    activeBookingMaterialInput.dataset.comboSuppress = '1';
+    if (typeof window.setSelectedMaterialId === 'function') {
+        window.setSelectedMaterialId(activeBookingMaterialInput, materialId || '', value);
+    } else {
+        const hid = activeBookingMaterialInput.closest('.position-relative')?.querySelector('input[name="material_id[]"]');
+        if (hid) hid.value = materialId || '';
+    }
+    const list = document.getElementById(BOOKING_MATERIAL_LIST_ID);
+    if (list) list.style.display = 'none';
+    document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+    activeBookingMaterialInput.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function changeQty(btn, delta) {
+    const input = btn.parentElement.querySelector('input');
+    let val = parseFloat(input.value) || 0;
+    val = Math.max(0, val + delta);
+    input.value = formatPrecisionInput(val);
+    updatePrice(btn.closest('form'));
+}
+
+function formatPrecisionInput(value, maxDecimals = 8) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0';
+    return n.toFixed(maxDecimals).replace(/\.?0+$/, '');
+}
+
+function removeItemRow(btn) {
+    const row = btn.closest('.compact-item-row');
+    const form = btn.closest('form');
+    if (!row || !form) return;
+    const rows = form.querySelectorAll('.compact-item-row');
+    if (rows.length <= 1) {
+        const qtyInput = row.querySelector('.qty-input');
+        const rateInput = row.querySelector('.rate-input');
+        const matInput = row.querySelector('.price-trigger');
+        if (qtyInput) qtyInput.value = '1';
+        if (rateInput) rateInput.value = '';
+        if (matInput) matInput.value = '';
+        const lineTotalInput = row.querySelector('.line-total');
+        if (lineTotalInput) lineTotalInput.value = '';
+    } else {
+        row.remove();
+    }
+    updatePrice(form);
+}
+
+function addItemRow() {
+    const container = document.getElementById('items-container');
+    const firstRow = container.querySelector('.compact-item-row');
+    const newRow = firstRow.cloneNode(true);
+    newRow.querySelectorAll('input').forEach(i => {
+        if(i.classList.contains('qty-input')) { i.value = '1'; }
+        else if(i.classList.contains('line-total')) { i.value = ''; }
+        else { i.value = ''; }
+    });
+    container.appendChild(newRow);
+    attachListeners(newRow);
+    updatePrice(container.closest('form'));
+}
+
+function addItemRowEdit(btn) {
+    const container = btn.previousElementSibling;
+    const firstRow = container.querySelector('.compact-item-row') || document.querySelector('#items-container .compact-item-row');
+    const newRow = firstRow.cloneNode(true);
+    
+    newRow.querySelectorAll('input').forEach(i => {
+        if(i.classList.contains('qty-input')) { i.value = '1'; }
+        else if(i.classList.contains('line-total')) { i.value = ''; }
+        else { i.value = ''; }
+    });
+    container.appendChild(newRow);
+    attachListeners(newRow);
+    updatePrice(container.closest('form'));
+}
+
+function attachListeners(row) {
+    const materialInput = row.querySelector('.price-trigger');
+    const rateInput = row.querySelector('.rate-input');
+    const qtyInput = row.querySelector('.qty-input');
+
+    if (materialInput && rateInput) {
+        const applyMaterialRate = () => {
+            const name = (materialInput.value || '').trim().toLowerCase();
+            if (!name) return;
+            const price = MATERIAL_PRICE_MAP[name];
+            if (price === undefined || price === null || Number.isNaN(Number(price))) return;
+            rateInput.value = formatPrecisionInput(price);
+            updatePrice(row.closest('form'));
+        };
+        materialInput.addEventListener('change', applyMaterialRate);
+        materialInput.addEventListener('blur', applyMaterialRate);
+        materialInput.addEventListener('focus', () => openBookingMaterialCombobox(materialInput));
+        materialInput.addEventListener('input', () => filterBookingMaterialCombobox(materialInput));
+    }
+
+    // Null-safe: only attach listeners when inputs are present
+    [rateInput, qtyInput].forEach(el => {
+        if (el) el.addEventListener('input', () => updatePrice(row.closest('form')));
+    });
+}
+
+function updateRowTotal(row) {
+    if (!row) return 0;
+    const rateInput = row.querySelector('.rate-input');
+    const qtyInput = row.querySelector('.qty-input');
+    const lineTotalInput = row.querySelector('.line-total');
+    const price = parseFloat(rateInput?.value) || 0;
+    const qty = parseFloat(qtyInput?.value) || 0;
+    const lineTotal = price * qty;
+    if (lineTotalInput) lineTotalInput.value = formatPrecisionInput(lineTotal);
+    return lineTotal;
+}
+
+function updatePrice(form) {
+    if (!form) return;
+    let total = 0;
+    form.querySelectorAll('.compact-item-row').forEach(row => {
+        total += updateRowTotal(row);
+    });
+    const totalInput = form.querySelector('.total-amount');
+    if (totalInput) totalInput.value = formatPrecisionInput(total);
+}
+
+function initializeLazyBookingModal(modalEl) {
+    if (!modalEl || modalEl.dataset.lazyInitialized === '1') return;
+    modalEl.dataset.lazyInitialized = '1';
+    const form = modalEl.querySelector('form');
+    if (!form) return;
+    form.querySelectorAll('.compact-item-row').forEach(row => attachListeners(row));
+    updatePrice(form);
+    // Show global loading overlay on save for lazy-loaded forms (not caught by layout.html handler)
+    form.addEventListener('submit', function () {
+        if (typeof window.showLoading === 'function') window.showLoading();
+    });
+    // Account filter for payment method
+    const methodSel = form.querySelector('.booking-pay-method');
+    const accSel = form.querySelector('.booking-pay-account');
+    if (methodSel && accSel) {
+        const filterAcc = () => {
+            const want = (methodSel.value || 'Cash').toLowerCase() === 'bank' ? 'bank' : 'cash';
+            Array.from(accSel.options).forEach((opt, idx) => {
+                if (idx === 0) return;
+                const cat = (opt.dataset.cat || '').toLowerCase();
+                opt.hidden = cat && cat !== want;
+            });
+        };
+        methodSel.addEventListener('change', filterAcc);
+        filterAcc();
+    }
+}
+
+function loadEditBookingModal(url) {
+    AMSLazyModal.load({
+        hostId: 'lazyEditBookingModalHost',
+        url: url,
+        selector: '[id^="editBookingModal"]',
+        label: 'Loading booking form…',
+        onReady: function (modalEl) {
+            initializeLazyBookingModal(modalEl);
+        },
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('click', function(event) {
+        const editButton = event.target.closest('[data-edit-booking-url]');
+        if (!editButton) return;
+        event.preventDefault();
+        loadEditBookingModal(editButton.dataset.editBookingUrl);
+    });
+    buildBookingMaterialCombobox();
+    document.querySelectorAll('.compact-item-row').forEach(row => attachListeners(row));
+    document.querySelectorAll('#addBookingModal form, [id^="editBookingModal"] form').forEach(form => updatePrice(form));
+    const addBookingDate = document.getElementById('addBookingDate');
+    if (addBookingDate && !addBookingDate.value) {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        addBookingDate.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    }
+    document.querySelectorAll('form').forEach(form => {
+        const methodSel = form.querySelector('.booking-pay-method');
+        const accSel = form.querySelector('.booking-pay-account');
+        if (!methodSel || !accSel) return;
+        const filterAcc = () => {
+            const want = (methodSel.value || 'Cash').toLowerCase() === 'bank' ? 'bank' : 'cash';
+            Array.from(accSel.options).forEach((opt, idx) => {
+                if (idx === 0) { opt.hidden = false; return; }
+                const cat = (opt.dataset.cat || '').toLowerCase();
+                opt.hidden = cat && cat !== want;
+            });
+            const cur = accSel.options[accSel.selectedIndex];
+            if (cur && cur.hidden) accSel.value = '';
+        };
+        methodSel.addEventListener('change', filterAcc);
+        filterAcc();
+    });
+});
+</script>
+{% endblock %}

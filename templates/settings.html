@@ -1,0 +1,611 @@
+{% extends "layout.html" %}
+{% block content %}
+{% macro perm_groups(groups, values, id_prefix='') %}
+{% for group_title, fields in groups %}
+<h6 class="small fw-bold text-warning text-uppercase mt-3 mb-1">{{ group_title }}</h6>
+<div class="row g-2">
+    {% for field, label in fields %}
+    <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="{{ field }}" id="{{ id_prefix }}{{ field }}" {{ 'checked' if values.get(field) }}><label class="form-check-label" for="{{ id_prefix }}{{ field }}">{{ label }}</label></div></div>
+    {% endfor %}
+</div>
+{% endfor %}
+{% endmacro %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="fw-bold text-warning mb-0">Settings</h2>
+        <p class="text-white-50 small mb-0">System configuration and user management.</p>
+    </div>
+    <a href="/" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        {% if current_user.role == 'admin' %}
+        <div class="card border-secondary bg-dark shadow-sm mb-3" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-sliders me-2 text-warning"></i>General Settings</h6>
+            </div>
+            <div class="card-body p-3">
+                <form action="{{ url_for('update_settings') }}" method="POST">
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small text-white-50">Company Name</label>
+                            <input type="text" name="company_name" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.company_name or '' }}">
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small text-white-50">Company Address</label>
+                            <input type="text" name="company_address" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.company_address or '' }}">
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small text-white-50">Company Phone</label>
+                            <input type="text" name="company_phone" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.company_phone or '' }}">
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small text-white-50">Currency Symbol</label>
+                            <input type="text" name="currency" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.currency or '' }}">
+                        </div>
+                    </div>
+                    <hr class="border-secondary my-2">
+                    <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" role="switch" name="allow_global_negative_stock" id="globalNegativeStock" {% if settings.allow_global_negative_stock %}checked{% endif %}><label class="form-check-label text-danger small" for="globalNegativeStock">Always Allow Negative Stock</label></div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">Save General Settings</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+        {% if current_user.role == 'admin' or current_user.can_manage_materials %}
+        <div class="card border-secondary bg-dark shadow-sm mb-3" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-tags me-2 text-warning"></i>Material Categories</h6>
+            </div>
+            <div class="card-body p-3">
+                <form action="/material_categories/add" method="POST" class="d-flex gap-2 mb-3">
+                    <input type="text" name="category_name" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Add new category" required>
+                    <button type="submit" class="btn btn-warning btn-sm fw-bold">Add</button>
+                </form>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead class="x-small text-uppercase text-white-50">
+                            <tr>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="small">
+                            {% for cat in categories %}
+                            <tr class="border-secondary">
+                                <td class="fw-bold">{{ cat.name }}</td>
+                                <td>
+                                    <span class="badge {{ 'bg-success' if cat.is_active else 'bg-secondary' }}">
+                                        {{ 'Active' if cat.is_active else 'Disabled' }}
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <form action="/material_categories/{{ cat.id }}/rename" method="POST" class="d-inline-flex gap-1 me-2">
+                                        <input type="text" name="category_name" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Rename" required>
+                                        <button type="submit" class="btn btn-outline-info btn-sm">Save</button>
+                                    </form>
+                                    <form action="/material_categories/{{ cat.id }}/toggle" method="POST" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-warning btn-sm">{{ 'Disable' if cat.is_active else 'Enable' }}</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="card border-secondary bg-dark shadow-sm" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-people me-2 text-warning"></i>User Permissions</h6>
+            </div>
+            <div class="card-body p-3">
+                <p class="text-white-50 x-small mb-2">Managers live on this PC only. Wipe / Excel restore does <strong class="text-warning">not</strong> import or delete users. Every sale, wipe and edit already stores the <strong>username</strong> as text, so history still shows who did it after a data restore. Only <code>Admin</code> is built-in; add extra managers here.</p>
+                {% if current_user.role == 'admin' %}
+                <button class="btn btn-warning btn-sm fw-bold mb-3" data-bs-toggle="modal" data-bs-target="#addUserModal">+ New User</button>
+                {% endif %}
+                
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead class="x-small text-uppercase text-white-50">
+                            <tr>
+                                <th>User</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Permissions</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="small">
+                            {% for u in users %}
+                            <tr class="border-secondary">
+                                <td class="fw-bold">{{ u.username }}</td>
+                                <td><span class="badge {{ 'bg-warning text-dark' if u.role == 'admin' else 'bg-secondary' }}">{{ u.role }}</span></td>
+                                <td><span class="badge {{ 'bg-success' if (u.status or 'active')|lower == 'active' else 'bg-danger' }}">{{ u.status or 'active' }}</span></td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% if u.can_view_dashboard %}<span class="badge bg-dark border border-secondary text-light">Dashboard</span>{% endif %}
+                                        {% if u.can_manage_grn %}<span class="badge bg-dark border border-secondary text-info">GRN</span>{% endif %}
+                                        {% if u.can_view_stock %}<span class="badge bg-dark border border-secondary text-info">Stock</span>{% endif %}
+                                        {% if u.can_view_daily %}<span class="badge bg-dark border border-secondary text-success">Daily</span>{% endif %}
+                                        {% if u.can_view_history %}<span class="badge bg-dark border border-secondary text-primary">History</span>{% endif %}
+                                        {% if u.can_manage_bookings %}<span class="badge bg-dark border border-secondary text-warning">Bookings</span>{% endif %}
+                                        {% if u.can_manage_payments %}<span class="badge bg-dark border border-secondary text-warning">Payments</span>{% endif %}
+                                        {% if u.can_manage_sales %}<span class="badge bg-dark border border-secondary text-warning">Sales</span>{% endif %}
+                                        {% if u.can_view_delivery_rent %}<span class="badge bg-dark border border-secondary text-warning">Delivery Rent</span>{% endif %}
+                                        {% if u.can_view_client_ledger %}<span class="badge bg-dark border border-secondary text-primary">Client Ledger</span>{% endif %}
+                                        {% if u.can_view_supplier_ledger %}<span class="badge bg-dark border border-secondary text-primary">Supplier Ledger</span>{% endif %}
+                                        {% if u.can_view_decision_ledger %}<span class="badge bg-dark border border-secondary text-primary">Decision Ledger</span>{% endif %}
+                                        {% if u.can_manage_pending_bills %}<span class="badge bg-dark border border-secondary text-danger">Pending Bills</span>{% endif %}
+                                        {% if u.can_view_reports %}<span class="badge bg-dark border border-secondary text-success">Reports</span>{% endif %}
+                                        {% if u.can_manage_notifications %}<span class="badge bg-dark border border-secondary text-info">Notifications</span>{% endif %}
+                                        {% if u.can_import_export %}<span class="badge bg-dark border border-secondary text-warning">Import/Export</span>{% endif %}
+                                        {% if u.can_manage_clients %}<span class="badge bg-dark border border-secondary text-light">Clients</span>{% endif %}
+                                        {% if u.can_manage_suppliers %}<span class="badge bg-dark border border-secondary text-light">Suppliers</span>{% endif %}
+                                        {% if u.can_manage_materials %}<span class="badge bg-dark border border-secondary text-light">Materials</span>{% endif %}
+                                        {% if u.can_manage_delivery_persons %}<span class="badge bg-dark border border-secondary text-light">Delivery Persons</span>{% endif %}
+                                        {% if u.can_manage_accounts %}<span class="badge bg-dark border border-secondary text-success">Financial Accounts</span>{% endif %}
+                                        {% if u.can_view_cash_flow %}<span class="badge bg-dark border border-secondary text-success">Cash Flow</span>{% endif %}
+                                        {% if u.can_access_settings %}<span class="badge bg-dark border border-secondary text-light">Settings</span>{% endif %}
+                                        {% if u.restrict_backdated_edit %}<span class="badge bg-dark border border-secondary text-danger">Restrict Back-Date GRN Editing</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td class="text-end">
+                                    {% if current_user.role == 'admin' and (u.username or '')|lower != 'admin' %}
+                                    <button class="btn btn-link text-info p-0 me-2" data-bs-toggle="modal" data-bs-target="#editUser{{ u.id }}" title="Edit role / permissions"><i class="bi bi-pencil-square"></i></button>
+                                    <form action="{{ url_for('toggle_user_status', id=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('{% if (u.status or 'active')|lower == 'active' %}Suspend {{ u.username }}? They cannot log in. Past sales stay under this name.{% else %}Activate {{ u.username }} again?{% endif %}')">
+                                        {% if (u.status or 'active')|lower == 'active' %}
+                                        <button type="submit" class="btn btn-outline-warning btn-sm">Suspend</button>
+                                        {% else %}
+                                        <button type="submit" class="btn btn-outline-success btn-sm">Activate</button>
+                                        {% endif %}
+                                    </form>
+                                    {% else %}
+                                    <span class="text-white-50 small">Locked</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if current_user.role == 'admin' %}
+                <div class="mt-3">
+                    <h6 class="small fw-bold text-warning text-uppercase mb-1"><i class="bi bi-grid-3x3-gap me-1"></i>Feature Access Matrix — who can use what</h6>
+                    <p class="x-small text-white-50 mb-2">Every module feature on the left, every user on the top. <span class="text-success">ALL</span> = Admin/Root always has it. Green check = access granted. Blank = blocked at login gate.</p>
+                    <div class="table-responsive" style="max-height: 420px; overflow:auto; border:1px solid rgba(255,255,255,.12); border-radius:8px;">
+                        <table class="table table-dark table-sm align-middle mb-0">
+                            <thead class="x-small text-uppercase text-white-50 sticky-top">
+                                <tr>
+                                    <th>Feature</th>
+                                    {% for u in users %}
+                                    <th class="text-center" title="{{ u.username }} ({{ u.role }})"><span class="{{ 'text-warning' if u.role in ('admin','root') else '' }}">{{ u.username }}</span></th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody class="x-small">
+                                {% for group_title, fields in permission_groups %}
+                                <tr class="table-warning">
+                                    <td colspan="{{ users|length + 1 }}" class="fw-bold text-warning py-1">{{ group_title }}</td>
+                                </tr>
+                                {% for field, label in fields %}
+                                <tr class="border-secondary">
+                                    <td class="fw-bold">{{ label }} <span class="text-white-50">( {{ field }} )</span></td>
+                                    {% for u in users %}
+                                    <td class="text-center">
+                                        {% if u.role in ('admin', 'root') %}
+                                        <span class="badge bg-success" title="Admin/Root: full access">ALL</span>
+                                        {% elif user_perm_values[u.id].get(field) %}
+                                        <i class="bi bi-check-lg text-success"></i>
+                                        {% else %}
+                                        <span class="text-white-25">·</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="x-small text-white-50 mt-2 mb-0"><i class="bi bi-info-circle me-1"></i>New in this release: <strong class="text-warning">Financial Accounts</strong> (Khata) and <strong class="text-warning">Cash Flow</strong> — both start <strong>OFF</strong> for every user until you tick them above.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-secondary bg-dark shadow-sm mb-3" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-key me-2 text-warning"></i>Security</h6>
+            </div>
+            <div class="card-body p-3">
+                <form action="/change_password" method="POST">
+                    <div class="input-group input-group-sm">
+                        <input type="password" name="password" class="form-control bg-dark text-white border-secondary" placeholder="New Password" required>
+                        <button type="submit" class="btn btn-primary fw-bold">Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card border-secondary bg-dark shadow-sm mb-3" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-clock-history me-2 text-info"></i>Who Did What</h6>
+                <a href="{{ url_for('login_sessions_page') }}" class="btn btn-outline-success btn-sm fw-bold">Live logins</a>
+                <a href="{{ url_for('activity_log_page') }}" class="btn btn-outline-info btn-sm fw-bold">Full log</a>
+            </div>
+            <div class="card-body p-2">
+                <p class="text-white-50 x-small mb-2 px-1">Every create / edit / delete is stamped with the signed-in user.</p>
+                <div class="table-responsive" style="max-height: 260px; overflow:auto;">
+                    <table class="table table-dark table-sm mb-0 align-middle">
+                        <thead><tr><th>When</th><th>User</th><th>Action</th></tr></thead>
+                        <tbody>
+                        {% for row in recent_audit or [] %}
+                        <tr>
+                            <td class="x-small text-white-50">{{ row.timestamp.strftime('%m-%d %H:%M') if row.timestamp else '' }}</td>
+                            <td class="fw-bold text-warning">{{ row.username or '—' }}</td>
+                            <td class="x-small">{{ row.action }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-white-50 text-center py-3">No activity yet.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {% if current_user.role == 'admin' %}
+        <div class="card border-secondary bg-dark shadow-sm mb-3" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-database me-2 text-success"></i>Data Backup & Restore</h6>
+            </div>
+            <div class="card-body p-3">
+                <p class="text-white-50 x-small mb-2">
+                    Single-store backup/restore via the Import & Export center (XLSX).
+                </p>
+                <a href="{{ url_for('import_export.import_export_page') }}" class="btn btn-success btn-sm w-100 fw-bold mb-2">
+                    <i class="bi bi-arrow-left-right me-1"></i>Open Import & Export Center
+                </a>
+                <form method="POST" action="{{ url_for('import_export.transfer_export') }}">
+                    <input type="hidden" name="sections" value="literal_all">
+                    <button type="submit" class="btn btn-outline-success btn-sm w-100 fw-bold">
+                        <i class="bi bi-download me-1"></i>Download XLSX Backup
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if current_user.role == 'admin' %}
+        <div class="card border-secondary bg-dark shadow-sm mb-3" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-shield-check me-2 text-info"></i>Data Reconciliation</h6>
+            </div>
+            <div class="card-body p-3">
+                <p class="text-white-50 x-small mb-2">
+                    Scan bill links and delete-state consistency across Entries, Sales, Bookings, Payments, Pending Bills, and Delivery Rent.
+                </p>
+                <div class="d-flex gap-2 mb-3">
+                    <form action="{{ url_for('reconcile_data') }}" method="POST" class="flex-fill">
+                        <input type="hidden" name="apply_fixes" value="0">
+                        <button type="submit" class="btn btn-outline-info btn-sm w-100 fw-bold">Scan Only</button>
+                    </form>
+                    <form action="{{ url_for('reconcile_data') }}" method="POST" class="flex-fill">
+                        <input type="hidden" name="apply_fixes" value="1">
+                        <button type="submit" class="btn btn-info btn-sm w-100 fw-bold text-dark" onclick="return confirm('Apply auto-fixes for detected mismatches?');">Scan + Auto Fix</button>
+                    </form>
+                </div>
+                {% if recon_report %}
+                <div class="border border-secondary rounded p-2 small">
+                    <div class="text-white mb-1"><span class="text-white-50">Ran At:</span> {{ recon_report.ran_at }}</div>
+                    <div class="text-white mb-1"><span class="text-white-50">Mode:</span> {{ recon_report.mode }}</div>
+                    <div class="text-white mb-1"><span class="text-white-50">Entries Scanned:</span> {{ recon_report.entries_scanned }}</div>
+                    <div class="text-warning mb-1"><span class="text-white-50">Broken Refs:</span> {{ recon_report.broken_refs_count }}</div>
+                    <div class="text-info mb-1"><span class="text-white-50">Direct Sale Mismatches:</span> {{ recon_report.direct_sale_mismatch_count }}</div>
+                    <div class="text-info mb-1"><span class="text-white-50">Booking Mismatches:</span> {{ recon_report.booking_mismatch_count }}</div>
+                    <div class="text-info mb-1"><span class="text-white-50">Payment Mismatches:</span> {{ recon_report.payment_mismatch_count }}</div>
+                    <div class="text-success"><span class="text-white-50">Fixes Applied:</span> {{ recon_report.fixes_applied }}</div>
+                    {% if recon_report.broken_refs_sample %}
+                    <hr class="border-secondary my-2">
+                    <div class="text-white-50 mb-1">Broken Reference Sample</div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Entry</th>
+                                    <th>Ref</th>
+                                    <th>Client</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in recon_report.broken_refs_sample %}
+                                <tr>
+                                    <td>#{{ row.entry_id }}</td>
+                                    <td class="text-warning">{{ row.ref }}</td>
+                                    <td>{{ row.client }} <small class="text-white-50">{{ row.client_code }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if current_user.role == 'admin' %}
+        <div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #ef4444 !important; border-radius: 15px;">
+            <div class="card-header bg-transparent border-danger py-2">
+                <h6 class="fw-bold text-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Granular Data Wipe</h6>
+            </div>
+            <div class="card-body p-3">
+                <p class="text-white-50 x-small mb-3">Select yard datasets to clear. Users and passwords are <strong>never</strong> wiped. Take a backup first if you may restore later.</p>
+                <form action="{{ url_for('delete_selected_data') }}" method="POST">
+                    <div class="form-check small mb-2">
+                        <input class="form-check-input" type="checkbox" id="wipeCheckAll">
+                        <label class="form-check-label text-warning fw-bold" for="wipeCheckAll">Check All Datasets</label>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="clients" id="wipeClients"><label class="form-check-label text-white" for="wipeClients">Clients</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="suppliers" id="wipeSuppliers"><label class="form-check-label text-white" for="wipeSuppliers">Suppliers</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="supplier_payments" id="wipeSupplierPayments"><label class="form-check-label text-white" for="wipeSupplierPayments">Supplier Payments</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="pending_bills" id="wipeBills"><label class="form-check-label text-white" for="wipeBills">Pending Bills</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="notifications" id="wipeNotifications"><label class="form-check-label text-white" for="wipeNotifications">Notifications Data</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="dispatching" id="wipeDispatch"><label class="form-check-label text-white" for="wipeDispatch">Dispatch (OUT)</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="receiving" id="wipeReceive"><label class="form-check-label text-white" for="wipeReceive">Receive (IN)</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="grn" id="wipeGrn"><label class="form-check-label text-white" for="wipeGrn">GRN</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="materials" id="wipeMaterials"><label class="form-check-label text-white" for="wipeMaterials">Materials</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="material_categories" id="wipeMaterialCategories"><label class="form-check-label text-white" for="wipeMaterialCategories">Material Categories</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="direct_sales" id="wipeDirectSales"><label class="form-check-label text-white" for="wipeDirectSales">Direct Sales</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="material_returns" id="wipeMaterialReturns"><label class="form-check-label text-white" for="wipeMaterialReturns">Material Returns</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="delivery_rents" id="wipeDeliveryRents"><label class="form-check-label text-white" for="wipeDeliveryRents">Delivery Rents</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="delivery_persons" id="wipeDeliveryPersons"><label class="form-check-label text-white" for="wipeDeliveryPersons">Delivery Persons</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="invoices" id="wipeInvoices"><label class="form-check-label text-white" for="wipeInvoices">Invoices</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="payments" id="wipePayments"><label class="form-check-label text-white" for="wipePayments">Payments</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="bookings" id="wipeBookings"><label class="form-check-label text-white" for="wipeBookings">Bookings</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="accounts" id="wipeAccounts"><label class="form-check-label text-white" for="wipeAccounts">Financial Accounts</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="account_categories" id="wipeAccountCategories"><label class="form-check-label text-white" for="wipeAccountCategories">Account Categories</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="account_transactions" id="wipeAccountTransactions"><label class="form-check-label text-white" for="wipeAccountTransactions">Account Transactions</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="cash_reconciliation_data" id="wipeCashReconciliation"><label class="form-check-label text-white" for="wipeCashReconciliation">Cash Reconciliation Data</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="cash_reconciliation_audit" id="wipeCashReconciliationAudit"><label class="form-check-label text-white" for="wipeCashReconciliationAudit">Cash Audit Trail</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="delivery_person_payments" id="wipeDeliveryPersonPayments"><label class="form-check-label text-white" for="wipeDeliveryPersonPayments">Driver Payments</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="direct_sale_drafts" id="wipeDirectSaleDrafts"><label class="form-check-label text-white" for="wipeDirectSaleDrafts">Unsaved Sales Drafts</label></div></div>
+
+                    </div>
+
+                    <button type="button" id="openWipeModal" class="btn btn-danger btn-sm w-100 fw-bold" data-bs-toggle="modal" data-bs-target="#wipeConfirmModal">Wipe Selected</button>
+                
+                </form>
+
+                <!-- Wipe confirmation modal -->
+                <div class="modal fade" id="wipeConfirmModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <form id="wipeConfirmForm" class="modal-content border-danger bg-dark text-white" action="{{ url_for('delete_selected_data') }}" method="POST">
+                            <div class="modal-header border-danger py-2">
+                                <h6 class="fw-bold mb-0 text-danger">Confirm Data Wipe</h6>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="text-white-50 small">You are about to permanently delete the following datasets:</p>
+                                <ul id="selectedDatasetsList" class="text-white small mb-3"></ul>
+                                <div class="border border-secondary rounded p-2 mb-3 bg-black bg-opacity-25">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small fw-bold text-warning">Dry-run preview</span>
+                                        <span id="wipePreviewRows" class="badge bg-danger">0 rows</span>
+                                    </div>
+                                    <div class="x-small text-white-50 mb-1">Affected tables</div>
+                                    <div id="wipePreviewTables" class="x-small text-white mb-2">Loading...</div>
+                                    <div class="x-small text-white-50 mb-1">Estimated rows by dataset</div>
+                                    <ul id="wipePreviewDatasetRows" class="x-small text-white mb-0 ps-3"></ul>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="text" id="modal_confirm_text" name="confirm_text" class="form-control form-control-sm bg-dark text-white border-danger" placeholder="Type DELETE SELECTED to confirm" required>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="ackCheck"><label class="form-check-label text-white-50" for="ackCheck">I understand this action is irreversible</label>
+                                </div>
+                                <div class="form-check mb-2" id="hardDeleteOverrideWrap" style="display:none;">
+                                    <input class="form-check-input" type="checkbox" id="hardDeleteOverride" name="hard_delete_override" value="1">
+                                    <label class="form-check-label text-danger" for="hardDeleteOverride">Enable hard cleanup for blocked datasets</label>
+                                </div>
+                                <div class="small text-danger" id="hardDeleteHint" style="display:none;">
+                                    Hard cleanup requires stronger confirmation text: <strong>DELETE ALL DATA</strong>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="submit" id="modal_submit_btn" class="btn btn-danger w-100 fw-bold" disabled>Confirm Wipe</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modals -->
+{% if current_user.role == 'admin' %}
+<div class="modal fade" id="addUserModal" tabindex="-1">
+
+<!-- Wipe modal client-side script -->
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const openBtn = document.getElementById('openWipeModal');
+    const wipeCheckAll = document.getElementById('wipeCheckAll');
+    const wipeTargets = Array.from(document.querySelectorAll('input[name="delete_targets"]'));
+    function syncWipeCheckAllState() {
+        if (!wipeCheckAll || !wipeTargets.length) return;
+        const checkedCount = wipeTargets.filter(c => c.checked).length;
+        wipeCheckAll.checked = checkedCount === wipeTargets.length;
+        wipeCheckAll.indeterminate = checkedCount > 0 && checkedCount < wipeTargets.length;
+    }
+    if (wipeCheckAll && wipeTargets.length) {
+        wipeCheckAll.addEventListener('change', function() {
+            wipeTargets.forEach(c => { c.checked = wipeCheckAll.checked; });
+            wipeCheckAll.indeterminate = false;
+        });
+        wipeTargets.forEach(c => c.addEventListener('change', syncWipeCheckAllState));
+        syncWipeCheckAllState();
+    }
+    if (openBtn) {
+        openBtn.addEventListener('click', function(e){
+            const checked = Array.from(document.querySelectorAll('input[name="delete_targets"]:checked'));
+            if (!checked.length) {
+                alert('Please select at least one dataset to wipe');
+                e.preventDefault();
+                return;
+            }
+            const forbiddenTargets = new Set(['clients','materials','pending_bills','dispatching','receiving','direct_sales','material_returns','payments','bookings','invoices','accounts','delivery_person_payments']);
+            const hasBlockedTargets = checked.some(c => forbiddenTargets.has(c.value));
+            const list = document.getElementById('selectedDatasetsList');
+            list.innerHTML = '';
+            const previewRows = document.getElementById('wipePreviewRows');
+            const previewTables = document.getElementById('wipePreviewTables');
+            const previewDatasetRows = document.getElementById('wipePreviewDatasetRows');
+            previewRows.innerText = 'Loading';
+            previewTables.innerText = 'Loading...';
+            previewDatasetRows.innerHTML = '';
+            const form = document.getElementById('wipeConfirmForm');
+            // remove previous hidden inputs
+            form.querySelectorAll('input[name="delete_targets"]').forEach(n => n.remove());
+            const selectedValues = [];
+            checked.forEach(c => {
+                const lbl = document.querySelector('label[for="' + c.id + '"]');
+                const labelText = lbl ? lbl.innerText.trim() : c.value;
+                const li = document.createElement('li'); li.innerText = labelText; list.appendChild(li);
+                const hidden = document.createElement('input'); hidden.type='hidden'; hidden.name='delete_targets'; hidden.value=c.value; form.appendChild(hidden);
+                selectedValues.push(c.value);
+            });
+            fetch('{{ url_for("data_wipe_preview") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({delete_targets: selectedValues})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) throw new Error(data.error || 'Preview unavailable');
+                previewRows.innerText = String(data.estimated_rows || 0) + ' rows';
+                previewTables.innerText = (data.affected_tables || []).join(', ') || 'None';
+                previewDatasetRows.innerHTML = '';
+                (data.selected_datasets || []).forEach(item => {
+                    const li = document.createElement('li');
+                    li.innerText = item.label + ': ' + (item.estimated_rows || 0);
+                    previewDatasetRows.appendChild(li);
+                });
+            })
+            .catch(() => {
+                previewRows.innerText = 'Preview failed';
+                previewTables.innerText = 'Unable to calculate preview';
+                previewDatasetRows.innerHTML = '';
+            });
+            document.getElementById('modal_confirm_text').value='';
+            document.getElementById('modal_confirm_text').placeholder = 'Type DELETE SELECTED to confirm';
+            document.getElementById('ackCheck').checked=false;
+            document.getElementById('hardDeleteOverride').checked=false;
+            document.getElementById('hardDeleteOverrideWrap').style.display = hasBlockedTargets ? '' : 'none';
+            document.getElementById('hardDeleteHint').style.display = 'none';
+            document.getElementById('modal_submit_btn').disabled=true;
+        });
+
+        function checkModalEnable(){
+            const hardMode = document.getElementById('hardDeleteOverride').checked;
+            const requiredText = hardMode ? 'DELETE ALL DATA' : 'DELETE SELECTED';
+            document.getElementById('modal_confirm_text').placeholder = hardMode
+                ? 'Type DELETE ALL DATA to confirm hard cleanup'
+                : 'Type DELETE SELECTED to confirm';
+            document.getElementById('hardDeleteHint').style.display = hardMode ? '' : 'none';
+            const confirmed = document.getElementById('modal_confirm_text').value === requiredText;
+            const acked = document.getElementById('ackCheck').checked;
+            document.getElementById('modal_submit_btn').disabled = !(confirmed && acked);
+        }
+        document.getElementById('modal_confirm_text').addEventListener('input', checkModalEnable);
+        document.getElementById('ackCheck').addEventListener('change', checkModalEnable);
+        document.getElementById('hardDeleteOverride').addEventListener('change', checkModalEnable);
+    }
+});
+</script>
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/add_user" method="POST" class="modal-content border-secondary bg-dark text-white">
+            <div class="modal-header border-secondary py-2">
+                <h6 class="fw-bold mb-0">Create User</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" name="username" class="form-control bg-dark text-white border-secondary" placeholder="Username" required>
+                </div>
+                <div class="mb-3">
+                    <input type="password" name="password" class="form-control bg-dark text-white border-secondary" placeholder="Password (leave blank to use default)">
+                    <small class="text-white-50 d-block mt-1">Users log in with Tenant Name + Username + Password.</small>
+                </div>
+                <div class="mb-3">
+                    <select name="role" class="form-select bg-dark text-white border-secondary">
+                        <option value="user">Standard User</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                <h6 class="small fw-bold text-warning text-uppercase mb-2">Module Access (Grouped)</h6>
+                {{ perm_groups(permission_groups, default_permissions, 'addUser') }}
+                <div class="mt-3">
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" name="restrict_backdated_edit" id="restrictBackdatedAdd">
+                        <label class="form-check-label" for="restrictBackdatedAdd">Restrict Back-Date GRN Editing</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning w-100 fw-bold">Create Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% for u in users %}
+{% if u.username != 'admin' %}
+<div class="modal fade" id="editUser{{ u.id }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/edit_user_permissions/{{ u.id }}" method="POST" class="modal-content border-secondary bg-dark text-white">
+            <div class="modal-header border-secondary py-2">
+                <h6 class="fw-bold mb-0">Edit Permissions: {{ u.username }}</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="x-small text-white-50">Role</label>
+                    <select name="role" class="form-select bg-dark text-white border-secondary">
+                        <option value="user" {{ 'selected' if u.role == 'user' }}>Standard User</option>
+                        <option value="admin" {{ 'selected' if u.role == 'admin' }}>Administrator</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="x-small text-white-50">Reset Password (Optional)</label>
+                    <input type="text" name="password" class="form-control bg-dark text-white border-secondary" placeholder="Leave blank to keep existing password">
+                </div>
+                <h6 class="small fw-bold text-warning text-uppercase mb-2">Module Access (Grouped)</h6>
+                {{ perm_groups(permission_groups, user_perm_values[u.id], 'editUser') }}
+                <div class="mt-3">
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" name="restrict_backdated_edit" id="restrictBackdatedEdit{{ u.id }}" {{ 'checked' if u.restrict_backdated_edit }}>
+                        <label class="form-check-label" for="restrictBackdatedEdit{{ u.id }}">Restrict Back-Date GRN Editing</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning w-100 fw-bold">Update Permissions</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,21 @@
+{# Shared filter bar — wrap any GET form with consistent label / input heights.
+   Usage:
+     {% call fb.bar(action='/payments') %}
+       <div class="ui-field"><label class="ui-label">From</label>
+         <input type="date" name="from" class="form-control"></div>
+       …
+       <div class="ui-actions">
+         <button class="btn btn-warning"><i class="bi bi-funnel"></i> Apply</button>
+         <a class="btn btn-outline-secondary" href="{{ request.path }}">Clear</a>
+       </div>
+     {% endcall %}
+#}
+{% macro bar(action='', method='get', extra_class='') -%}
+<form class="ui-card ui-form" method="{{ method }}" action="{{ action }}">
+  <div class="ui-card-body">
+    <div class="ui-row {{ extra_class }}">
+      {{ caller() }}
+    </div>
+  </div>
+</form>
+{%- endmacro %}

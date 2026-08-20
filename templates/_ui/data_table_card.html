@@ -1,0 +1,23 @@
+{# Shared data-table card wrapper.
+   Usage:
+     {% call dt.card('Stock by Brand', 'bi-tags', toolbar) %}
+       <table class="ui-table">…</table>
+     {% endcall %}
+   Args:
+     title   — header text
+     icon    — bootstrap icon class
+     toolbar — optional caller block (right-side buttons)
+#}
+{% macro card(title, icon='bi-table', toolbar=None) -%}
+<div class="ui-card">
+  <div class="ui-card-header">
+    <h5><i class="bi {{ icon }}"></i> {{ title }}</h5>
+    {% if toolbar %}<div class="ui-toolbar">{{ toolbar }}</div>{% endif %}
+  </div>
+  <div class="ui-card-body flush">
+    <div class="ui-table-wrap">
+      {{ caller() }}
+    </div>
+  </div>
+</div>
+{%- endmacro %}

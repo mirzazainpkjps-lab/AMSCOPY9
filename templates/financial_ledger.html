@@ -1,0 +1,285 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+  .ledger-table th, .ledger-table td { white-space: nowrap; vertical-align: middle; }
+  .ledger-table td.description { white-space: normal; min-width: 250px; }
+  .ledger-number { font-variant-numeric: tabular-nums; }
+  .ledger-card { background: #1e293b; border: 1px solid #475569; border-radius: 14px; }
+  @media (max-width: 767px) { .ledger-table { min-width: 980px; } }
+</style>
+
+{% set is_client = entity_type == 'client' %}
+{% set is_supplier = entity_type == 'supplier' %}
+{% set is_driver = entity_type == 'delivery_person' %}
+{% set title = 'Client Ledger' if is_client else ('Supplier Ledger' if is_supplier else 'Delivery Person Ledger') %}
+{% set entity_name = entity.name or '' %}
+
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h2 class="fw-bold text-warning mb-0"><i class="bi {{ 'bi-person-lines-fill' if is_client else ('bi-box-seam' if is_supplier else 'bi-truck') }} me-2"></i>{{ title }}</h2>
+      <span class="badge bg-dark border border-secondary text-info">{{ entity_name }}</span>
+    </div>
+    <div class="text-white-50 small mt-1">
+      {% if is_client %}{{ entity.code or 'No account code' }}{% endif %}
+      {% if entity.phone %} · {{ entity.phone }}{% endif %}
+      {% if entity.address %} · {{ entity.address }}{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if is_client %}
+      <a class="btn btn-outline-success fw-bold" href="{{ url_for('download_client_ledger', id=entity.id, action='download', start_date=filters.start_date, end_date=filters.end_date, type=filters.type_filter, q=filters.query, amount_min=filters.amount_min, amount_max=filters.amount_max, account=filters.account_filter, status=filters.status_filter) }}"><i class="bi bi-download me-1"></i>Export / download</a>
+    {% elif is_supplier %}
+      <a class="btn btn-outline-success fw-bold" href="{{ url_for('download_supplier_ledger', id=entity.id, action='download', start_date=filters.start_date, end_date=filters.end_date, type=filters.type_filter, q=filters.query, amount_min=filters.amount_min, amount_max=filters.amount_max, account=filters.account_filter, status=filters.status_filter) }}"><i class="bi bi-download me-1"></i>Export / download</a>
+    {% else %}
+      <a class="btn btn-outline-success fw-bold" href="{{ url_for('download_delivery_person_ledger', id=entity.id, action='download', start_date=filters.start_date, end_date=filters.end_date, type=filters.type_filter, q=filters.query, amount_min=filters.amount_min, amount_max=filters.amount_max, account=filters.account_filter, status=filters.status_filter) }}"><i class="bi bi-download me-1"></i>Export / download</a>
+    {% endif %}
+    {% if is_client %}<a class="btn btn-outline-success" href="{{ url_for('accounts.client_payments', client=entity.code or entity.name) }}"><i class="bi bi-cash-stack me-1"></i>Payments</a>{% endif %}
+    {% if is_supplier %}<a class="btn btn-outline-info" href="{{ url_for('accounts.supplier_payments', supplier=entity.id) }}"><i class="bi bi-cash-stack me-1"></i>Payments</a>{% endif %}
+    {% if is_driver %}<a class="btn btn-outline-info" href="{{ url_for('delivery_rents_page', driver=entity.name) }}"><i class="bi bi-truck me-1"></i>Delivery rents</a><button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#driverSettlementModal"><i class="bi bi-cash-stack me-1"></i>Pay driver</button>{% endif %}
+    {% if opening_url %}<button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#openingBalanceModal"><i class="bi bi-wallet2 me-1"></i>Opening balance</button>{% endif %}
+    <a class="btn btn-outline-light" href="{{ back_url }}">Back</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card ledger-card h-100"><div class="card-body"><div class="text-white-50 small">Opening balance</div><div class="fs-4 fw-bold text-info ledger-number">Rs. {{ "{:,.2f}".format((entity.opening_balance or 0)) }}</div>{% if entity.opening_balance_date %}<div class="text-white-50 small">{{ entity.opening_balance_date.strftime('%Y-%m-%d') }}</div>{% endif %}</div></div></div>
+  <div class="col-6 col-xl-3"><div class="card ledger-card h-100"><div class="card-body"><div class="text-white-50 small">Total debit</div><div class="fs-4 fw-bold text-warning ledger-number">Rs. {{ "{:,.2f}".format(ledger.total_debit or 0) }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card ledger-card h-100"><div class="card-body"><div class="text-white-50 small">Total credit</div><div class="fs-4 fw-bold text-success ledger-number">Rs. {{ "{:,.2f}".format(ledger.total_credit or 0) }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card ledger-card h-100"><div class="card-body"><div class="text-white-50 small">Closing balance</div><div class="fs-4 fw-bold {{ 'text-danger' if (ledger.closing_balance or 0) > 0 else 'text-success' }} ledger-number">Rs. {{ "{:,.2f}".format(filtered_closing or 0) }}</div><div class="text-white-50 small">{{ ledger.status }}</div></div></div></div>
+</div>
+
+<div class="card ledger-card shadow-sm mb-4">
+  <div class="card-header bg-transparent border-secondary">
+    <div class="d-flex justify-content-between align-items-center gap-2"><h5 class="mb-0 text-warning"><i class="bi bi-funnel me-2"></i>Ledger filters</h5><a href="{{ request.path }}" class="btn btn-sm btn-outline-light">Clear filters</a></div>
+  </div>
+  <div class="card-body">
+    <form method="GET" class="row g-3">
+      {% if is_client %}
+      <div class="col-12 col-lg-3"><label class="form-label text-white-50 small fw-bold">Client account</label><input class="form-control bg-dark text-white border-secondary" list="ledgerEntityOptions" value="{{ entity.code or entity.name }}" readonly><datalist id="ledgerEntityOptions">{% for item in selector_entities %}<option value="{{ item.code }}">{{ item.name }}</option>{% endfor %}</datalist></div>
+      {% elif is_supplier %}
+      <div class="col-12 col-lg-3"><label class="form-label text-white-50 small fw-bold">Supplier</label><input class="form-control bg-dark text-white border-secondary" list="ledgerEntityOptions" name="supplier_search" value="{{ entity.name }}" placeholder="Supplier name/code…"><datalist id="ledgerEntityOptions">{% for item in selector_entities %}<option value="{{ item.name }}">{{ item.name }}</option>{% endfor %}</datalist></div>
+      {% else %}
+      <div class="col-12 col-lg-3"><label class="form-label text-white-50 small fw-bold">Delivery person</label><input class="form-control bg-dark text-white border-secondary" list="ledgerEntityOptions" name="driver_search" value="{{ entity.name }}" placeholder="Delivery person…"><datalist id="ledgerEntityOptions">{% for item in selector_entities %}<option value="{{ item.name }}">{{ item.name }}</option>{% endfor %}</datalist></div>
+      {% endif %}
+      <div class="col-6 col-lg-2"><label class="form-label text-white-50 small fw-bold">Start date</label><input type="date" name="start_date" value="{{ filters.start_date or '' }}" class="form-control bg-dark text-white border-secondary"></div>
+      <div class="col-6 col-lg-2"><label class="form-label text-white-50 small fw-bold">End date</label><input type="date" name="end_date" value="{{ filters.end_date or '' }}" class="form-control bg-dark text-white border-secondary"></div>
+      <div class="col-6 col-lg-2"><label class="form-label text-white-50 small fw-bold">Transaction type</label><input type="search" name="type" value="{{ filters.type_filter or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="GRN / Payment…"></div>
+      <div class="col-6 col-lg-2"><label class="form-label text-white-50 small fw-bold">Search / reference</label><input type="search" name="q" value="{{ filters.query or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Bill, note, account…"></div>
+      <div class="col-6 col-lg-2"><label class="form-label text-white-50 small fw-bold">Account</label><input type="search" name="account" value="{{ filters.account_filter or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Account / note…"></div>
+      <div class="col-6 col-lg-2"><label class="form-label text-white-50 small fw-bold">Status</label><select name="status" class="form-select bg-dark text-white border-secondary"><option value="">All movements</option><option value="debit" {{ 'selected' if filters.status_filter == 'debit' }}>Debit / due</option><option value="credit" {{ 'selected' if filters.status_filter == 'credit' }}>Credit / paid</option><option value="zero" {{ 'selected' if filters.status_filter == 'zero' }}>Zero movement</option></select></div>
+      <div class="col-6 col-lg-1"><label class="form-label text-white-50 small fw-bold">Min</label><input type="number" step="0.01" name="amount_min" value="{{ filters.amount_min or '' }}" class="form-control bg-dark text-white border-secondary"></div>
+      <div class="col-6 col-lg-1"><label class="form-label text-white-50 small fw-bold">Max</label><input type="number" step="0.01" name="amount_max" value="{{ filters.amount_max or '' }}" class="form-control bg-dark text-white border-secondary"></div>
+      <div class="col-12 col-lg-1 d-grid align-items-end"><button class="btn btn-warning text-dark fw-bold" type="submit">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+{% if is_client and obligations %}
+<div class="card ledger-card shadow-sm mb-4">
+  <div class="card-header bg-transparent border-secondary"><h5 class="mb-0 text-info"><i class="bi bi-receipt me-2"></i>Underlying bills and remaining amounts</h5><div class="text-white-50 small mt-1">This is a non-destructive FIFO allocation view. Every original bill remains in its source table.</div></div>
+  <div class="table-responsive">
+    <table class="table table-dark table-sm mb-0">
+      <thead><tr><th class="ps-4">Date</th><th>Source</th><th>Bill</th><th class="text-end">Gross</th><th class="text-end">Embedded paid/credit</th><th class="text-end pe-4">Remaining</th></tr></thead>
+      <tbody>{% for bill in obligations %}<tr><td class="ps-4 text-white-50">{{ bill.date.strftime('%Y-%m-%d') if bill.date and bill.date.year > 1 else '—' }}</td><td>{{ bill.source_type }}</td><td>{{ bill.reference }}</td><td class="text-end">Rs. {{ "{:,.2f}".format(bill.gross or 0) }}</td><td class="text-end text-success">Rs. {{ "{:,.2f}".format(bill.embedded_credit or 0) }}</td><td class="text-end pe-4 fw-bold {{ 'text-warning' if bill.remaining > 0 else 'text-success' }}">Rs. {{ "{:,.2f}".format(bill.remaining or 0) }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card ledger-card shadow-sm">
+  <div class="card-header bg-transparent border-secondary d-flex justify-content-between align-items-center"><h5 class="mb-0 text-success"><i class="bi bi-journal-text me-2"></i>Financial transaction ledger</h5><span class="badge bg-success">{{ total }} movements</span></div>
+  <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle mb-0 ledger-table">
+      <thead class="bg-slate-900"><tr><th class="ps-4">Date</th><th>Type</th><th>Reference</th><th class="description">Description</th><th>Account / notes</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Running balance</th><th class="text-end pe-4">Actions</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td class="ps-4 text-white-50">{{ row.date.strftime('%Y-%m-%d %H:%M') if row.date and row.date.year > 1 else '—' }}</td>
+          <td><span class="badge bg-dark border border-secondary">{{ row.type }}</span></td>
+          <td class="text-warning fw-bold">{% if row.reference and row.type not in ['OPENING', 'Carry Forward'] %}<a class="text-warning text-decoration-none" href="{{ url_for('view_bill', bill_no=row.reference) }}">{{ row.reference }}</a>{% elif row.reference %}{{ row.reference }}{% else %}—{% endif %}</td>
+          <td class="description">{{ row.description }}</td>
+          <td class="text-white-50 small">{{ row.account or row.note or '—' }}</td>
+          <td class="text-end text-warning ledger-number">{{ "{:,.2f}".format(row.debit or 0) if row.debit else '—' }}</td>
+          <td class="text-end text-success ledger-number">{{ "{:,.2f}".format(row.credit or 0) if row.credit else '—' }}</td>
+          <td class="text-end fw-bold ledger-number">{{ "{:,.2f}".format(row.balance or 0) }}</td>
+          <td class="text-end pe-4">
+            {% if is_driver and row.source_type == 'DeliveryPersonPayment' and row.source_id %}
+              {% if not row.source.is_void %}<button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editDriverPayment{{ row.source_id }}" title="Edit settlement"><i class="bi bi-pencil"></i></button><form method="POST" action="{{ url_for('void_delivery_person_payment', id=row.source_id) }}" class="d-inline" onsubmit="return confirm('Reverse this settlement? The historical row will be preserved.');"><button class="btn btn-sm btn-outline-danger" title="Reverse settlement"><i class="bi bi-arrow-counterclockwise"></i></button></form>{% else %}<form method="POST" action="{{ url_for('restore_delivery_person_payment', id=row.source_id) }}" class="d-inline"><button class="btn btn-sm btn-outline-success" title="Restore settlement"><i class="bi bi-arrow-repeat"></i></button></form>{% endif %}
+            {% else %}<span class="text-white-50">—</span>{% endif %}
+          </td>
+        </tr>
+      {% else %}<tr><td colspan="9" class="text-center py-5 text-white-50">No ledger movements match these filters.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer bg-transparent border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2"><span class="text-white-50 small">{{ total }} filtered movements · complete history remains in the source tables</span><span class="text-white-50 small">Page {{ page }} of {{ total_pages }}</span></div>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="mt-3" aria-label="Ledger pagination"><ul class="pagination pagination-sm justify-content-center flex-wrap">
+  <li class="page-item {{ 'disabled' if page <= 1 else '' }}"><a class="page-link bg-dark border-secondary text-warning" href="{{ request.path }}?start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type_filter }}&q={{ filters.query }}&amount_min={{ filters.amount_min }}&amount_max={{ filters.amount_max }}&account={{ filters.account_filter }}&status={{ filters.status_filter }}&page=1&per_page={{ per_page }}">First</a></li>
+  <li class="page-item {{ 'disabled' if page <= 1 else '' }}"><a class="page-link bg-dark border-secondary text-warning" href="{{ request.path }}?start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type_filter }}&q={{ filters.query }}&amount_min={{ filters.amount_min }}&amount_max={{ filters.amount_max }}&account={{ filters.account_filter }}&status={{ filters.status_filter }}&page={{ page-1 }}&per_page={{ per_page }}">Previous</a></li>
+  <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ page }}</span></li>
+  <li class="page-item {{ 'disabled' if page >= total_pages else '' }}"><a class="page-link bg-dark border-secondary text-warning" href="{{ request.path }}?start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type_filter }}&q={{ filters.query }}&amount_min={{ filters.amount_min }}&amount_max={{ filters.amount_max }}&account={{ filters.account_filter }}&status={{ filters.status_filter }}&page={{ page+1 }}&per_page={{ per_page }}">Next</a></li>
+  <li class="page-item {{ 'disabled' if page >= total_pages else '' }}"><a class="page-link bg-dark border-secondary text-warning" href="{{ request.path }}?start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type_filter }}&q={{ filters.query }}&amount_min={{ filters.amount_min }}&amount_max={{ filters.amount_max }}&account={{ filters.account_filter }}&status={{ filters.status_filter }}&page={{ total_pages }}&per_page={{ per_page }}">Last</a></li>
+</ul></nav>
+{% endif %}
+
+{% if is_driver %}
+{% for row in rows if row.source_type == 'DeliveryPersonPayment' and row.source_id and row.source and not row.source.is_void and (row.type == 'Payment' or (row.type == 'Waive-Off' and not row.source.amount_paid)) %}
+<div class="modal fade" id="editDriverPayment{{ row.source_id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content border-secondary" style="background:#1e293b" method="POST" action="{{ url_for('edit_delivery_person_payment', id=row.source_id) }}" data-driver-edit-form>
+      <div class="modal-header border-0">
+        <h5 class="text-warning mb-0">Edit driver payment</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-dark border-secondary small mb-3">
+          Editing applies only the <strong>difference</strong> to the account balance — the original amount is never counted twice.
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Amount paid</label>
+            <input type="number" min="0" step="0.01" name="amount_paid" value="{{ '%.2f'|format(row.source.amount_paid or 0) }}" class="form-control bg-dark text-white border-secondary" required>
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Waive-off / adjustment</label>
+            <input type="number" min="0" step="0.01" name="waive_off_amount" value="{{ '%.2f'|format(row.source.waive_off_amount or 0) }}" class="form-control bg-dark text-white border-secondary">
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Payment method</label>
+            <select name="method" class="form-select bg-dark text-white border-secondary" data-driver-method>
+              {% for m in ['Cash', 'Bank', 'Check', 'Online'] %}
+              <option value="{{ m }}" {{ 'selected' if (row.source.method or 'Cash') == m }}>{{ m }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Payment account</label>
+            <select name="payment_account_id" class="form-select bg-dark text-white border-secondary" data-driver-account>
+              <option value="">Select account…</option>
+              {% for a in payment_accounts %}
+              <option value="{{ a.id }}" data-category="{{ (a.category or '')|lower }}" {{ 'selected' if row.source.payment_account_id == a.id }}>[{{ (a.category or 'cash')|upper }}] {{ a.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Date</label>
+            <input type="date" name="date" value="{{ row.source.date_posted.strftime('%Y-%m-%d') if row.source.date_posted else today_date }}" class="form-control bg-dark text-white border-secondary">
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Reference</label>
+            <input type="text" name="reference" value="{{ row.source.reference or '' }}" class="form-control bg-dark text-white border-secondary">
+          </div>
+          <div class="col-12">
+            <label class="text-white-50 small fw-bold">Description / notes</label>
+            <textarea name="note" rows="2" class="form-control bg-dark text-white border-secondary">{{ row.source.note or '' }}</textarea>
+          </div>
+        </div>
+        <input type="hidden" name="expected_revision" value="{{ row.source.revision or 1 }}">
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-warning text-dark fw-bold w-100">Update payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+<div class="modal fade" id="driverSettlementModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content border-secondary" style="background:#1e293b" method="POST" action="{{ url_for('settle_delivery_person', id=entity.id) }}" data-driver-pay-form>
+      <div class="modal-header border-0">
+        <h5 class="text-success mb-0"><i class="bi bi-cash-stack me-2"></i>Pay driver</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-dark border-secondary small mb-3">
+          Outstanding to {{ entity.name }}: <strong class="text-warning">Rs. {{ "{:,.2f}".format(ledger.closing_balance or 0) }}</strong>.
+          The amount is allocated FIFO across open rent items, and the selected account is reduced by the same amount.
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Amount paid</label>
+            <input type="number" min="0" step="0.01" name="paid_amount" value="0" class="form-control bg-dark text-white border-secondary" required>
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Waive-off / adjustment</label>
+            <input type="number" min="0" step="0.01" name="waive_off_amount" value="0" class="form-control bg-dark text-white border-secondary">
+            <div class="form-text text-white-50 small">No cash movement.</div>
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Payment method</label>
+            <select name="method" class="form-select bg-dark text-white border-secondary" data-driver-method>
+              <option value="Cash">Cash</option>
+              <option value="Bank">Bank</option>
+              <option value="Check">Check</option>
+              <option value="Online">Online</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Payment account</label>
+            <select name="payment_account_id" class="form-select bg-dark text-white border-secondary" data-driver-account>
+              <option value="">Select account…</option>
+              {% for a in payment_accounts %}
+              <option value="{{ a.id }}" data-category="{{ (a.category or '')|lower }}">[{{ (a.category or 'cash')|upper }}] {{ a.name }} (Rs. {{ "{:,.2f}".format(a.balance or 0) }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text text-white-50 small">This account receives the money-out effect.</div>
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Date</label>
+            <input type="date" name="date" class="form-control bg-dark text-white border-secondary" value="{{ today_date or '' }}">
+          </div>
+          <div class="col-6">
+            <label class="text-white-50 small fw-bold">Reference</label>
+            <input type="text" name="reference" class="form-control bg-dark text-white border-secondary" placeholder="Voucher / slip no.">
+          </div>
+          <div class="col-12">
+            <label class="text-white-50 small fw-bold">Description / notes</label>
+            <textarea name="note" rows="2" class="form-control bg-dark text-white border-secondary" placeholder="e.g. Delivery service payment"></textarea>
+          </div>
+        </div>
+        <input type="hidden" name="idempotency_key" value="driver-{{ entity.id }}-{{ submission_token }}">
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-success fw-bold w-100">Save payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Method/account consistency + double-submit guard.  The server-side
+// idempotency key is the authoritative duplicate protection.
+document.querySelectorAll('[data-driver-pay-form], [data-driver-edit-form]').forEach(function (form) {
+  var method = form.querySelector('[data-driver-method]');
+  var account = form.querySelector('[data-driver-account]');
+  if (method && account) {
+    var sync = function () {
+      var want = method.value === 'Cash' ? 'cash' : 'bank';
+      Array.prototype.forEach.call(account.options, function (opt) {
+        if (!opt.value) { return; }
+        var ok = opt.dataset.category === want;
+        opt.hidden = !ok;
+        opt.disabled = !ok;
+      });
+      var sel = account.selectedOptions[0];
+      if (sel && sel.value && sel.disabled) { account.value = ''; }
+    };
+    method.addEventListener('change', sync);
+    sync();
+  }
+  form.addEventListener('submit', function () {
+    var btn = form.querySelector('button[type="submit"], .modal-footer button');
+    if (btn) { setTimeout(function () { btn.disabled = true; }, 0); }
+  });
+});
+</script>
+{% endif %}
+
+{% if opening_url %}
+<div class="modal fade" id="openingBalanceModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><form class="modal-content border-secondary" style="background:#1e293b" method="POST" action="{{ opening_url }}"><div class="modal-header border-0"><h5 class="text-warning">Set opening balance</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="text-white-50 small">Opening balance</label><input type="number" step="0.01" name="opening_balance" value="{{ '%.2f'|format(entity.opening_balance or 0) }}" class="form-control bg-dark text-white border-secondary" required><small class="text-white-50">Positive is owed by the counter-party; negative is an advance.</small><label class="text-white-50 small mt-3">Opening date</label><input type="date" name="opening_balance_date" value="{{ entity.opening_balance_date.strftime('%Y-%m-%d') if entity.opening_balance_date else '' }}" class="form-control bg-dark text-white border-secondary" required></div><div class="modal-footer border-0"><button class="btn btn-warning text-dark fw-bold w-100">Save opening balance</button></div></form></div></div>
+{% endif %}
+{% endblock %}

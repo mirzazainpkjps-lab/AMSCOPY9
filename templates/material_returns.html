@@ -1,0 +1,545 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+@media (max-width: 575.98px) {
+    .returns-filter-form {
+        padding: 0.6rem !important;
+    }
+    .returns-filter-form .row.form-grid-top {
+        row-gap: 0.4rem !important;
+    }
+    .returns-item-row {
+        row-gap: 0.35rem !important;
+    }
+    .returns-item-row > [class*="col-"] .form-control,
+    .returns-item-row > [class*="col-"] .btn {
+        min-height: 32px;
+    }
+    #addReturnModal .modal-body {
+        padding: 0.65rem !important;
+    }
+}
+</style>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0 text-white">Material Returns</h4>
+    <button class="btn btn-warning fw-bold" data-bs-toggle="modal" data-bs-target="#addReturnModal">
+        <i class="bi bi-plus-circle me-1"></i> New Return
+    </button>
+</div>
+
+<div class="d-flex gap-2 mb-3">
+    <a href="{{ url_for('material_returns_page', show='active', client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to, material=material_filter) }}" class="btn btn-sm {% if show_mode == 'active' %}btn-warning text-dark{% else %}btn-outline-warning{% endif %} fw-bold">Active</a>
+
+    <a href="{{ url_for('material_returns_page', show='all', client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to, material=material_filter) }}" class="btn btn-sm {% if show_mode == 'all' %}btn-info text-dark{% else %}btn-outline-info{% endif %} fw-bold">All</a>
+</div>
+
+<form method="GET" action="{{ url_for('material_returns_page') }}" class="card border-0 shadow-sm p-3 mb-3 ui-helper-form returns-filter-form" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 12px;">
+    <input type="hidden" name="show" value="{{ show_mode }}">
+    <div class="row g-2 form-grid-top">
+        <div class="col-md-3">
+            <label class="text-white-50 small fw-bold mb-1">Client</label>
+            <div class="position-relative">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="client" id="returnFilterClientCode" value="{{ client_filter }}" placeholder="Search by name or code..." autocomplete="off" onfocus="showCombobox('returnFilterClientCode', 'returnFilterClientCombobox')" oninput="filterCombobox('returnFilterClientCode', 'returnFilterClientCombobox', 'returnFilterClientNameDisplay')">
+                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('returnFilterClientCode', 'returnFilterClientCombobox')">
+                        <i class="bi bi-chevron-down text-warning"></i>
+                    </button>
+                </div>
+                <div id="returnFilterClientCombobox" class="combobox-list shadow-lg" style="display: none;">
+                    {% for c in clients %}
+                    <div class="combobox-item" data-combo-code="{{ c.code }}" data-combo-name="{{ c.name }}" data-combo-input="returnFilterClientCode" data-combo-display="returnFilterClientNameDisplay">
+                        <span class="fw-bold text-warning code-span">{{ c.code }}</span>
+                        <span class="ms-2 text-white-50 small name-span">{{ c.name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="returnFilterClientNameDisplay" class="text-info small mt-1 fw-bold form-helper-row"></div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <label class="text-white-50 small fw-bold mb-1">Bill</label>
+            <input type="text" class="form-control" name="bill_no" value="{{ bill_filter }}">
+        </div>
+        <div class="col-md-2 position-relative">
+            <label class="text-white-50 small fw-bold mb-1">Material</label>
+            <div class="input-group">
+                <input type="text" class="form-control" name="material" id="rtnFilterMat" value="{{ material_filter }}" placeholder="Search material..." autocomplete="off" onfocus="showCombobox('rtnFilterMat', 'rtnFilterMatList')" oninput="filterCombobox('rtnFilterMat', 'rtnFilterMatList', 'rtnFilterMatDisplay')">
+                <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('rtnFilterMat', 'rtnFilterMatList')"><i class="bi bi-chevron-down text-warning"></i></button>
+            </div>
+            <div id="rtnFilterMatList" class="combobox-list shadow-lg" style="display:none;">
+                {% for m in materials %}
+                <div class="combobox-item" data-combo-code="{{ m.name }}" data-combo-name="{{ m.name }}" data-combo-input="rtnFilterMat" data-combo-display="rtnFilterMatDisplay">
+                    <span class="fw-bold text-warning code-span">{{ m.name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div id="rtnFilterMatDisplay" class="text-info small mt-1 fw-bold"></div>
+        </div>
+        <div class="col-md-2">
+            <label class="text-white-50 small fw-bold mb-1">From</label>
+            <input type="date" class="form-control" name="date_from" value="{{ date_from }}">
+        </div>
+        <div class="col-md-2">
+            <label class="text-white-50 small fw-bold mb-1">To</label>
+            <input type="date" class="form-control" name="date_to" value="{{ date_to }}">
+        </div>
+        <div class="col-md-1 d-flex align-items-end ui-actions-col">
+            <button class="btn btn-warning w-100 fw-bold">Go</button>
+        </div>
+    </div>
+</form>
+
+<div class="card border-0 shadow-sm" style="background: #0f172a; border: 2px solid #1f2937 !important; border-radius: 12px;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Bill</th>
+                    <th>Client</th>
+                    <th>Type</th>
+                    <th>Items</th>
+                    <th class="text-end">Amount</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in returns %}
+                <tr class="{{ 'table-danger' if r.is_void else '' }}">
+                    <td>{{ r.date_posted.strftime('%Y-%m-%d %H:%M') if r.date_posted else '-' }}</td>
+                    <td>{{ r.manual_bill_no or r.auto_bill_no or ('RTN-' ~ r.id) }}</td>
+                    <td>{{ r.client_name }}</td>
+                    <td>
+                        {% if (r.return_type or 'normal') == 'booked' %}
+                        <span class="badge bg-warning text-dark">Booked</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Normal</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if r.items %}
+                            {% for it in r.items %}
+                                <div class="small">{{ it.material_name }} ({{ '%.2f'|format(it.qty or 0) }})</div>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold">{{ '%.2f'|format(r.amount or 0) }}</td>
+                    <td class="text-end">
+                        {% if not r.is_void %}
+                        <a class="btn btn-sm btn-outline-info"
+                           href="{{ url_for('material_returns_page', edit_id=r.id, show=show_mode, client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to, material=material_filter, page=pagination.page, per_page=per_page) }}">Edit</a>
+                        <form action="{{ url_for('delete_bill', type='MaterialReturn', id=r.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this material return?')">
+                            <button class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                        {% else %}
+                        <span class="badge bg-danger">Deleted</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">No material return records found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if pagination and pagination.pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm">
+        {% if pagination.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('material_returns_page', page=pagination.prev_num, per_page=per_page, show=show_mode, client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to, material=material_filter) }}">Prev</a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ pagination.page }} / {{ pagination.pages }}</span></li>
+        {% if pagination.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('material_returns_page', page=pagination.next_num, per_page=per_page, show=show_mode, client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to, material=material_filter) }}">Next</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<div id="returnMaterialCombobox" class="combobox-list shadow-lg" style="display: none;"></div>
+
+<div class="modal fade" id="addReturnModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <form class="modal-content border-secondary ui-helper-form" style="background: #1e293b;" method="POST" action="{{ url_for('add_material_return') }}">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-white">Add Material Return</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3 form-grid-top">
+                    <div class="col-md-4">
+                        <label class="text-white-50 small fw-bold mb-1">Client</label>
+                        <div class="position-relative">
+                            <div class="input-group">
+                                <input class="form-control" name="client_code" id="addReturnClientCode" required placeholder="Search by name or code..." autocomplete="off" onfocus="showCombobox('addReturnClientCode', 'addReturnClientCombobox')" oninput="filterCombobox('addReturnClientCode', 'addReturnClientCombobox', 'addReturnClientNameDisplay')">
+                                <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('addReturnClientCode', 'addReturnClientCombobox')">
+                                    <i class="bi bi-chevron-down text-warning"></i>
+                                </button>
+                            </div>
+                            <div id="addReturnClientCombobox" class="combobox-list shadow-lg" style="display: none;">
+                                {% for c in clients %}
+                                <div class="combobox-item" data-combo-code="{{ c.code }}" data-combo-name="{{ c.name }}" data-combo-input="addReturnClientCode" data-combo-display="addReturnClientNameDisplay">
+                                    <span class="fw-bold text-warning code-span">{{ c.code }}</span>
+                                    <span class="ms-2 text-white-50 small name-span">{{ c.name }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div id="addReturnClientNameDisplay" class="text-info small mt-1 fw-bold form-helper-row"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="text-white-50 small fw-bold mb-1">Date</label>
+                        <input type="datetime-local" class="form-control" name="date">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="text-white-50 small fw-bold mb-1">Return Type</label>
+                        <select class="form-control" name="return_type" id="returnTypeSelect">
+                            <option value="normal">Normal Return</option>
+                            <option value="booked">Booked Return</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="text-white-50 small fw-bold mb-1">Manual Bill (Optional)</label>
+                        <input class="form-control" name="manual_bill_no">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="text-white-50 small fw-bold mb-1">Next Auto Bill</label>
+                        <input class="form-control" value="{{ next_auto }}" readonly>
+                    </div>
+                </div>
+
+                <div id="returnItems">
+                    <div class="row g-2 return-row mb-2 returns-item-row">
+                        <div class="col-md-5 position-relative">
+                            <div class="input-group">
+                                <input type="hidden" name="material_id[]" class="material-id-input" value="">
+                                <input class="form-control return-material-input" name="material_name[]" placeholder="Material" autocomplete="off" onfocus="openReturnMaterialCombobox(this)" oninput="filterReturnMaterialCombobox(this)">
+                                <button class="btn btn-outline-secondary" type="button" onclick="openReturnMaterialFromButton(this)">
+                                    <i class="bi bi-chevron-down text-warning"></i>
+                                </button>
+                            </div>
+                            <div class="return-material-display text-info small mt-1 fw-bold form-helper-row"></div>
+                        </div>
+                        <div class="col-md-2"><input type="number" step="0.01" min="0" class="form-control return-qty" name="qty[]" placeholder="Qty"></div>
+                        <div class="col-md-2 normal-return-field"><input type="number" step="0.01" min="0" class="form-control return-rate" name="unit_rate[]" placeholder="Unit Price"></div>
+                        <div class="col-md-2"><input type="number" step="0.01" min="0" class="form-control return-rent-rate" name="rent_rate[]" placeholder="Rent Price"></div>
+                        <div class="col-md-2"><input class="form-control return-line-total" readonly placeholder="Line Total"></div>
+                        <div class="col-md-1 d-grid"><button type="button" class="btn btn-outline-danger remove-row">&times;</button></div>
+                    </div>
+                </div>
+                <button type="button" id="addReturnRow" class="btn btn-outline-warning btn-sm mt-1">+ Add Row</button>
+
+                <div class="row g-2 mt-3 form-grid-top">
+                    <div class="col-md-9">
+                        <label class="text-white-50 small fw-bold mb-1">Note</label>
+                        <input class="form-control" name="note" placeholder="Reason for return">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="text-white-50 small fw-bold mb-1">Total Return Amount</label>
+                        <input id="returnGrandTotal" class="form-control fw-bold" readonly value="0.00">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-warning fw-bold">Save Return</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if edit_return %}
+<div class="modal fade" id="editReturnModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <form class="modal-content border-secondary ui-helper-form" style="background: #1e293b;" method="POST" action="{{ url_for('edit_material_return', id=edit_return.id) }}">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-white">Edit Material Return</h5>
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('material_returns_page', show=show_mode, client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to, material=material_filter, page=pagination.page, per_page=per_page) }}">Close</a>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3 form-grid-top">
+                    <div class="col-md-4">
+                        <label class="text-white-50 small fw-bold mb-1">Client</label>
+                        <input class="form-control" value="{{ edit_return.client_name }}" readonly>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="text-white-50 small fw-bold mb-1">Date</label>
+                        <input type="datetime-local" class="form-control" name="date" value="{{ edit_return.date_posted.strftime('%Y-%m-%dT%H:%M') if edit_return.date_posted else '' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="text-white-50 small fw-bold mb-1">Return Type</label>
+                        <select class="form-control" name="return_type" id="editReturnTypeSelect">
+                            <option value="normal" {{ 'selected' if (edit_return.return_type or 'normal') == 'normal' else '' }}>Normal Return</option>
+                            <option value="booked" {{ 'selected' if (edit_return.return_type or '') == 'booked' else '' }}>Booked Return</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="text-white-50 small fw-bold mb-1">Manual Bill (Optional)</label>
+                        <input class="form-control" value="{{ edit_return.manual_bill_no or '' }}" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="text-white-50 small fw-bold mb-1">Auto Bill</label>
+                        <input class="form-control" value="{{ edit_return.auto_bill_no or ('RTN-' ~ edit_return.id) }}" readonly>
+                    </div>
+                </div>
+
+                <div id="editReturnItems">
+                    {% for it in edit_return.items %}
+                    <div class="row g-2 return-row mb-2 returns-item-row">
+                        <div class="col-md-5 position-relative">
+                            <div class="input-group">
+                                <input type="hidden" name="material_id[]" class="material-id-input" value="{% for m in materials %}{% if m.name == it.material_name %}{{ m.id }}{% endif %}{% endfor %}">
+                                <input class="form-control return-material-input" name="material_name[]" value="{{ it.material_name }}" placeholder="Material" autocomplete="off" onfocus="openReturnMaterialCombobox(this)" oninput="filterReturnMaterialCombobox(this)">
+                                <button class="btn btn-outline-secondary" type="button" onclick="openReturnMaterialFromButton(this)">
+                                    <i class="bi bi-chevron-down text-warning"></i>
+                                </button>
+                            </div>
+                            <div class="return-material-display text-info small mt-1 fw-bold form-helper-row"></div>
+                        </div>
+                        <div class="col-md-2"><input type="number" step="0.01" min="0" class="form-control return-qty" name="qty[]" placeholder="Qty" value="{{ '%.2f'|format(it.qty or 0) }}"></div>
+                        <div class="col-md-2 normal-return-field"><input type="number" step="0.01" min="0" class="form-control return-rate" name="unit_rate[]" placeholder="Unit Price" value="{{ '%.2f'|format(it.unit_rate if it.unit_rate is not none else (it.price_at_time or 0)) }}"></div>
+                        <div class="col-md-2"><input type="number" step="0.01" min="0" class="form-control return-rent-rate" name="rent_rate[]" placeholder="Rent Price" value="{{ '%.2f'|format(it.rent_rate or 0) }}"></div>
+                        <div class="col-md-2"><input class="form-control return-line-total" readonly placeholder="Line Total"></div>
+                        <div class="col-md-1 d-grid"><button type="button" class="btn btn-outline-danger remove-row">×</button></div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" id="editAddReturnRow" class="btn btn-outline-warning btn-sm mt-1">+ Add Row</button>
+
+                <div class="row g-2 mt-3 form-grid-top">
+                    <div class="col-md-9">
+                        <label class="text-white-50 small fw-bold mb-1">Note</label>
+                        <input class="form-control" name="note" value="{{ edit_return.note or '' }}" placeholder="Reason for return">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="text-white-50 small fw-bold mb-1">Total Return Amount</label>
+                        <input id="editReturnGrandTotal" class="form-control fw-bold" readonly value="0.00">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <a class="btn btn-secondary" href="{{ url_for('material_returns_page', show=show_mode, client=client_filter, bill_no=bill_filter, date_from=date_from, date_to=date_to, material=material_filter, page=pagination.page, per_page=per_page) }}">Cancel</a>
+                <button class="btn btn-warning fw-bold">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+<button type="button" id="openEditReturnModalBtn" class="d-none" data-bs-toggle="modal" data-bs-target="#editReturnModal"></button>
+{% endif %}
+
+<script>
+(function () {
+    const RETURN_MATERIALS = [
+        {% for m in materials %}
+        { id: {{ m.id }}, name: {{ (m.name or '')|tojson }} },
+        {% endfor %}
+    ];
+    window.AMS_KNOWN_MATERIAL_NAMES = new Set(
+        RETURN_MATERIALS.map((m) => m.name).concat(RETURN_MATERIALS.map((m) => String(m.name || '').toLowerCase()))
+    );
+    const RETURN_MATERIAL_LIST_ID = 'returnMaterialCombobox';
+    let returnMaterialInputCounter = 0;
+    let activeReturnMaterialInput = null;
+
+    function toNum(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
+    function ensureReturnMaterialInputId(input) {
+        if (!input) return;
+        returnMaterialInputCounter += 1;
+        input.id = `returnMaterialSearch${returnMaterialInputCounter}`;
+    }
+    function buildReturnMaterialCombobox() {
+        const list = document.getElementById(RETURN_MATERIAL_LIST_ID);
+        if (!list) return;
+        list.innerHTML = '';
+        RETURN_MATERIALS.forEach((mat) => {
+            const div = document.createElement('div');
+            div.className = 'combobox-item';
+            div.dataset.value = mat.name;
+            div.innerHTML = `<span class="fw-bold text-warning code-span">${mat.name}</span>`;
+            div.addEventListener('click', () => selectReturnMaterial(mat.name, mat.id));
+            list.appendChild(div);
+        });
+    }
+    window.openReturnMaterialCombobox = function (input) {
+        if (!input) return;
+        if (!input.id) ensureReturnMaterialInputId(input);
+        activeReturnMaterialInput = input;
+        const list = document.getElementById(RETURN_MATERIAL_LIST_ID);
+        if (!list) return;
+        document.querySelectorAll('.combobox-list').forEach((l) => l.style.display = 'none');
+        list.style.display = 'block';
+        if (typeof positionCombobox === 'function') {
+            positionCombobox(input.id, RETURN_MATERIAL_LIST_ID);
+        }
+    };
+    window.openReturnMaterialFromButton = function (btn) {
+        const input = btn?.closest('.input-group')?.querySelector('.return-material-input');
+        if (input) window.openReturnMaterialCombobox(input);
+    };
+    window.filterReturnMaterialCombobox = function (input) {
+        if (!input) return;
+        if (input.dataset.comboSuppress === '1') {
+            input.dataset.comboSuppress = '';
+            return;
+        }
+        window.openReturnMaterialCombobox(input);
+        const list = document.getElementById(RETURN_MATERIAL_LIST_ID);
+        if (!list) return;
+        const filter = (input.value || '').toLowerCase();
+        list.querySelectorAll('.combobox-item').forEach((item) => {
+            const txt = (item.dataset.value || '').toLowerCase();
+            item.style.display = txt.includes(filter) ? '' : 'none';
+        });
+    };
+    function selectReturnMaterial(value, materialId) {
+        if (!activeReturnMaterialInput) return;
+        activeReturnMaterialInput.value = value;
+        activeReturnMaterialInput.dataset.comboSuppress = '1';
+        if (typeof window.setSelectedMaterialId === 'function') {
+            window.setSelectedMaterialId(activeReturnMaterialInput, materialId || '', value);
+        } else {
+            const hid = activeReturnMaterialInput.closest('.position-relative')?.querySelector('input[name="material_id[]"]');
+            if (hid) hid.value = materialId || '';
+        }
+        const display = activeReturnMaterialInput.closest('.position-relative')?.querySelector('.return-material-display');
+        if (display) display.innerText = `Material: ${value}`;
+        const list = document.getElementById(RETURN_MATERIAL_LIST_ID);
+        if (list) list.style.display = 'none';
+        activeReturnMaterialInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function recalcFor(container, returnType, grandTotalInputId) {
+        if (!container) return;
+        let grand = 0;
+        container.querySelectorAll('.return-row').forEach((row) => {
+            const q = toNum(row.querySelector('.return-qty')?.value);
+            const unit = toNum(row.querySelector('.return-rate')?.value);
+            const rent = toNum(row.querySelector('.return-rent-rate')?.value);
+            const t = returnType === 'booked' ? (q * rent) : (q * (unit + rent));
+            const out = row.querySelector('.return-line-total');
+            if (out) out.value = t.toFixed(2);
+            grand += t;
+        });
+        const grandInput = document.getElementById(grandTotalInputId);
+        if (grandInput) grandInput.value = grand.toFixed(2);
+    }
+
+    function recalc() {
+        const returnType = document.getElementById('returnTypeSelect')?.value || 'normal';
+        recalcFor(document.getElementById('returnItems'), returnType, 'returnGrandTotal');
+    }
+    function toggleReturnFields() {
+        const returnType = document.getElementById('returnTypeSelect')?.value || 'normal';
+        const normalFields = document.querySelectorAll('.normal-return-field');
+        if (returnType === 'booked') {
+            normalFields.forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.return-rate').forEach((i) => i.required = false);
+            document.querySelectorAll('.return-rent-rate').forEach((i) => i.required = false);
+        } else {
+            normalFields.forEach(el => el.style.display = '');
+            document.querySelectorAll('.return-rate').forEach((i) => i.required = true);
+            document.querySelectorAll('.return-rent-rate').forEach((i) => i.required = false);
+        }
+        recalc();
+    }
+    function bindRow(row, recalcFn) {
+        if (!row) return;
+        const doRecalc = typeof recalcFn === 'function' ? recalcFn : recalc;
+        const matInput = row.querySelector('.return-material-input');
+        if (matInput) {
+            ensureReturnMaterialInputId(matInput);
+            const display = row.querySelector('.return-material-display');
+            if (display) {
+                display.id = `${matInput.id}Display`;
+                display.innerText = '';
+            }
+        }
+        row.querySelectorAll('input').forEach((i) => i.addEventListener('input', doRecalc));
+        const removeBtn = row.querySelector('.remove-row');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function () {
+                const root = row.closest('#returnItems') || row.closest('#editReturnItems') || document;
+                const rows = root.querySelectorAll('.return-row');
+                if (rows.length <= 1) return;
+                row.remove();
+                doRecalc();
+            });
+        }
+    }
+    const editReturnTypeSelect = document.getElementById('editReturnTypeSelect');
+    function toggleEditReturnFields() {
+        const rt = editReturnTypeSelect?.value || 'normal';
+        document.querySelectorAll('#editReturnModal .normal-return-field').forEach((el) => {
+            el.style.display = rt === 'booked' ? 'none' : '';
+        });
+        const normal = rt !== 'booked';
+        document.querySelectorAll('#editReturnModal .return-rate').forEach((i) => i.required = normal);
+    }
+    if (editReturnTypeSelect) {
+        editReturnTypeSelect.addEventListener('change', toggleEditReturnFields);
+        toggleEditReturnFields();
+        window.addEventListener('load', function () {
+            const btn = document.getElementById('openEditReturnModalBtn');
+            if (btn) btn.click();
+        });
+    }
+
+    const container = document.getElementById('returnItems');
+    if (container) {
+        buildReturnMaterialCombobox();
+        bindRow(container.querySelector('.return-row'), recalc);
+        const addBtn = document.getElementById('addReturnRow');
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                const first = container.querySelector('.return-row');
+                if (!first) return;
+                const clone = first.cloneNode(true);
+                clone.querySelectorAll('input').forEach((i) => { i.value = ''; });
+                bindRow(clone, recalc);
+                container.appendChild(clone);
+            });
+        }
+        const returnTypeSelect = document.getElementById('returnTypeSelect');
+        if (returnTypeSelect) {
+            returnTypeSelect.addEventListener('change', toggleReturnFields);
+            toggleReturnFields(); // initial
+        }
+    }
+
+    const editContainer = document.getElementById('editReturnItems');
+    if (editContainer) {
+        buildReturnMaterialCombobox();
+        function recalcEdit() {
+            const rt = document.getElementById('editReturnTypeSelect')?.value || 'normal';
+            recalcFor(editContainer, rt, 'editReturnGrandTotal');
+        }
+
+        editContainer.querySelectorAll('.return-row').forEach((r) => bindRow(r, recalcEdit));
+        editContainer.querySelectorAll('input').forEach((i) => i.addEventListener('input', recalcEdit));
+        if (editReturnTypeSelect) editReturnTypeSelect.addEventListener('change', recalcEdit);
+        recalcEdit();
+
+        const editAddBtn = document.getElementById('editAddReturnRow');
+        if (editAddBtn) {
+            editAddBtn.addEventListener('click', function () {
+                const first = editContainer.querySelector('.return-row');
+                if (!first) return;
+                const clone = first.cloneNode(true);
+                clone.querySelectorAll('input').forEach((i) => { if (!i.readOnly) i.value = ''; });
+                bindRow(clone, recalcEdit);
+                editContainer.appendChild(clone);
+                recalcEdit();
+            });
+        }
+    }
+})();
+</script>
+{% endblock %}

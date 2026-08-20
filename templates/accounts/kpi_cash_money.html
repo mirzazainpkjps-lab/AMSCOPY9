@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+
+{% block title %}Total Cash (KPI){% endblock %}
+
+{% block content %}
+<style>
+.acc-page-header{ background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(79,70,229,0.18)); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:20px 24px; margin-bottom:24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.acc-page-header h2{ margin:0; font-weight:700; } .acc-page-header .subtitle{ color:var(--text-muted); font-size:.9rem; margin-top:4px;}
+.kpi{ border:0; border-radius:16px; color:#fff; min-height:140px; box-shadow:0 10px 24px rgba(2,6,23,.25), 0 2px 6px rgba(2,6,23,.18); position:relative; overflow:hidden; transition: transform .18s ease, box-shadow .18s ease; }
+.kpi:hover{ transform: translateY(-3px); box-shadow:0 16px 30px rgba(2,6,23,.35); }
+.kpi .card-body{ padding:18px 20px; position:relative; z-index:2; }
+.kpi .lab{ text-transform:uppercase; font-size:.72rem; letter-spacing:.8px; font-weight:800; opacity:.92; }
+.kpi .val{ font-size:1.85rem; font-weight:900; margin-top:6px; }
+.kpi .meta{ opacity:.85; margin-top: 4px; font-size:.85rem; }
+.kpi .ico{ position:absolute; right:-10px; bottom:-14px; font-size:6rem; opacity:.18; z-index:1; pointer-events:none; }
+.kpi a{ color:#fff; text-decoration:none; }
+.s-green{ background:linear-gradient(135deg,#10b981,#047857);} .s-amber{ background:linear-gradient(135deg,#f59e0b,#b45309);}
+.kpi-cta{ display:inline-flex; align-items:center; gap:6px; margin-top:12px; background: rgba(255,255,255,.18); color:#fff; border:1px solid rgba(255,255,255,.35); padding: 6px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; text-decoration: none; transition: background .15s ease; }
+.kpi-cta:hover{ background: rgba(255,255,255,.32); color:#fff; }
+</style>
+
+<div class="container-fluid">
+  <div class="acc-page-header">
+    <div>
+      <h2><i class="bi bi-cash-coin me-2 text-primary"></i>Total Cash (KPI Drill-Down)</h2>
+      <div class="subtitle">Choose Cash or Bank to see account balances and ledgers.</div>
+    </div>
+    <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <a href="{{ url_for('accounts.kpi_cash_accounts') }}" class="text-decoration-none">
+        <div class="card kpi s-green">
+          <div class="card-body">
+            <div class="lab"><i class="bi bi-cash-coin me-1"></i>Cash Balances</div>
+            <div class="val">Rs. {{ "%.2f"|format(total_cash) }}</div>
+            <div class="meta">{{ cash_count }} cash account{{ 's' if cash_count != 1 else '' }}</div>
+            <span class="kpi-cta">View cash accounts <i class="bi bi-arrow-right"></i></span>
+          </div>
+          <i class="bi bi-wallet2 ico"></i>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6">
+      <a href="{{ url_for('accounts.kpi_bank_accounts') }}" class="text-decoration-none">
+        <div class="card kpi s-amber">
+          <div class="card-body">
+            <div class="lab"><i class="bi bi-bank me-1"></i>Bank Balances</div>
+            <div class="val">Rs. {{ "%.2f"|format(total_bank) }}</div>
+            <div class="meta">{{ bank_count }} bank account{{ 's' if bank_count != 1 else '' }}</div>
+            <span class="kpi-cta">View bank accounts <i class="bi bi-arrow-right"></i></span>
+          </div>
+          <i class="bi bi-piggy-bank ico"></i>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-bell me-2"></i>Notifications</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('notifications_upcoming') }}" class="btn btn-outline-success btn-sm fw-bold">
+            <i class="bi bi-clock-history me-1"></i>Upcoming Reminders
+            <span class="badge bg-warning text-dark ms-1">{{ reminders|length }}</span>
+        </a>
+        <button type="button" class="btn btn-outline-warning btn-sm fw-bold" onclick="testAlarm()"><i class="bi bi-volume-up me-1"></i>Test Alarm</button>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col"><div class="card bg-dark border-secondary p-2"><small class="text-white-50">Total</small><div class="fw-bold text-white">{{ counts.total }}</div></div></div>
+    <div class="col"><div class="card bg-dark border-secondary p-2"><small class="text-white-50">Pending</small><div class="fw-bold text-warning">{{ counts.pending }}</div></div></div>
+    <div class="col"><div class="card bg-dark border-secondary p-2"><small class="text-white-50">Very High</small><div class="fw-bold text-danger">{{ counts.very_high }}</div></div></div>
+    <div class="col"><div class="card bg-dark border-secondary p-2"><small class="text-white-50">High</small><div class="fw-bold text-danger">{{ counts.high }}</div></div></div>
+    <div class="col"><div class="card bg-dark border-secondary p-2"><small class="text-white-50">Medium</small><div class="fw-bold text-info">{{ counts.medium }}</div></div></div>
+    <div class="col"><div class="card bg-dark border-secondary p-2"><small class="text-white-50">Low</small><div class="fw-bold text-success">{{ counts.low }}</div></div></div>
+    <div class="col"><div class="card bg-dark border-secondary p-2"><small class="text-white-50">Active Reminders</small><div class="fw-bold text-warning">{{ reminders|length }}</div></div></div>
+</div>
+
+<div class="card bg-dark border-secondary mb-3">
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="small text-white-50">Search</label>
+                <input name="q" class="form-control bg-dark text-white border-secondary" value="{{ filters.q }}" placeholder="client/code/bill/reason">
+            </div>
+            <div class="col-md-2">
+                <label class="small text-white-50">Category</label>
+                <select name="category" class="form-select bg-dark text-white border-secondary">
+                    <option value="all" {% if filters.category == 'all' %}selected{% endif %}>All</option>
+                    <option value="billed" {% if filters.category == 'billed' %}selected{% endif %}>Billed</option>
+                    <option value="unbilled" {% if filters.category == 'unbilled' %}selected{% endif %}>Unbilled</option>
+                    <option value="cash_unbilled" {% if filters.category == 'cash_unbilled' %}selected{% endif %}>Cash Unbilled</option>
+                    <option value="open_khata" {% if filters.category == 'open_khata' %}selected{% endif %}>Open Khata</option>
+                    <option value="cash_paid" {% if filters.category == 'cash_paid' %}selected{% endif %}>Cash Paid</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="small text-white-50">Status</label>
+                <select name="status" class="form-select bg-dark text-white border-secondary">
+                    <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All</option>
+                    <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="paid" {% if filters.status == 'paid' %}selected{% endif %}>Paid</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="small text-white-50">Risk</label>
+                <select name="risk" class="form-select bg-dark text-white border-secondary">
+                    <option value="all" {% if filters.risk == 'all' %}selected{% endif %}>All</option>
+                    <option value="very_high" {% if filters.risk == 'very_high' %}selected{% endif %}>Very High</option>
+                    <option value="high" {% if filters.risk == 'high' %}selected{% endif %}>High</option>
+                    <option value="medium" {% if filters.risk == 'medium' %}selected{% endif %}>Medium</option>
+                    <option value="low" {% if filters.risk == 'low' %}selected{% endif %}>Low</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button class="btn btn-warning text-dark fw-bold w-100">Apply</button>
+                <a href="{{ url_for('notifications_page') }}" class="btn btn-outline-secondary w-100">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-8">
+        <div class="card bg-dark border-secondary">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Due Follow-up Queue</span>
+                <small class="text-white-50">Click client name for full timeline and actions</small>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Bill</th>
+                            <th class="text-end">Amount</th>
+                            <th>Risk</th>
+                            <th>Next Reminder</th>
+                            <th>Last Response</th>
+                            <th class="text-center">Contacts</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for r in rows %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('notifications_bill_detail', bill_id=r.bill.id) }}" class="fw-bold text-warning text-decoration-none">
+                                    {{ r.bill.client_name or 'Unknown Client' }}
+                                </a>
+                                <div class="small text-white-50">{{ r.bill.client_code or 'No Code' }}</div>
+                            </td>
+                            <td>{{ r.bill.bill_no or '---' }}</td>
+                            <td class="text-end">{{ "{:,.0f}".format(r.amount) }}</td>
+                            <td>
+                                <span class="badge {% if r.risk_level_key == 'very_high' %}bg-danger{% elif r.risk_level_key == 'high' %}bg-danger{% elif r.risk_level_key == 'medium' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ r.risk_level }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if r.active_remind_at %}
+                                <span class="small text-warning fw-bold">{{ r.active_remind_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                                {% else %}
+                                <span class="small text-white-50">Not set</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if r.last_contact_at %}
+                                <div class="small text-info">{{ r.last_contact_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                                <div class="small text-white-50 text-truncate" style="max-width: 220px;">{{ r.last_contact_response or 'No response recorded' }}</div>
+                                {% else %}
+                                <span class="small text-white-50">No history</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-info text-dark">{{ r.contact_count or 0 }}</span>
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('notifications_bill_detail', bill_id=r.bill.id) }}" class="btn btn-sm btn-outline-info">Open</a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="8" class="text-center text-white-50 py-4">No records</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header">Staff Emails (Daily PDF)</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('notifications_add_email') }}" class="d-flex gap-2 mb-3">
+                    <input name="email" type="email" class="form-control bg-dark text-white border-secondary" placeholder="staff@company.com" required>
+                    <button class="btn btn-warning text-dark btn-sm">Add</button>
+                </form>
+                {% for e in staff_emails %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="{{ 'text-white' if e.is_active else 'text-white-50' }}">{{ e.email }}</small>
+                    <div class="d-flex gap-1">
+                        <form method="POST" action="{{ url_for('notifications_toggle_email', id=e.id) }}">
+                            <button class="btn btn-sm btn-outline-secondary">{{ 'Disable' if e.is_active else 'Enable' }}</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('notifications_delete_email', id=e.id) }}">
+                            <button class="btn btn-sm btn-outline-danger">X</button>
+                        </form>
+                    </div>
+                </div>
+                {% else %}
+                <small class="text-white-50">No email addresses added.</small>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

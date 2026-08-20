@@ -1,0 +1,71 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<style>
+  .history-actions {
+    white-space: nowrap;
+  }
+</style>
+<div class="container-fluid px-0 px-sm-2">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+    <div>
+      <div class="text-white-50 small text-uppercase fw-bold">Master Console</div>
+      <h2 class="text-white fw-bold mb-1">Backup History: {{ tenant.name }}</h2>
+      <div class="text-white-50">Auto snapshots captured before tenant wipe actions.</div>
+    </div>
+    <div class="mt-3 mt-md-0">
+      <a class="btn btn-outline-warning fw-bold" href="{{ url_for('tenants_dashboard') }}">Back to Tenants</a>
+    </div>
+  </div>
+
+  <div class="card border-secondary bg-dark text-white shadow-sm">
+    <div class="card-header bg-black text-white fw-bold border-secondary">Wipe Backup Timeline</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-dark table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Performed By</th>
+              <th>Status</th>
+              <th>Targets</th>
+              <th>Backup File</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else '' }}</td>
+              <td>
+                <div class="fw-bold">{{ r.performed_by or '' }}</div>
+                <div class="small text-white-50">{{ r.performed_by_role or '' }}</div>
+              </td>
+              <td>
+                <span class="badge {{ 'bg-success' if r.wipe_status == 'completed' else ('bg-danger' if r.wipe_status == 'failed' else 'bg-warning text-dark') }}">
+                  {{ r.wipe_status }}
+                </span>
+              </td>
+              <td class="small">{{ r.targets or '' }}</td>
+              <td class="small">{{ r.backup_filename }}</td>
+              <td class="history-actions">
+                <a class="btn btn-sm btn-outline-info fw-bold me-1" href="{{ url_for('tenants_backup_history_download', history_id=r.id) }}">
+                  Download
+                </a>
+                <form method="post" action="{{ url_for('tenants_backup_history_restore', history_id=r.id) }}" class="d-inline" onsubmit="return confirm('Restore this snapshot to tenant now? Current tenant data will be replaced.');">
+                  <button class="btn btn-sm btn-outline-warning fw-bold" type="submit">Restore to Tenant</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-white-50 py-4">No backup history found for this tenant.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

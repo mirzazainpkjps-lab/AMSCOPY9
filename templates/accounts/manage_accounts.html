@@ -1,0 +1,472 @@
+{% extends "layout.html" %}
+
+{% block title %}Manage Accounts{% endblock %}
+
+{% block content %}
+<style>
+    .acc-page-header{
+        background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(236,72,153,0.18));
+        border: 1px solid rgba(148,163,184,0.18);
+        border-radius: 16px;
+        padding: 20px 24px;
+        margin-bottom: 24px;
+        display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    }
+    .acc-page-header h2{ margin:0; font-weight:700; letter-spacing:.3px; }
+    .acc-page-header .subtitle{ color: var(--text-muted); font-size: .9rem; margin-top: 4px; }
+    .acc-page-header .acc-toolbar{ display:flex; gap:8px; flex-wrap:wrap; }
+
+    .stat-card{
+        position: relative; border:0; border-radius: 14px; color:#fff !important;
+        overflow: hidden; min-height: 110px;
+        box-shadow: 0 8px 20px rgba(2,6,23,.22);
+    }
+    .stat-card .card-body{ padding: 16px 18px; position: relative; z-index:2; }
+    .stat-card .stat-icon{
+        position: absolute; right: -6px; bottom: -10px;
+        font-size: 4.5rem; opacity: .18; z-index: 1; line-height: 1;
+    }
+    .stat-card .stat-label{ text-transform: uppercase; font-size: .7rem; letter-spacing:.8px; font-weight:700; opacity:.92; }
+    .stat-card .stat-value{ font-size: 1.6rem; font-weight: 800; margin-top: 4px; }
+    .stat-card .stat-value small{ font-size: .8rem; opacity: .85; font-weight: 600; }
+    .sc-emerald { background: linear-gradient(135deg,#10b981,#047857); }
+    .sc-blue    { background: linear-gradient(135deg,#3b82f6,#1d4ed8); }
+    .sc-violet  { background: linear-gradient(135deg,#8b5cf6,#6d28d9); }
+    .sc-amber   { background: linear-gradient(135deg,#f59e0b,#b45309); }
+
+    .acc-section-card{
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        background: var(--surface-1);
+        overflow: hidden;
+    }
+    .acc-section-card > .card-header{
+        background: linear-gradient(180deg, rgba(99,102,241,.08), transparent);
+        border-bottom: 1px solid var(--border-color);
+        padding: 14px 18px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .acc-section-card > .card-header h5{ margin: 0; font-weight: 700; }
+
+    .group-chip{
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 8px 14px; border-radius: 999px; font-weight: 600;
+        background: linear-gradient(135deg, rgba(139,92,246,.15), rgba(56,189,248,.15));
+        border: 1px solid rgba(148,163,184,.3);
+        color: var(--text-primary);
+        font-size: .85rem;
+    }
+    .group-chip i{ color:#8b5cf6; }
+    .group-chip .chip-count{
+        background: rgba(0,0,0,.2);
+        color: #fff;
+        border-radius: 999px;
+        padding: 1px 9px;
+        font-size: .7rem;
+    }
+    html[data-theme="light"] .group-chip{
+        background: linear-gradient(135deg, rgba(139,92,246,.1), rgba(56,189,248,.1));
+        color:#1e293b;
+    }
+    html[data-theme="light"] .group-chip .chip-count{ background:#1e293b; }
+
+    .acc-table thead th{
+        text-transform: uppercase; font-size: .7rem; letter-spacing: .7px;
+        color: var(--text-muted); background: transparent;
+    }
+    .acc-table tbody td{ vertical-align: middle; }
+    .acc-balance{ font-weight: 700; color:#34d399; }
+    .acc-balance.neg{ color:#f87171; }
+    .acc-name-cell .name{ font-weight: 700; }
+    .acc-name-cell .meta{ font-size: .76rem; color: var(--text-muted); }
+
+    .badge-soft-info     { background: rgba(56,189,248,.16); color:#7dd3fc; border:1px solid rgba(56,189,248,.3); }
+    .badge-soft-violet   { background: rgba(139,92,246,.16); color:#c4b5fd; border:1px solid rgba(139,92,246,.3); }
+    .badge-soft-amber    { background: rgba(245,158,11,.16); color:#fcd34d; border:1px solid rgba(245,158,11,.3); }
+    .badge-soft-emerald  { background: rgba(16,185,129,.16); color:#6ee7b7; border:1px solid rgba(16,185,129,.3); }
+    .badge-soft-rose     { background: rgba(244,63,94,.16); color:#fda4af; border:1px solid rgba(244,63,94,.3); }
+    html[data-theme="light"] .badge-soft-info{ color:#0369a1; }
+    html[data-theme="light"] .badge-soft-violet{ color:#5b21b6; }
+    html[data-theme="light"] .badge-soft-amber{ color:#92400e; }
+    html[data-theme="light"] .badge-soft-emerald{ color:#065f46; }
+    html[data-theme="light"] .badge-soft-rose{ color:#9f1239; }
+
+    .filter-bar{
+        display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+        padding: 12px 16px; border-bottom: 1px solid var(--border-color);
+        background: var(--surface-1);
+    }
+    .filter-bar .form-control, .filter-bar .form-select{ max-width: 240px; }
+
+    .empty-state{ padding: 40px 16px; text-align:center; color: var(--text-muted); }
+    .empty-state i{ font-size: 2.5rem; opacity:.5; }
+</style>
+
+{% set total_balance = accounts | sum(attribute='balance') %}
+{% set bank_count = accounts | selectattr('category', 'equalto', 'bank') | list | length %}
+{% set cash_count = accounts | selectattr('category', 'equalto', 'cash') | list | length %}
+
+<div class="container-fluid">
+    <div class="acc-page-header">
+        <div>
+            <h2><i class="bi bi-gear-wide-connected me-2"></i>Manage Accounts</h2>
+            <div class="subtitle">Add, organize, and review your cash and bank accounts and their groups.</div>
+        </div>
+        <div class="acc-toolbar">
+            <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Dashboard
+            </a>
+            <a href="{{ url_for('accounts.reconciliations') }}" class="btn btn-outline-info">
+                <i class="bi bi-clock-history me-1"></i> Reconciliations
+            </a>
+            {% if can_manage_master %}<button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
+                <i class="bi bi-tag-fill me-1"></i> New Group
+            </button>
+            <a href="{{ url_for('accounts.add_account') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i> Add New Account
+            </a>{% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card stat-card sc-violet">
+                <div class="card-body">
+                    <div class="stat-label"><i class="bi bi-collection me-1"></i> Total Accounts</div>
+                    <div class="stat-value">{{ accounts|length }}</div>
+                </div>
+                <i class="bi bi-collection-fill stat-icon"></i>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card stat-card sc-emerald">
+                <div class="card-body">
+                    <div class="stat-label"><i class="bi bi-wallet2 me-1"></i> Total Balance</div>
+                    <div class="stat-value"><small>Rs.</small> {{ "%.2f"|format(total_balance or 0) }}</div>
+                </div>
+                <i class="bi bi-cash-stack stat-icon"></i>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card stat-card sc-blue">
+                <div class="card-body">
+                    <div class="stat-label"><i class="bi bi-bank me-1"></i> Bank Accounts</div>
+                    <div class="stat-value">{{ bank_count }}</div>
+                </div>
+                <i class="bi bi-bank2 stat-icon"></i>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card stat-card sc-amber">
+                <div class="card-body">
+                    <div class="stat-label"><i class="bi bi-cash-coin me-1"></i> Cash Accounts</div>
+                    <div class="stat-value">{{ cash_count }}</div>
+                </div>
+                <i class="bi bi-coin stat-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="card acc-section-card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-tags-fill me-2 text-info"></i>Transaction Groups</h5>
+            {% if can_manage_master %}<button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
+                <i class="bi bi-plus-lg me-1"></i> New Group
+            </button>{% endif %}
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">
+                Groups help you organize accounts by purpose (e.g. <strong>Company</strong>, <strong>Own Funds</strong>, <strong>Clients</strong>, <strong>External</strong>, <strong>Loan</strong>). Each account belongs to one group and groups drive the receive/pay flows.
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+                {% for category in categories %}
+                {% set group_count = accounts | selectattr('source_category', 'equalto', category.name) | list | length %}
+                <span class="group-chip" title="{{ category.note or '' }}">
+                    <i class="bi bi-tag-fill"></i>
+                    {{ category.name }}
+                    <span class="chip-count">{{ group_count }}</span>
+                </span>
+                {% else %}
+                <div class="empty-state w-100">
+                    <i class="bi bi-tags"></i>
+                    <div class="mt-2">No transaction groups yet. Click <strong>New Group</strong> to create one.</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card acc-section-card">
+        <div class="card-header">
+            <h5><i class="bi bi-list-columns-reverse me-2 text-warning"></i>All Accounts</h5>
+            {% if can_manage_master %}<a href="{{ url_for('accounts.add_account') }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i> Add Account
+            </a>{% endif %}
+        </div>
+        <div class="filter-bar">
+            <div class="input-group input-group-sm" style="max-width: 280px;">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="acc-search" class="form-control" placeholder="Search accounts...">
+            </div>
+            <select id="acc-filter-channel" class="form-select form-select-sm">
+                <option value="">All channels</option>
+                <option value="cash">Cash</option>
+                <option value="bank">Bank</option>
+            </select>
+            <select id="acc-filter-group" class="form-select form-select-sm">
+                <option value="">All groups</option>
+                {% for category in categories %}
+                <option value="{{ category.name }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Account status">
+                <a class="btn {% if show_mode=='active' %}btn-success{% else %}btn-outline-success{% endif %}" href="{{ url_for('accounts.manage_accounts', show='active') }}">Active</a>
+                <a class="btn {% if show_mode=='archived' %}btn-danger{% else %}btn-outline-danger{% endif %}" href="{{ url_for('accounts.manage_accounts', show='archived') }}">Archived</a>
+                <a class="btn {% if show_mode=='all' %}btn-info{% else %}btn-outline-info{% endif %}" href="{{ url_for('accounts.manage_accounts', show='all') }}">All</a>
+            </div>
+            <span class="ms-auto small text-muted" id="acc-count">{{ accounts|length }} accounts</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle acc-table mb-0" id="accountsTable">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Group</th>
+                            <th>Type</th>
+                            <th>Channel</th>
+                            <th class="text-end">Balance</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for account in accounts %}
+                        <tr data-name="{{ (account.name or '')|lower }}"
+                            data-channel="{{ (account.category or '')|lower }}"
+                            data-group="{{ account.source_category or '' }}">
+                            <td class="acc-name-cell">
+                                <div class="name">{{ account.name }}</div>
+                                {% if account.bank_name %}
+                                <div class="meta"><i class="bi bi-bank me-1"></i>{{ account.bank_name }}{% if account.account_number %} • {{ account.account_number }}{% endif %}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-soft-info">{{ account.source_category or 'Unassigned' }}</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-soft-violet">{{ account.account_type }}</span>
+                            </td>
+                            <td>
+                                {% if account.category == 'bank' %}
+                                <span class="badge badge-soft-info"><i class="bi bi-bank me-1"></i>Bank</span>
+                                {% else %}
+                                <span class="badge badge-soft-amber"><i class="bi bi-cash-coin me-1"></i>Cash</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <span class="acc-balance {% if (account.balance or 0) < 0 %}neg{% endif %}">
+                                    Rs. {{ "%.2f"|format(account.balance or 0) }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if account.is_active %}
+                                <span class="badge badge-soft-emerald"><i class="bi bi-check-circle-fill me-1"></i>Active</span>
+                                {% else %}
+                                <span class="badge badge-soft-rose"><i class="bi bi-x-circle-fill me-1"></i>Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">{{ account.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td class="text-end text-nowrap">
+                                <a href="{{ url_for('accounts.account_ledger', account_id=account.id) }}"
+                                   class="btn btn-sm btn-outline-info" title="View Ledger">
+                                    <i class="bi bi-journal-text"></i>
+                                </a>
+                                {% if account.is_active %}<a href="{{ url_for('accounts.reconcile_account', account_id=account.id) }}"
+                                   class="btn btn-sm btn-outline-success" title="Reconcile">
+                                    <i class="bi bi-check2-square"></i>
+                                </a>{% endif %}
+                                {% if can_manage_master %}<button class="btn btn-sm btn-outline-warning" title="Edit" onclick="editAccount({{ account.id }})">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <form method="POST" action="{{ url_for('accounts.toggle_account', account_id=account.id) }}" style="display:inline" onsubmit="return confirm('{% if account.is_active %}Deactivate{% else %}Reactivate{% endif %} this account?');">
+                                    <button type="submit" class="btn btn-sm {% if account.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}" title="{% if account.is_active %}Deactivate{% else %}Reactivate{% endif %}">
+                                        <i class="bi {% if account.is_active %}bi-power{% else %}bi-arrow-clockwise{% endif %}"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('accounts.delete_account', account_id=account.id) }}" style="display:inline" onsubmit="return confirm('Delete this account? If it has historical transactions it will be archived instead to preserve accounting history.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-dark" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="8" class="empty-state"><i class="bi bi-inbox"></i><div class="mt-2">No accounts yet. Click <strong>Add Account</strong> to get started.</div></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Group Modal -->
+<div class="modal fade" id="newCategoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('accounts.add_account_category') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-tag-fill me-2 text-info"></i>Create Transaction Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="category_name">Group Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="category_name" name="name" placeholder="e.g. Company, Own Funds, Clients, External, Loan" required>
+                    <div class="small text-muted mt-1">Pick a clear, short name. You can assign accounts to this group when creating them.</div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label fw-semibold" for="category_note">Note <span class="text-muted small">(optional)</span></label>
+                    <textarea class="form-control" id="category_note" name="note" rows="3" placeholder="What this group is used for..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i> Create Group</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Account Modal -->
+<div class="modal fade" id="editAccountModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form id="editAccountForm" method="POST" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-warning"></i>Edit Account</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Account Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="name" id="ea_name" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Channel <span class="text-danger">*</span></label>
+            <select class="form-select" name="category" id="ea_category" required>
+              <option value="cash">Cash</option>
+              <option value="bank">Bank</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
+            <select class="form-select" name="account_type" id="ea_account_type" required>
+              <option value="company">Company</option>
+              <option value="personal">Personal</option>
+              <option value="supplier">Supplier</option>
+              <option value="client">Client</option>
+              <option value="loan">Loan</option>
+              <option value="external">External</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Group <span class="text-danger">*</span></label>
+            <select class="form-select" name="source_category" id="ea_source_category" required>
+              {% for c in categories %}
+              <option value="{{ c.name }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Current Balance <span class="text-muted small">(edit to adjust)</span></label>
+            <div class="input-group">
+              <span class="input-group-text">Rs.</span>
+              <input type="number" step="0.01" class="form-control" name="balance" id="ea_balance">
+            </div>
+            <div class="small text-muted mt-1"><i class="bi bi-info-circle me-1"></i>Any change creates an Adjustment entry in the ledger.</div>
+          </div>
+
+          <div class="col-12 ea-bank-row" style="display:none">
+            <hr><h6 class="fw-bold mb-3"><i class="bi bi-bank me-2 text-info"></i>Bank Details</h6>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Bank Name</label><input type="text" class="form-control" name="bank_name" id="ea_bank_name"></div>
+              <div class="col-md-6"><label class="form-label">Account Holder</label><input type="text" class="form-control" name="account_holder_name" id="ea_account_holder_name"></div>
+              <div class="col-md-6"><label class="form-label">Account Number</label><input type="text" class="form-control" name="account_number" id="ea_account_number"></div>
+              <div class="col-md-6"><label class="form-label">Branch / IBAN</label><input type="text" class="form-control" name="branch_code" id="ea_branch_code"></div>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label fw-semibold">Note</label>
+            <textarea class="form-control" name="note" id="ea_note" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i> Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+async function editAccount(accountId) {
+    try {
+        const res = await fetch(`/accounts/${accountId}/data`, {credentials: 'same-origin'});
+        if (!res.ok) throw new Error('Failed to load account.');
+        const a = await res.json();
+        document.getElementById('editAccountForm').action = `/accounts/${a.id}/edit`;
+        document.getElementById('ea_name').value = a.name;
+        document.getElementById('ea_category').value = a.category;
+        document.getElementById('ea_account_type').value = a.account_type;
+        document.getElementById('ea_source_category').value = a.source_category;
+        document.getElementById('ea_balance').value = a.balance.toFixed(2);
+        document.getElementById('ea_bank_name').value = a.bank_name;
+        document.getElementById('ea_account_holder_name').value = a.account_holder_name;
+        document.getElementById('ea_account_number').value = a.account_number;
+        document.getElementById('ea_branch_code').value = a.branch_code;
+        document.getElementById('ea_note').value = a.note;
+        toggleBankRow();
+        new bootstrap.Modal(document.getElementById('editAccountModal')).show();
+    } catch (e) {
+        alert(e.message || 'Could not load account details.');
+    }
+}
+function toggleBankRow() {
+    const isBank = document.getElementById('ea_category').value === 'bank';
+    document.querySelector('.ea-bank-row').style.display = isBank ? '' : 'none';
+}
+document.getElementById('ea_category').addEventListener('change', toggleBankRow);
+
+(function() {
+    const search = document.getElementById('acc-search');
+    const channel = document.getElementById('acc-filter-channel');
+    const group = document.getElementById('acc-filter-group');
+    const tbody = document.querySelector('#accountsTable tbody');
+    const countEl = document.getElementById('acc-count');
+
+    function applyFilters() {
+        if (!tbody) return;
+        const term = (search.value || '').trim().toLowerCase();
+        const ch = (channel.value || '').toLowerCase();
+        const gr = group.value || '';
+        let shown = 0;
+        tbody.querySelectorAll('tr[data-name]').forEach(row => {
+            const name = row.dataset.name || '';
+            const matchesTerm = !term || name.includes(term);
+            const matchesCh = !ch || row.dataset.channel === ch;
+            const matchesGr = !gr || row.dataset.group === gr;
+            const visible = matchesTerm && matchesCh && matchesGr;
+            row.style.display = visible ? '' : 'none';
+            if (visible) shown++;
+        });
+        if (countEl) countEl.textContent = shown + ' accounts';
+    }
+
+    [search, channel, group].forEach(el => el && el.addEventListener('input', applyFilters));
+    [channel, group].forEach(el => el && el.addEventListener('change', applyFilters));
+})();
+</script>
+{% endblock %}

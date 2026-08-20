@@ -1,0 +1,223 @@
+{% extends "layout.html" %}
+{% from "_ui/page_header.html" import render as ui_header %}
+{% from "_ui/kpi_tile.html" import tile as ui_tile %}
+{% from "_ui/data_table_card.html" import card as ui_table_card %}
+{% from "_ui/filter_bar.html" import bar as ui_filter_bar %}
+{% block content %}
+<div class="ui-v2">
+
+  {% set _toolbar %}
+    <a href="{{ url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to) }}" class="btn btn-warning btn-pill fw-bold">
+      <i class="bi bi-list-check me-1"></i> Daily Breakdown
+    </a>
+    <a href="/" class="btn btn-outline-secondary btn-pill fw-bold">
+      <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+    <button type="button" class="btn btn-outline-secondary btn-pill fw-bold" onclick="window.print()">
+      <i class="bi bi-printer"></i>
+    </button>
+  {% endset %}
+  {{ ui_header('bi-graph-up', 'Stock Summary', subtitle=(date_from ~ ' → ' ~ date_to), toolbar=_toolbar) }}
+
+  {% call ui_filter_bar(action=url_for('inventory.stock_summary')) %}
+    <div class="ui-field ui-col-3">
+      <label class="ui-label">From</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+    </div>
+    <div class="ui-field ui-col-3">
+      <label class="ui-label">To</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+    </div>
+    <div class="ui-field ui-col-3">
+      <label class="ui-label">Material</label>
+      <select name="material" class="form-select">
+        <option value="">All Materials</option>
+        {% for m in materials %}
+          <option value="{{ m.name }}" {{ 'selected' if material_filter == m.name }}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ui-field ui-col-2">
+      <label class="ui-label">Category</label>
+      <select name="material_category" class="form-select">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+          <option value="{{ cat.id }}" {{ 'selected' if category_filter|int == cat.id }}>{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ui-actions ui-col-1">
+      <label class="ui-label">&nbsp;</label>
+      <button class="btn btn-warning w-100"><i class="bi bi-funnel me-1"></i> Apply</button>
+    </div>
+    <div class="ui-actions ui-col-12">
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('inventory.stock_summary') }}">
+        <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+      </a>
+    </div>
+  {% endcall %}
+
+  <div class="ui-kpi-grid">
+    {{ ui_tile(
+      href=url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to, material=material_filter, material_category=category_filter),
+      label='Total Received',
+      value=("%.2f"|format(grand_received)),
+      icon='bi-box-arrow-in-down',
+      colour='green',
+      sub='Across selected range',
+      cta='Open daily breakdown'
+    ) }}
+    {{ ui_tile(
+      href=url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to, material=material_filter, material_category=category_filter),
+      label='Total Delivered',
+      value=("%.2f"|format(grand_delivered)),
+      icon='bi-box-arrow-up-right',
+      colour='cyan',
+      sub='Across selected range',
+      cta='Open daily breakdown'
+    ) }}
+    {{ ui_tile(
+      href=url_for('inventory.daily_transactions', date_from=date_from, date_to=date_to, material=material_filter, material_category=category_filter),
+      label='Net Movement',
+      value=("%.2f"|format(grand_net)),
+      icon='bi-graph-up-arrow',
+      colour=('amber' if grand_net >= 0 else 'rose'),
+      sub='Received − Delivered',
+      cta='Open daily breakdown'
+    ) }}
+  </div>
+
+  {% call ui_table_card('Material-Wise Totals', icon='bi-tags') %}
+    <table class="ui-table">
+      <thead>
+        <tr>
+          <th>Material</th>
+          <th class="num">Received</th>
+          <th class="num">Delivered</th>
+          <th class="num">Net</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in totals_by_material %}
+        <tr>
+          <td class="fw-bold">{{ row.material }}</td>
+          <td class="num pos">{{ "%.2f"|format(row.received) }}</td>
+          <td class="num">{{ "%.2f"|format(row.delivered) }}</td>
+          {% set net_cls = 'pos' if row.net >= 0 else 'neg' %}
+          <td class="num {{ net_cls }}">{{ "%.2f"|format(row.net) }}</td>
+        </tr>
+        {% else %}
+        <tr><td class="ui-empty" colspan="4">No transactions found in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endcall %}
+
+  {% call ui_table_card('GRN Receipts (Incoming Stock History)', icon='bi-box-arrow-in-down') %}
+    <p class="text-white-50 small mb-3">
+      Every incoming movement in this range that traces to a GRN — the actual
+      GRN document (bill + supplier) is preserved, so "Received" above is
+      auditable history, not just an added quantity.
+    </p>
+    <table class="ui-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>GRN Bill</th>
+          <th>Supplier</th>
+          <th>Material</th>
+          <th class="num">Qty Received</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in grn_receipts %}
+        <tr>
+          <td>{{ r.date }}</td>
+          <td class="fw-bold">{{ r.bill_no }}</td>
+          <td>{{ r.supplier }}</td>
+          <td>{{ r.material }}</td>
+          <td class="num pos">{{ "%.2f"|format(r.qty) }}</td>
+        </tr>
+        {% else %}
+        <tr><td class="ui-empty" colspan="5">No GRN receipts in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endcall %}
+
+  {% call ui_table_card('Day-Wise Totals', icon='bi-calendar3') %}
+    <table class="ui-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th class="num">Received</th>
+          <th class="num">Delivered</th>
+          <th class="num">Net</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in day_wise %}
+        <tr>
+          <td class="fw-bold">{{ row.date }}</td>
+          <td class="num pos">{{ "%.2f"|format(row.received) }}</td>
+          <td class="num">{{ "%.2f"|format(row.delivered) }}</td>
+          {% set net_cls = 'pos' if row.net >= 0 else 'neg' %}
+          <td class="num {{ net_cls }}">{{ "%.2f"|format(row.net) }}</td>
+        </tr>
+        {% else %}
+        <tr><td class="ui-empty" colspan="4">No day-wise data found in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endcall %}
+
+  {% call ui_table_card('Selected Date Snapshot (' ~ sel_date ~ ')', icon='bi-camera') %}
+    <table class="ui-table">
+      <thead>
+        <tr>
+          <th>Material Brand</th>
+          <th>Category</th>
+          <th class="num">Opening</th>
+          <th class="num">Stock In</th>
+          <th class="num">Stock Out</th>
+          <th class="num">Closing</th>
+          <th class="num">Physical</th>
+          <th class="num">Diff</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in stats %}
+        <tr>
+          <td class="fw-bold">{{ s.name }}</td>
+          <td class="text-muted">{{ s.category or 'General' }}</td>
+          <td class="num">{{ s.opening|int }}</td>
+          <td class="num pos">+{{ s.in|int }}</td>
+          <td class="num">-{{ s.out|int }}</td>
+          <td class="num warn">{{ s.closing|int }}</td>
+          <td class="num">
+            <input type="number" class="form-control form-control-sm text-center fw-bold" placeholder="0"
+                   oninput="updateDiff(this, {{ s.closing }}, 'diff-{{ loop.index }}')">
+          </td>
+          <td class="num" id="diff-{{ loop.index }}">--</td>
+        </tr>
+        {% else %}
+        <tr><td class="ui-empty" colspan="8">No snapshot data found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endcall %}
+</div>
+
+<script>
+function updateDiff(input, closing, diffId) {
+  let physical = parseFloat(input.value) || 0;
+  let diff = physical - closing;
+  let cell = document.getElementById(diffId);
+  if (!cell) return;
+  cell.innerText = (diff > 0 ? "+" : "") + diff.toFixed(0);
+  cell.classList.remove('pos', 'neg', 'warn');
+  if (diff === 0) cell.classList.add('pos');
+  else cell.classList.add('neg');
+}
+</script>
+{% endblock %}

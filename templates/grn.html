@@ -1,0 +1,224 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-box-arrow-in-down me-2"></i>Goods Receipt Notes</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        <button class="btn btn-warning btn-sm text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#addGRNModal">
+            <i class="bi bi-plus-lg"></i> Add GRN
+        </button>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm" style="background:#0f172a; border:1px solid #334155;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="p-3 rounded-circle" style="background: rgba(251,191,36,0.15);">
+                    <i class="bi bi-receipt text-warning fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-white-50 small fw-bold">Total GRNs</div>
+                    <div class="fs-4 fw-bold text-white">{{ grns|length }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50">Date</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Supplier</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Auto Bill</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Manual Bill</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Items</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Total Quantity</th>
+                    <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
+                </tr>
+            </thead>
+            <tbody style="background: #1e293b;">
+                {% for grn in grns %}
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td class="ps-4 small text-white-50">{{ grn.date_posted.strftime('%d-%m-%Y %H:%M') }}</td>
+                    <td class="fw-bold text-white">{{ grn.supplier }}</td>
+                    <td><span class="badge bg-warning text-dark">{{ grn.auto_bill_no }}</span></td>
+                    <td class="text-white-50">{{ grn.manual_bill_no or '-' }}</td>
+                    <td>
+                        {% for item in grn.items %}
+                        <div class="small text-white-50">
+                            {{ item.mat_name }} 
+                            <span class="text-info">({{ item.qty }})</span>
+                            {% if item.price_at_time %}
+                            <span class="text-warning ms-1">@ {{ item.price_at_time }}</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </td>
+                    <td class="fw-bold text-info">{{ grn.items|sum(attribute='qty') }}</td>
+                    <td class="text-end pe-4">
+                        {% if grn.photo_path %}
+                        <a href="{{ url_for('uploaded_file', filename=grn.photo_path) }}" 
+                           target="_blank" class="btn btn-sm btn-info me-1">
+                            <i class="bi bi-image"></i>
+                        </a>
+                        {% endif %}
+                        <form method="POST" style="display:inline;" 
+                              onsubmit="return confirm('Delete this GRN? This will reverse the stock.')">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="{{ grn.id }}">
+                            <button type="submit" class="btn btn-sm btn-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-white-50">No GRNs found yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add GRN Modal -->
+<div class="modal fade" id="addGRNModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <form method="POST" enctype="multipart/form-data" class="modal-content border-secondary" style="background: #1e293b;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold mb-0">Add GRN</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <input type="hidden" name="action" value="add">
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="text-white-50 small fw-bold mb-1">SUPPLIER NAME</label>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" name="supplier" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="text-white-50 small fw-bold mb-1">MANUAL BILL NO</label>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" name="manual_bill_no">
+                    </div>
+                    <div class="col-md-12">
+                        <label class="text-white-50 small fw-bold mb-1">BILL PHOTO (OPTIONAL)</label>
+                        <input type="file" class="form-control bg-dark text-white border-secondary" name="photo" accept="image/*">
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-between align-items-center">
+                    <h6 class="text-info fw-bold mb-0">Items</h6>
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="addGRNItem()">
+                        <i class="bi bi-plus"></i> Add Item
+                    </button>
+                </div>
+
+                <div class="row g-2 px-2 mt-2 mb-0">
+                    <div class="col-md-5"><label class="small text-white-50 fw-bold">MATERIAL</label></div>
+                    <div class="col-md-3"><label class="small text-white-50 fw-bold">QUANTITY</label></div>
+                    <div class="col-md-3"><label class="small text-white-50 fw-bold">RATE</label></div>
+                </div>
+
+                <div id="grn-items-container" class="mt-1">
+                    <div class="grn-item mb-2 p-2 rounded border border-secondary bg-dark">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-5">
+                                <select class="form-select form-select-sm bg-dark text-white border-secondary" name="mat_name[]" required>
+                                    <option value="">Select Material</option>
+                                    {% for mat in materials %}
+                                    <option value="{{ mat.name }}">{{ mat.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" class="form-control bg-dark text-white border-secondary qty-input" name="qty[]" placeholder="Quantity" step="0.01" required style="font-size: 1.05rem; font-weight: bold; padding: 0.6rem 0.5rem;">
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary" name="price[]" placeholder="Rate" step="0.01">
+                            </div>
+                            <div class="col-md-1 text-end">
+                                <button type="button" class="btn btn-danger btn-sm remove-item" onclick="this.closest('.grn-item').remove()">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2">
+                <button type="reset" class="btn btn-outline-secondary flex-grow-1 fw-bold">Reset</button>
+                <button type="button" class="btn btn-secondary flex-grow-1 fw-bold" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold flex-grow-1">Save GRN</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function addGRNItem() {
+    const container = document.getElementById('grn-items-container');
+    const newItem = container.querySelector('.grn-item').cloneNode(true);
+    const idx = Date.now();
+    const search = newItem.querySelector('.grn-mat-search');
+    const list = newItem.querySelector('.combobox-list');
+    if (search && list) {
+        const sid = 'grnMatSearch' + idx;
+        const lid = 'grnMatList' + idx;
+        search.id = sid;
+        search.value = '';
+        search.setAttribute('onfocus', "showCombobox('" + sid + "', '" + lid + "')");
+        search.setAttribute('oninput', "filterCombobox('" + sid + "', '" + lid + "')");
+        list.id = lid;
+        list.querySelectorAll('.combobox-item').forEach(it => it.setAttribute('data-combo-input', sid));
+    }
+    newItem.querySelectorAll('input[name="qty[]"], input[name="price[]"]').forEach(input => input.value = '');
+    container.appendChild(newItem);
+}
+
+// Add event listeners to material selects to reset qty and price when material changes
+document.addEventListener('DOMContentLoaded', function() {
+    const addGRNModal = document.getElementById('addGRNModal');
+    if (addGRNModal) {
+        addGRNModal.addEventListener('show.bs.modal', function() {
+            // Ensure first item is ready
+            const firstItem = addGRNModal.querySelector('.grn-item');
+            if (firstItem) {
+                const select = firstItem.querySelector('select[name="mat_name[]"]');
+                if (select) {
+                    select.addEventListener('change', function() {
+                        // Reset qty and price when material changes
+                        const row = this.closest('.grn-item');
+                        const qtyInput = row.querySelector('input[name="qty[]"]');
+                        const priceInput = row.querySelector('input[name="price[]"]');
+                        if (qtyInput) qtyInput.value = '';
+                        if (priceInput) priceInput.value = '';
+                    });
+                }
+            }
+        });
+        
+        // Setup change handlers for dynamically added items
+        const container = addGRNModal.querySelector('#grn-items-container');
+        if (container) {
+            container.addEventListener('DOMNodeInserted', function(e) {
+                const newSelect = e.target.querySelector && e.target.querySelector('select[name="mat_name[]"]');
+                if (newSelect) {
+                    newSelect.addEventListener('change', function() {
+                        const row = this.closest('.grn-item');
+                        const qtyInput = row.querySelector('input[name="qty[]"]');
+                        const priceInput = row.querySelector('input[name="price[]"]');
+                        if (qtyInput) qtyInput.value = '';
+                        if (priceInput) priceInput.value = '';
+                    });
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

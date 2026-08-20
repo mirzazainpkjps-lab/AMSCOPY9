@@ -1,0 +1,366 @@
+<div class="modal fade" id="editSaleModal{{ sale.id }}" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen">
+        <form class="modal-content sale-form ui-helper-form ds-sale-sheet" action="/edit_bill/DirectSale/{{ sale.id }}" method="POST" enctype="multipart/form-data" data-booking-container="bookingStatusContainerEdit{{ sale.id }}" data-financial-container="clientFinancialContainerEdit{{ sale.id }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold mb-0">Edit Sale: {{ sale.manual_bill_no or 'No Bill' }}</h5>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <!-- Left side panel -->
+                    <div class="col-lg-3 col-md-4 border-end border-secondary pe-md-3 side-panel">
+                        <div>
+                            <label class="text-white-50 small fw-bold mb-1">1. Select Sale Type</label>
+                            <select name="category" id="editSaleCategory{{ sale.id }}" class="form-select bg-dark text-white border-secondary edit-sale-category">
+                                <option value="Booking Delivery" {% if sale.category == 'Booking Delivery' %}selected{% endif %}>Booked Sale</option>
+                                <option value="Mixed Transaction" {% if sale.category == 'Mixed Transaction' %}selected{% endif %}>Booked + Due</option>
+                                <option value="Credit Customer" {% if sale.category == 'Credit Customer' %}selected{% endif %}>Due Sale</option>
+                                <option value="Open Khata" {% if sale.category == 'Open Khata' %}selected{% endif %}>Open Khata</option>
+                                <option value="Cash" {% if sale.category == 'Cash' %}selected{% endif %}>Cash Sale</option>
+                            </select>
+                        </div>
+                        <div class="position-relative">
+                            <label class="text-white-50 small fw-bold mb-1">2. Select Client</label>
+                            <div class="edit-client-search-wrap">
+                                <div class="input-group">
+                                    <input type="text" name="client_code" id="editSaleClientCode{{ sale.id }}" value="{{ sale_client_code_by_id.get(sale.id) or sale.client_name or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Search by name or code..." autocomplete="off" required onfocus="showCombobox('editSaleClientCode{{ sale.id }}', 'editSaleCombobox{{ sale.id }}')" oninput="filterCombobox('editSaleClientCode{{ sale.id }}', 'editSaleCombobox{{ sale.id }}', 'editSaleClientNameDisplay{{ sale.id }}'); updateBookingStatus(this.value, 'bookingStatusContainerEdit{{ sale.id }}', 'clientFinancialContainerEdit{{ sale.id }}')">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('editSaleClientCode{{ sale.id }}', 'editSaleCombobox{{ sale.id }}')">
+                                        <i class="bi bi-chevron-down text-warning"></i>
+                                    </button>
+                                </div>
+                                <div id="editSaleCombobox{{ sale.id }}" class="combobox-list shadow-lg" style="display: none;" data-display-id="editSaleClientNameDisplay{{ sale.id }}">
+                                    {% for client in clients %}
+                                    <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="editSaleClientCode{{ sale.id }}" data-combo-display="editSaleClientNameDisplay{{ sale.id }}">
+                                        <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                                        <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div id="editSaleClientNameDisplay{{ sale.id }}" class="text-info small mt-1 fw-bold">Name: {{ sale.client_name }}</div>
+                            </div>
+                            <div class="edit-manual-client-wrap mt-2 position-relative" style="display:none;">
+                                <label class="text-white-50 small fw-bold mb-1">Customer Name (Manual)</label>
+                                <div class="input-group">
+                                    <input type="text" name="manual_client_name" id="editSaleManualClientName{{ sale.id }}" class="form-control bg-dark text-white border-secondary edit-manual-client-input" value="{% if sale.category == 'Open Khata' %}{{ sale.client_name }}{% endif %}" placeholder="Search by name..." autocomplete="off" onfocus="showCombobox('editSaleManualClientName{{ sale.id }}', 'editSaleManualClientList{{ sale.id }}')" oninput="filterCombobox('editSaleManualClientName{{ sale.id }}', 'editSaleManualClientList{{ sale.id }}', 'editSaleManualClientDisplay{{ sale.id }}')">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('editSaleManualClientName{{ sale.id }}', 'editSaleManualClientList{{ sale.id }}')">
+                                        <i class="bi bi-chevron-down text-warning"></i>
+                                    </button>
+                                </div>
+                                <div id="editSaleManualClientList{{ sale.id }}" class="combobox-list shadow-lg" style="display: none;">
+                                    {% for client in clients %}
+                                    <div class="combobox-item" data-combo-code="{{ client.name }}" data-combo-name="{{ client.name }}" data-combo-input="editSaleManualClientName{{ sale.id }}" data-combo-display="editSaleManualClientDisplay{{ sale.id }}">
+                                        <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                                        <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div id="editSaleManualClientDisplay{{ sale.id }}" class="text-info small mt-1 fw-bold"></div>
+                            </div>
+                        </div>
+                        <div id="bookingStatusContainerEdit{{ sale.id }}" class="p-3 rounded border" style="min-height: 220px; overflow-y: auto; background: var(--ui-surface-2); border-color: var(--ui-border-strong);">
+                            <p class="text-white-50 text-center mt-5">Select a client to see booked items</p>
+                        </div>
+                        <div id="clientFinancialContainerEdit{{ sale.id }}" class="p-3 rounded border" style="min-height: 110px; background: var(--ui-surface-2); border-color: var(--ui-border-strong);">
+                            <p class="text-white-50 text-center mt-3 mb-0">Select a client to see running balance</p>
+                        </div>
+                    </div>
+
+                    <!-- Right side -->
+                    <div class="col-lg-9 col-md-8 ps-md-3">
+                        <div class="section-title">3. Sale Details</div>
+                        <div class="delivery-date-row mb-3">
+                            <div class="delivery-section">
+                                <label class="text-white-50 small fw-bold mb-1">DELIVERY PERSONS</label>
+                                {% set delivery_allocations = delivery_allocations_by_sale.get(sale.id, []) %}
+                                <div class="delivery-row-labels">
+                                    <div class="delivery-cell">Delivery Person</div>
+                                    <div class="delivery-cell text-center">Bags Delivered</div>
+                                    <div class="delivery-cell text-center">Rent</div>
+                                    <div class="delivery-cell shrink text-center">Remove</div>
+                                </div>
+                                <div class="delivery-person-rows">
+                                    {% if delivery_allocations %}
+                                        {% for alloc in delivery_allocations %}
+                                        {% set dp_id = alloc.delivery_person.id if alloc.delivery_person else alloc.delivery_person_id %}
+                                        <div class="delivery-person-row delivery-row">
+                                            <div class="delivery-cell">
+                                                <select name="delivery_person_id[]" class="form-select bg-dark text-white border-secondary delivery-person-select" required>
+                                                    <option value="">Select person</option>
+                                                    {% for dp in delivery_persons %}
+                                                    <option value="{{ dp.id }}" {% if dp_id and dp.id == dp_id %}selected{% endif %}>{{ dp.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="delivery-cell">
+                                                <input type="number" step="any" name="delivery_bags[]" class="form-control bg-dark text-white border-secondary text-center delivery-bags-input" value="{{ alloc.bags_delivered or 0 }}">
+                                            </div>
+                                            <div class="delivery-cell">
+                                                <input type="number" step="0.01" name="delivery_rent_amount[]" class="form-control bg-dark text-white border-secondary text-center delivery-rent-input" value="{{ alloc.rent_amount or 0 }}">
+                                            </div>
+                                            <div class="delivery-cell shrink text-center">
+                                                <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeDeliveryPersonRow(this)">X</button>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="delivery-person-row delivery-row">
+                                            <div class="delivery-cell">
+                                                <select name="delivery_person_id[]" class="form-select bg-dark text-white border-secondary delivery-person-select" required>
+                                                    <option value="">Select person</option>
+                                                    {% for dp in delivery_persons %}
+                                                    <option value="{{ dp.id }}">{{ dp.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="delivery-cell">
+                                                <input type="number" step="any" name="delivery_bags[]" class="form-control bg-dark text-white border-secondary text-center delivery-bags-input" value="">
+                                            </div>
+                                            <div class="delivery-cell">
+                                                <input type="number" step="0.01" name="delivery_rent_amount[]" class="form-control bg-dark text-white border-secondary text-center delivery-rent-input" value="">
+                                            </div>
+                                            <div class="delivery-cell shrink text-center">
+                                                <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeDeliveryPersonRow(this)">X</button>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-warning w-100 mt-2" onclick="addDeliveryPersonRow(this)">+ Add Delivery Person</button>
+                            </div>
+                            <div class="delivery-section">
+                                <label class="text-white-50 small fw-bold mb-1">SALE DATE</label>
+                                <div class="delivery-date-spacer"></div>
+                                <div class="input-group sale-date-shell">
+                                    <span class="input-group-text"><i class="bi bi-calendar-event sale-date-icon"></i></span>
+                                    <input type="text" name="sale_date" class="form-control text-white edit-sale-date air-date-time" value="{{ sale.date_posted.strftime('%Y-%m-%d %H:%M') if sale.date_posted else '' }}" placeholder="YYYY-MM-DD HH:MM" readonly>
+                                    <button class="btn sale-date-btn" type="button" aria-label="Open calendar"><i class="bi bi-calendar-week"></i></button>
+                                </div>
+                                <div class="sale-date-hint edit-sale-date-hint">--</div>
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-2" id="editManualClientToggleDiv{{ sale.id }}" style="display:none;">
+                            <input class="form-check-input edit-manual-client-check" type="checkbox" id="editManualClientCheck{{ sale.id }}">
+                            <label class="form-check-label text-white-50 small" for="editManualClientCheck{{ sale.id }}">Unregistered / Manual Client Name</label>
+                        </div>
+                        <div class="d-flex justify-content-end mb-1">
+                            <div class="form-check form-check-sm">
+                                <input class="form-check-input" type="checkbox" id="toggleIgnoreBookingEdit{{ sale.id }}">
+                                <label class="form-check-label text-white-50 small" for="toggleIgnoreBookingEdit{{ sale.id }}">Show ignore booking per item</label>
+                            </div>
+                        </div>
+                        <div class="sale-item-header d-none d-md-grid mb-2 px-2 text-white-50">
+                            <div class="text-center">Material</div>
+                            <div class="text-center">GRN</div>
+                            <div class="text-center">Alternate</div>
+                            <div class="text-center">Qty</div>
+                            <div class="text-center">Unit Price</div>
+                            <div class="text-center">Item Total</div>
+                            <div class="text-center">Remove</div>
+                        </div>
+                        <div class="items-container-edit">
+                            {% for item in sale.items %}
+                            <div class="compact-item-row mb-2 p-2 rounded border border-secondary bg-dark">
+                                <div class="sale-item-grid">
+                                    <div class="position-relative">
+                                        <div class="input-group input-group-sm">
+                                            <input type="hidden" name="material_id[]" id="editSaleMaterialId{{ sale.id }}_{{ loop.index0 }}" class="material-id-input" value="{% for mat in materials %}{% if mat.name|lower == item.product_name|lower %}{{ mat.id }}{% endif %}{% endfor %}">
+                                            <input type="text" name="product_name[]" id="editSaleMaterialSearch{{ sale.id }}_{{ loop.index0 }}" value="{{ item.product_name }}" class="form-control bg-dark text-white border-secondary price-trigger" placeholder="Search material..." autocomplete="off" required onfocus="showCombobox('editSaleMaterialSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleMaterialList{{ sale.id }}_{{ loop.index0 }}')" oninput="filterCombobox('editSaleMaterialSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleMaterialList{{ sale.id }}_{{ loop.index0 }}', 'editSaleMaterialDisplay{{ sale.id }}_{{ loop.index0 }}')" data-material-id-input="editSaleMaterialId{{ sale.id }}_{{ loop.index0 }}" data-selected-material-name="{{ item.product_name }}" data-combo-suppress="1">
+                                            <button class="btn btn-outline-secondary material-toggle-btn" type="button" onclick="toggleCombobox('editSaleMaterialSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleMaterialList{{ sale.id }}_{{ loop.index0 }}')">
+                                                <i class="bi bi-chevron-down text-warning"></i>
+                                            </button>
+                                        </div>
+                                        <div id="editSaleMaterialList{{ sale.id }}_{{ loop.index0 }}" class="combobox-list shadow-lg" style="display: none;">
+                                            {% for mat in materials %}
+                                            <div class="combobox-item" data-material-id="{{ mat.id }}" data-combo-code="{{ mat.name }}" data-combo-name="{{ mat.name }}" data-combo-input="editSaleMaterialSearch{{ sale.id }}_{{ loop.index0 }}" data-combo-display="editSaleMaterialDisplay{{ sale.id }}_{{ loop.index0 }}">
+                                                <span class="fw-bold text-warning code-span">{{ mat.name }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div id="editSaleMaterialDisplay{{ sale.id }}_{{ loop.index0 }}" class="text-info small mt-1 fw-bold"></div>
+                                    </div>
+                                    <div class="position-relative">
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" name="grn_item_id[]" id="editSaleGRNSearch{{ sale.id }}_{{ loop.index0 }}" value="{{ item.grn_item_id or '' }}" class="form-control bg-dark text-white border-secondary grn-input" placeholder="GRN (optional)" autocomplete="off" onfocus="showCombobox('editSaleGRNSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleGRNList{{ sale.id }}_{{ loop.index0 }}')" oninput="filterCombobox('editSaleGRNSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleGRNList{{ sale.id }}_{{ loop.index0 }}', 'editSaleGRNDisplay{{ sale.id }}_{{ loop.index0 }}')">
+                                            <button class="btn btn-outline-secondary grn-toggle-btn" type="button" onclick="toggleCombobox('editSaleGRNSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleGRNList{{ sale.id }}_{{ loop.index0 }}')">
+                                                <i class="bi bi-chevron-down text-warning"></i>
+                                            </button>
+                                        </div>
+                                        <div id="editSaleGRNList{{ sale.id }}_{{ loop.index0 }}" class="combobox-list shadow-lg" style="display: none;">
+                                            {% for grn in grns %}
+                                            {% for item in grn.items if not item.is_void %}
+                                            <div class="combobox-item" data-value="{{ item.id }}" data-material="{{ item.mat_name }}" onclick="selectGRNItem('editSaleGRNSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleGRNList{{ sale.id }}_{{ loop.index0 }}', '{{ item.id }}', '{{ grn.manual_bill_no or grn.auto_bill_no }} - {{ item.mat_name }} ({{ item.qty }} @ Rs.{{ item.price_at_time }})', 'editSaleGRNDisplay{{ sale.id }}_{{ loop.index0 }}')">
+                                                <span class="fw-bold text-warning code-span">{{ grn.manual_bill_no or grn.auto_bill_no }}</span>
+                                                <span class="ms-2 text-white-50 small">{{ item.mat_name }} ({{ item.qty }} @ Rs.{{ item.price_at_time }})</span>
+                                            </div>
+                                            {% endfor %}
+                                            {% endfor %}
+                                        </div>
+                                        <div id="editSaleGRNDisplay{{ sale.id }}_{{ loop.index0 }}" class="text-info small mt-1 fw-bold"></div>
+                                    </div>
+                                    <div class="position-relative">
+                                        <div class="input-group input-group-sm">
+                                            <input type="hidden" name="alternate_material_id[]" id="editSaleAltMaterialId{{ sale.id }}_{{ loop.index0 }}" class="alt-material-id-input" value="">
+                                            <input type="text" name="alternate_material[]" id="editSaleAltMaterialSearch{{ sale.id }}_{{ loop.index0 }}" value="{{ sale_alt_material_by_product.get(item.product_name, '') if sale_alt_material_by_product else '' }}" class="form-control bg-dark text-white border-secondary alt-material-input" placeholder="Alternate (optional)" autocomplete="off" onfocus="showCombobox('editSaleAltMaterialSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleAltMaterialList{{ sale.id }}_{{ loop.index0 }}')" oninput="filterCombobox('editSaleAltMaterialSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleAltMaterialList{{ sale.id }}_{{ loop.index0 }}', 'editSaleAltMaterialDisplay{{ sale.id }}_{{ loop.index0 }}')" data-material-id-input="editSaleAltMaterialId{{ sale.id }}_{{ loop.index0 }}">
+                                            <button class="btn btn-outline-secondary alt-material-toggle-btn" type="button" onclick="toggleCombobox('editSaleAltMaterialSearch{{ sale.id }}_{{ loop.index0 }}', 'editSaleAltMaterialList{{ sale.id }}_{{ loop.index0 }}')">
+                                                <i class="bi bi-chevron-down text-warning"></i>
+                                            </button>
+                                        </div>
+                                        <div id="editSaleAltMaterialList{{ sale.id }}_{{ loop.index0 }}" class="combobox-list alt-material-list shadow-lg" style="display: none;">
+                                            {% for mat in materials %}
+                                            <div class="combobox-item" data-combo-code="{{ mat.name }}" data-combo-name="{{ mat.name }}" data-combo-input="editSaleAltMaterialSearch{{ sale.id }}_{{ loop.index0 }}" data-combo-display="editSaleAltMaterialDisplay{{ sale.id }}_{{ loop.index0 }}">
+                                                <span class="fw-bold text-warning code-span">{{ mat.name }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div id="editSaleAltMaterialDisplay{{ sale.id }}_{{ loop.index0 }}" class="text-info small mt-1 fw-bold alt-material-display"></div>
+                                    </div>
+                                    <div>
+                                        <div class="input-group input-group-sm">
+                                            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="changeSaleQty(this, -1)">-</button>
+                                            <input type="number" step="any" name="qty[]" value="{{ item.qty }}" class="form-control bg-dark text-white border-secondary text-center qty-input" style="font-size: 1.05rem; font-weight: 700; padding: 0.475rem 0.5rem;" required>
+                                            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="changeSaleQty(this, 1)">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="rate-cell position-relative">
+                                        <input type="number" step="any" name="unit_rate[]" class="form-control form-control-sm bg-dark text-white border-secondary rate-input" value="{{ item.price_at_time }}" placeholder="Rate (not needed if booked)">
+                                        <div class="reserved-rate-badge text-warning small fw-bold" style="display:none;">Reserved</div>
+                                        <div class="ignore-booking-inline">
+                                            <input type="hidden" name="ignore_booking_item[]" value="0" class="ignore-booking-hidden">
+                                            <input class="form-check-input ignore-booking-item" type="checkbox">
+                                            <span class="text-white-50 small">Ignore</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <input type="number" step="any" class="form-control form-control-sm bg-dark text-info border-secondary text-center line-total" placeholder="Item Total" readonly tabindex="-1">
+                                    </div>
+                                    <div class="text-center">
+                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeSaleItemRow(this)" title="Remove item">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="item-status-badge mt-1"></div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-warning mb-2 w-100" onclick="addSaleItemRowEdit(this)">+ Add More Items</button>
+
+                        <div class="row g-3">
+                            <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">RENT CHARGED TO CLIENT (TOTAL)</label>
+                                    <input type="number" step="0.01" class="form-control bg-dark text-white border-secondary rent-charged-total" value="{{ sale.rent_item_revenue or 0 }}" readonly>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">DELIVERY PERSON RENT (ACTUAL)</label>
+                                    {% set edit_rent_total = delivery_rent_totals_by_sale.get(sale.id, sale.delivery_rent_cost or 0) %}
+                                    <input type="number" step="0.01" name="delivery_rent" class="form-control bg-dark text-white border-secondary delivery-rent-total" value="{{ edit_rent_total or 0 }}" readonly>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">RENT DIFFERENCE (PROFIT/LOSS)</label>
+                                    <input type="number" step="0.01" class="form-control bg-dark text-white border-secondary rent-diff-total" value="{{ (sale.rent_item_revenue or 0) - ((edit_rent_total or 0) or 0) }}" readonly>
+                                    <small class="rent-diff-hint text-white-50">No difference</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">AUTO BILL NO</label>
+                                    <input type="text" class="form-control bg-dark text-white border-secondary" value="{{ sale.auto_bill_no or '' }}" readonly>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">MANUAL BILL NO</label>
+                                    <input type="text" id="editSaleManualBill{{ sale.id }}" name="manual_bill_no" class="form-control bg-dark text-white border-secondary" value="{{ sale.manual_bill_no }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input edit-has-bill-checkbox" type="checkbox" name="has_bill" id="editHasBillCheck{{ sale.id }}" data-target="editSaleManualBill{{ sale.id }}" {% if sale.manual_bill_no %}checked{% endif %}>
+                            <label class="form-check-label text-white-50" for="editHasBillCheck{{ sale.id }}">This transaction has a Bill No</label>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">UPDATE PHOTO</label>
+                                    <input type="file" name="photo" class="form-control bg-dark text-white border-secondary" accept="image/*">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">UPDATE URL</label>
+                                    <input type="url" name="photo_url" class="form-control bg-dark text-white border-secondary" value="{{ sale.photo_url or '' }}" placeholder="https://...">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="text-white-50 small fw-bold mb-1">NOTES</label>
+                            <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Add sale notes...">{{ sale.note or '' }}</textarea>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">TOTAL AMOUNT</label>
+                                    <input type="number" step="0.01" name="amount" class="form-control bg-dark text-white border-secondary total-amount" value="{{ sale.amount }}" required>
+                                    <small class="text-white-50 x-small">Adjust this amount for mixed booking/credit bills.</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">DISCOUNT</label>
+                                    <input type="number" step="any" name="discount" class="form-control bg-dark text-white border-secondary" value="{{ sale.discount or 0 }}">
+                                    <input type="text" name="discount_reason" class="form-control bg-dark text-white border-secondary mt-1 form-control-sm" value="{{ sale.discount_reason or '' }}" placeholder="Reason">
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">PAID NOW</label>
+                                    <input type="number" step="0.01" name="paid_amount" class="form-control bg-dark text-white border-secondary" value="{{ sale.paid_amount }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3" id="paymentMethodSection" style="display: none;">
+                            <div class="col-sm-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">PAYMENT METHOD</label>
+                                    <select name="payment_method" class="form-select bg-dark text-white border-secondary">
+                                        <option value="Cash" {% if (sale.payment_method or 'Cash') == 'Cash' %}selected{% endif %}>Cash</option>
+                                        <option value="Bank" {% if sale.payment_method == 'Bank' %}selected{% endif %}>Bank Transfer</option>
+                                        <option value="Check" {% if sale.payment_method == 'Check' %}selected{% endif %}>Check</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-sm-6" id="salePaymentAccountSection" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">SELECT ACCOUNT</label>
+                                    <select name="payment_account_id" class="form-select bg-dark text-white border-secondary">
+                                        <option value="">Select account...</option>
+                                        {% for account in accounts %}
+                                            {% if account.category in ['cash', 'bank'] %}
+                                            <option value="{{ account.id }}" data-category="{{ account.category }}" {% if sale.payment_account_id == account.id %}selected{% endif %}>{{ account.name }}{% if account.category == 'bank' %} ({{ account.bank_name or 'Bank' }}){% endif %}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <div class="small text-muted mt-1">Bank/branch details are taken from the selected account.</div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="bank_name" value="{{ sale.bank_name or '' }}">
+                            <input type="hidden" name="account_name" value="{{ sale.account_name or '' }}">
+                            <input type="hidden" name="account_no" value="{{ sale.account_no or '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning text-dark fw-bold w-100 py-2 rounded-pill">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>

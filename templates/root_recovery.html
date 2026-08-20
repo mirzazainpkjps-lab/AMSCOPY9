@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" data-server-theme="{{ ui_theme_preference or '' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Root Recovery - AMS SYSTEM FOR EASE</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/5.3.0/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/1.10.0/font/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <script>
+        (function () {
+            var saved = "";
+            try { saved = localStorage.getItem("ams_theme") || ""; } catch (_) {}
+            var serverTheme = "{{ ui_theme_preference or '' }}";
+            var t = (saved || serverTheme || "").toLowerCase();
+            if (t !== "light" && t !== "dark") {
+                t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+            }
+            document.documentElement.setAttribute("data-theme", t);
+            document.documentElement.style.colorScheme = t;
+        })();
+    </script>
+    <style>
+        body {
+            background-color: var(--surface-0);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .recover-card {
+            background: var(--surface-1);
+            border: 2px solid #38bdf8;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 460px;
+            padding: 28px;
+            margin: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="recover-card">
+        <div class="d-flex justify-content-end mb-2">
+            <button type="button" class="theme-switch" data-theme-toggle>
+                <i class="bi bi-moon-stars-fill"></i>
+                <span class="theme-label">Dark</span>
+            </button>
+        </div>
+        <h4 class="text-white fw-bold mb-1">Root Recovery</h4>
+        <p class="text-white-50 small mb-3">Reset root password using an unused offline recovery code.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} py-2 small">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" autocomplete="off">
+            <div class="mb-2">
+                <label class="form-label text-white-50 small">Root Username</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" name="username" value="{{ root_username or 'root' }}" required>
+            </div>
+            <div class="mb-2">
+                <label class="form-label text-white-50 small">Recovery Code</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" name="recovery_code" placeholder="XXXX-XXXX-XXXX" required>
+            </div>
+            <div class="mb-2">
+                <label class="form-label text-white-50 small">New Password</label>
+                <input type="password" class="form-control bg-dark text-white border-secondary" name="new_password" minlength="8" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label text-white-50 small">Confirm Password</label>
+                <input type="password" class="form-control bg-dark text-white border-secondary" name="confirm_password" minlength="8" required>
+            </div>
+            <button type="submit" class="btn btn-info w-100 fw-bold">Reset Root Password</button>
+        </form>
+        <a href="{{ url_for('login') }}" class="btn btn-outline-light w-100 mt-2">Back to Login</a>
+    </div>
+</body>
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+<script>
+    if (window.AMSTheme) {
+        window.AMSTheme.init("{{ ui_theme_preference or '' }}");
+    }
+</script>
+</html>

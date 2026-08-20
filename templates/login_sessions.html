@@ -1,0 +1,78 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold text-warning mb-0">Live logins</h2>
+        <p class="text-white-50 small mb-0">Several managers can stay signed in at the same time from different PCs / IPs. Logging in does not kick anyone else out.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('activity_log_page') }}" class="btn btn-outline-info btn-sm fw-bold">Activity log</a>
+        <a href="{{ url_for('settings') }}" class="btn btn-outline-light btn-sm fw-bold">Settings</a>
+    </div>
+</div>
+
+<div class="ui-card mb-3">
+    <div class="ui-card-header"><h5 class="mb-0">Currently open (seen in last 45 min)</h5></div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>IP</th>
+                    <th>Signed in</th>
+                    <th>Last seen</th>
+                    <th>Browser</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in live %}
+                <tr>
+                    <td class="fw-bold text-warning">{{ r.username }}</td>
+                    <td><span class="badge bg-secondary">{{ r.role }}</span></td>
+                    <td class="text-info">{{ r.ip or '—' }}</td>
+                    <td class="small text-white-50">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '' }}</td>
+                    <td class="small {% if r.is_live %}text-success{% else %}text-white-50{% endif %}">
+                        {{ r.last_seen_at.strftime('%Y-%m-%d %H:%M:%S') if r.last_seen_at else '' }}
+                        {% if r.is_live %}<span class="badge bg-success ms-1">live</span>{% endif %}
+                    </td>
+                    <td class="small text-white-50">{{ (r.user_agent or '')[:80] }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-white-50 py-3">No open sessions yet. Log in from another PC and refresh this page.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="ui-card">
+    <div class="ui-card-header"><h5 class="mb-0">Recent login history</h5></div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>IP</th>
+                    <th>In</th>
+                    <th>Out</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recent %}
+                <tr>
+                    <td>{{ r.username }}</td>
+                    <td>{{ r.role }}</td>
+                    <td>{{ r.ip or '—' }}</td>
+                    <td class="small text-white-50">{{ r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else '' }}</td>
+                    <td class="small text-white-50">{{ r.ended_at.strftime('%Y-%m-%d %H:%M:%S') if r.ended_at else 'open' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-white-50 py-3">No login rows yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,152 @@
+{
+  "/": {
+    "total_ms": 1194.39,
+    "status": 200,
+    "bytes": 117063,
+    "queries": 2551,
+    "db_ms": 58.6,
+    "render_ms": 1.7,
+    "slowest_ms": 2.63,
+    "slowest_sql": "SELECT entry.material AS entry_material, sum(CASE WHEN (entry.type = ?) THEN entry.qty ELSE ? END) AS total_in, sum(CASE WHEN (entry.type = ?) THEN entry.qty ELSE ? END) AS total_out FROM entry WHERE entry.is_void = 0 GROUP BY entry.material"
+  },
+  "/accounts/": {
+    "total_ms": 1255.3,
+    "status": 200,
+    "bytes": 535907,
+    "queries": 2655,
+    "db_ms": 62.16,
+    "render_ms": 8.86,
+    "slowest_ms": 2.3,
+    "slowest_sql": "SELECT supplier_payment.id AS supplier_payment_id, supplier_payment.supplier_id AS supplier_payment_supplier_id, supplier_payment.amount AS supplier_payment_amount, supplier_payment.amount_minor AS supplier_payment_amount_minor, supplier_payment.method AS supplier_payment_method, supplier_payment.payment_type AS supplier_payment_payment_type, supplier_payment.source_type AS supplier_payment_source_type, supplier_payment.source_id AS supplier_payment_source_id, supplier_payment.date_posted AS sup"
+  },
+  "/profit_reports": {
+    "total_ms": 766.92,
+    "status": 200,
+    "bytes": 261802,
+    "queries": 1993,
+    "db_ms": 92.58,
+    "render_ms": 2.51,
+    "slowest_ms": 2.1,
+    "slowest_sql": "SELECT sum(entry.qty) AS sum_1 FROM entry WHERE entry.is_void = 0 AND entry.type = ? AND date(entry.date) >= ? AND date(entry.date) <= ?"
+  },
+  "/clients": {
+    "total_ms": 29.6,
+    "status": 200,
+    "bytes": 824820,
+    "queries": 10,
+    "db_ms": 5.14,
+    "render_ms": 12.43,
+    "slowest_ms": 2.62,
+    "slowest_sql": "SELECT entry.client AS entry_client, sum(entry.qty) AS sum_1 FROM entry WHERE entry.type = ? AND entry.client IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) GROUP BY entry.client"
+  },
+  "/materials": {
+    "total_ms": 5.98,
+    "status": 200,
+    "bytes": 174851,
+    "queries": 6,
+    "db_ms": 0.17,
+    "render_ms": 2.03,
+    "slowest_ms": 0.04,
+    "slowest_sql": "SELECT material.id AS material_id, material.code AS material_code, material.name AS material_name, material.category_id AS material_category_id, material.unit_price AS material_unit_price, material.total AS material_total, material.unit AS material_unit, material.is_active AS material_is_active, material.created_at AS material_created_at FROM material ORDER BY material.code ASC LIMIT ? OFFSET ?"
+  },
+  "/bookings": {
+    "total_ms": 34.31,
+    "status": 200,
+    "bytes": 1973174,
+    "queries": 9,
+    "db_ms": 0.59,
+    "render_ms": 21.85,
+    "slowest_ms": 0.24,
+    "slowest_sql": "SELECT client.id AS client_id, client.code AS client_code, client.name AS client_name, client.phone AS client_phone, client.address AS client_address, client.category AS client_category, client.opening_balance AS client_opening_balance, client.opening_balance_date AS client_opening_balance_date, client.is_active AS client_is_active, client.transferred_to_id AS client_transferred_to_id, client.require_manual_invoice AS client_require_manual_invoice, client.book_no AS client_book_no, client.financ"
+  },
+  "/direct_sales": {
+    "total_ms": 198.74,
+    "status": 200,
+    "bytes": 6519459,
+    "queries": 21,
+    "db_ms": 9.12,
+    "render_ms": 150.81,
+    "slowest_ms": 4.16,
+    "slowest_sql": "SELECT entry.client_code AS entry_client_code, lower(trim(entry.client)) AS client_norm, coalesce(entry.booked_material, entry.material) AS mat_name, sum(entry.qty) AS sum_1 FROM entry WHERE entry.type = ? AND entry.is_void = 0 AND NOT (entry.nimbus_no = ? AND entry.client_category != ?) GROUP BY entry.client_code, lower(trim(entry.client)), coalesce(entry.booked_material, entry.material)"
+  },
+  "/pending_bills": {
+    "total_ms": 44.0,
+    "status": 200,
+    "bytes": 2654071,
+    "queries": 5,
+    "db_ms": 1.6,
+    "render_ms": 33.12,
+    "slowest_ms": 1.08,
+    "slowest_sql": "SELECT count(*) AS count_1 FROM (SELECT pending_bill.id AS pending_bill_id, pending_bill.client_code AS pending_bill_client_code, pending_bill.client_name AS pending_bill_client_name, pending_bill.bill_no AS pending_bill_bill_no, pending_bill.bill_kind AS pending_bill_bill_kind, pending_bill.nimbus_no AS pending_bill_nimbus_no, pending_bill.amount AS pending_bill_amount, pending_bill.reason AS pending_bill_reason, pending_bill.photo_url AS pending_bill_photo_url, pending_bill.photo_path AS pendi"
+  },
+  "/payments": {
+    "total_ms": 11.62,
+    "status": 200,
+    "bytes": 246240,
+    "queries": 8,
+    "db_ms": 0.5,
+    "render_ms": 2.28,
+    "slowest_ms": 0.28,
+    "slowest_sql": "SELECT client.id AS client_id, client.code AS client_code, client.name AS client_name, client.phone AS client_phone, client.address AS client_address, client.category AS client_category, client.opening_balance AS client_opening_balance, client.opening_balance_date AS client_opening_balance_date, client.is_active AS client_is_active, client.transferred_to_id AS client_transferred_to_id, client.require_manual_invoice AS client_require_manual_invoice, client.book_no AS client_book_no, client.financ"
+  },
+  "/ledger": {
+    "total_ms": 7.35,
+    "status": 200,
+    "bytes": 258172,
+    "queries": 3,
+    "db_ms": 0.36,
+    "render_ms": 1.49,
+    "slowest_ms": 0.24,
+    "slowest_sql": "SELECT client.id AS client_id, client.code AS client_code, client.name AS client_name, client.phone AS client_phone, client.address AS client_address, client.category AS client_category, client.opening_balance AS client_opening_balance, client.opening_balance_date AS client_opening_balance_date, client.is_active AS client_is_active, client.transferred_to_id AS client_transferred_to_id, client.require_manual_invoice AS client_require_manual_invoice, client.book_no AS client_book_no, client.financ"
+  },
+  "/inventory/stock_summary": {
+    "total_ms": 19.4,
+    "status": 200,
+    "bytes": 134392,
+    "queries": 21,
+    "db_ms": 6.8,
+    "render_ms": 1.74,
+    "slowest_ms": 2.76,
+    "slowest_sql": "SELECT entry.material AS entry_material, sum(CASE WHEN (entry.type = ?) THEN entry.qty WHEN (entry.type = ?) THEN -entry.qty ELSE ? END) AS prev_net FROM entry WHERE entry.date < ? AND entry.is_void = 0 GROUP BY entry.material"
+  },
+  "/api/clients/search?q=ahm": {
+    "total_ms": 2.47,
+    "status": 200,
+    "bytes": 506,
+    "queries": 2,
+    "db_ms": 0.25,
+    "render_ms": 0,
+    "slowest_ms": 0.22,
+    "slowest_sql": "SELECT client.id AS client_id, client.code AS client_code, client.name AS client_name, client.phone AS client_phone, client.address AS client_address, client.category AS client_category, client.opening_balance AS client_opening_balance, client.opening_balance_date AS client_opening_balance_date, client.is_active AS client_is_active, client.transferred_to_id AS client_transferred_to_id, client.require_manual_invoice AS client_require_manual_invoice, client.book_no AS client_book_no, client.financ"
+  },
+  "/clients?search=ahm": {
+    "total_ms": 24.9,
+    "status": 200,
+    "bytes": 586244,
+    "queries": 10,
+    "db_ms": 5.05,
+    "render_ms": 8.57,
+    "slowest_ms": 2.49,
+    "slowest_sql": "SELECT entry.client AS entry_client, sum(entry.qty) AS sum_1 FROM entry WHERE entry.type = ? AND entry.client IN (?, ?, ?, ?, ?, ?) GROUP BY entry.client"
+  },
+  "/direct_sales?page=2": {
+    "total_ms": 239.99,
+    "status": 200,
+    "bytes": 6219009,
+    "queries": 21,
+    "db_ms": 11.75,
+    "render_ms": 169.86,
+    "slowest_ms": 6.18,
+    "slowest_sql": "SELECT entry.client_code AS entry_client_code, lower(trim(entry.client)) AS client_norm, coalesce(entry.booked_material, entry.material) AS mat_name, sum(entry.qty) AS sum_1 FROM entry WHERE entry.type = ? AND entry.is_void = 0 AND NOT (entry.nimbus_no = ? AND entry.client_category != ?) GROUP BY entry.client_code, lower(trim(entry.client)), coalesce(entry.booked_material, entry.material)"
+  },
+  "/profit_reports?start_date=2026-07-01&end_date=2026-07-31": {
+    "total_ms": 1490.5,
+    "status": 200,
+    "bytes": 264633,
+    "queries": 3727,
+    "db_ms": 150.97,
+    "render_ms": 76.65,
+    "slowest_ms": 2.15,
+    "slowest_sql": "SELECT sum(entry.qty) AS sum_1 FROM entry WHERE entry.is_void = 0 AND entry.type = ? AND date(entry.date) >= ? AND date(entry.date) <= ?"
+  }
+}

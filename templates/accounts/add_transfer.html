@@ -1,0 +1,110 @@
+{% extends "layout.html" %}
+
+{% block title %}New Transfer{% endblock %}
+
+{% block content %}
+{% from 'accounts/_entity_combobox.html' import entity_combobox %}
+<style>
+.acc-page-header{ background: linear-gradient(135deg, rgba(59,130,246,0.18), rgba(139,92,246,0.18)); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:20px 24px; margin-bottom:24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.acc-page-header h2{ margin:0; font-weight:700; } .acc-page-header .subtitle{ color:var(--text-muted); font-size:.9rem; margin-top:4px;}
+.tf-card{ border:1px solid var(--border-color); border-radius:14px; background:var(--surface-1); padding:24px; }
+.tf-card .form-label{ font-weight:600; }
+.acc-pick{ display:flex; gap:10px; align-items:center; padding:10px 14px; border:1px solid var(--border-color); border-radius:10px; background: var(--surface-2); }
+.acc-pick .bal{ margin-left:auto; font-weight:700; color:#10b981; }
+.tf-preview{ position:sticky; top:90px; border:1px solid var(--border-color); border-radius:14px; background:var(--surface-1); padding:18px; }
+.tf-preview h6{ font-size:.78rem; text-transform:uppercase; letter-spacing:.8px; color:var(--text-muted); margin-bottom:14px; }
+.tf-preview .row-line{ display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed var(--border-color); }
+.tf-preview .row-line:last-child{ border-bottom:0; }
+.flow{ display:flex; align-items:center; justify-content:center; gap:14px; margin:10px 0 6px; }
+.flow .pill{ padding:8px 12px; border-radius:999px; font-weight:700; }
+.flow .pill.from{ background:rgba(239,68,68,.15); color:#ef4444; }
+.flow .pill.to{ background:rgba(16,185,129,.15); color:#10b981; }
+.flow .arr{ color:#8b5cf6; font-size:1.4rem; }
+</style>
+
+<div class="container-fluid">
+    <div class="acc-page-header">
+        <div><h2><i class="bi bi-shuffle me-2 text-primary"></i>New Transfer</h2><div class="subtitle">Move money between two of your company accounts.</div></div>
+        <a href="{{ url_for('accounts.transfers') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Transfers</a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <form method="POST" class="tf-card">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        {{ entity_combobox('fromAccountSearch', account_options, code_attr='id', name_attr='label', value_input_id='from_account', label='From Account', placeholder='Search source account…', required=True) }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ entity_combobox('toAccountSearch', account_options, code_attr='id', name_attr='label', value_input_id='to_account', label='To Account', placeholder='Search destination account…', required=True) }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="amount">Amount (Rs.) <span class="text-danger">*</span></label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" id="amount" name="amount" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="description">Description</label>
+                        <input type="text" class="form-control" id="description" name="description" placeholder="e.g. Cash deposit to bank">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="note">Note <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control" id="note" name="note" rows="2" placeholder="Any additional details..."></textarea>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-left-right me-1"></i>Record Transfer</button>
+                    <a href="{{ url_for('accounts.transfers') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+        <div class="col-lg-4">
+            <div class="tf-preview">
+                <h6><i class="bi bi-eye me-1"></i>Live Preview</h6>
+                <div class="flow">
+                    <span class="pill from" id="pv-from">From</span>
+                    <span class="arr"><i class="bi bi-arrow-right"></i></span>
+                    <span class="pill to" id="pv-to">To</span>
+                </div>
+                <div class="row-line"><span class="text-muted">Amount</span><strong id="pv-amount">Rs. 0.00</strong></div>
+                <div class="row-line"><span class="text-muted">From balance after</span><strong id="pv-from-after">—</strong></div>
+                <div class="row-line"><span class="text-muted">To balance after</span><strong id="pv-to-after">—</strong></div>
+                <div id="pv-warn" class="alert alert-danger small mt-3 d-none mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Insufficient balance in source account.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const fromSel = document.getElementById('from_account');
+const toSel = document.getElementById('to_account');
+const amtInp = document.getElementById('amount');
+const accountData = {{ account_data|tojson }};
+function fmt(n){ return 'Rs. ' + (Number(n||0)).toFixed(2); }
+function refresh() {
+    const fOpt = accountData[fromSel.value] || null;
+    const tOpt = accountData[toSel.value] || null;
+    const fName = fOpt ? fOpt.name : 'From';
+    const tName = tOpt ? tOpt.name : 'To';
+    const fBal = fOpt ? Number(fOpt.balance) : 0;
+    const tBal = tOpt ? Number(tOpt.balance) : 0;
+    const amt = Number(amtInp.value || 0);
+    document.getElementById('pv-from').textContent = fName;
+    document.getElementById('pv-to').textContent = tName;
+    document.getElementById('pv-amount').textContent = fmt(amt);
+    document.getElementById('pv-from-after').textContent = fOpt ? fmt(fBal - amt) : '—';
+    document.getElementById('pv-to-after').textContent = tOpt ? fmt(tBal + amt) : '—';
+    document.getElementById('pv-warn').classList.toggle('d-none', !(fOpt && amt > fBal));
+}
+[fromSel, toSel, amtInp].forEach(e => e.addEventListener('input', refresh));
+[fromSel, toSel].forEach(e => e.addEventListener('change', refresh));
+fromSel.addEventListener('change', () => {
+    if (fromSel.value && fromSel.value === toSel.value) { alert('Source and destination cannot be the same.'); toSel.value=''; }
+    refresh();
+});
+toSel.addEventListener('change', () => {
+    if (toSel.value && fromSel.value === toSel.value) { alert('Source and destination cannot be the same.'); toSel.value=''; }
+    refresh();
+});
+refresh();
+</script>
+{% endblock %}

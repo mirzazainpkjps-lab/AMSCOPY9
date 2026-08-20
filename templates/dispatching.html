@@ -1,0 +1,137 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold text-info mb-1"><i class="bi bi-truck me-2"></i>Booking Delivery (Dispatch)</h2>
+    <p class="text-white-50">Dispatch stock against existing client bookings.</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card border-0 shadow-lg" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 20px;">
+            <div class="card-body p-4">
+                <form action="/add_record" method="POST">
+                    <input type="hidden" name="type" value="OUT">
+                    
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Client (Name or Code)</label>
+                            <div class="position-relative">
+                                <input type="text" name="client" id="dispatchClientSearch" class="form-control bg-dark text-white border-secondary" placeholder="Search by name or code..." autocomplete="off" required onfocus="showCombobox('dispatchClientSearch', 'dispatchClientList')" oninput="filterCombobox('dispatchClientSearch', 'dispatchClientList', 'dispatchClientDisplay')">
+                                <div id="dispatchClientList" class="combobox-list shadow-lg" style="display: none;">
+                                    {% for c in clients %}
+                                    <div class="combobox-item" data-combo-code="{{ c.name }}" data-combo-name="{{ c.name }}" data-combo-input="dispatchClientSearch" data-combo-display="dispatchClientDisplay">
+                                        <span class="fw-bold text-warning name-span">{{ c.name }}</span>
+                                        <span class="ms-2 text-white-50 small code-span">{{ c.code or 'No Code' }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div id="dispatchClientDisplay" class="text-info small mt-1 fw-bold"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Material Brand</label>
+                            <div class="position-relative">
+                                <input type="hidden" name="material_id" id="dispatchMaterialId" value="">
+                                <input type="text" name="material" id="dispatchMaterialSearch" class="form-control bg-dark text-white border-secondary" placeholder="Type brand name..." autocomplete="off" required onfocus="showCombobox('dispatchMaterialSearch', 'dispatchMaterialList')" oninput="filterCombobox('dispatchMaterialSearch', 'dispatchMaterialList', 'dispatchMaterialDisplay')" data-material-id-input="dispatchMaterialId">
+                                <div id="dispatchMaterialList" class="combobox-list shadow-lg" style="display: none;">
+                                    {% for m in materials %}
+                                    <div class="combobox-item" data-material-id="{{ m.id }}" data-combo-code="{{ m.name }}" data-combo-name="{{ m.name }}" data-combo-input="dispatchMaterialSearch" data-combo-display="dispatchMaterialDisplay">
+                                        <span class="fw-bold text-warning">{{ m.name }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div id="dispatchMaterialDisplay" class="text-info small mt-1 fw-bold"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Quantity (Bags)</label>
+                            <input type="number" name="qty" class="form-control bg-dark text-white border-secondary fw-bold" placeholder="0" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Bill / Invoice No.</label>
+                            <div class="input-group">
+                                <input type="text" name="bill_no" id="dispatchBillNo" class="form-control bg-dark text-white border-secondary" placeholder="Optional">
+                                <span class="input-group-text bg-dark border-secondary">
+                                    <div class="form-check form-check-inline mb-0 ms-2">
+                                        <input class="form-check-input" type="checkbox" id="hasBillDispatch" name="has_bill" checked>
+                                        <label class="form-check-label text-white-50 small mb-0" for="hasBillDispatch">Has Bill</label>
+                                    </div>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="createInvoice" name="create_invoice" value="1">
+                            <label class="form-check-label text-warning fw-bold" for="createInvoice">Create Invoice</label>
+                        </div>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="trackAsCash" name="track_as_cash">
+                            <label class="form-check-label text-warning fw-bold" for="trackAsCash">Record as Cash Delivery (Track in Pending Bills)</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="text-white-50 small fw-bold mb-1">Nimbus Number</label>
+                        <input type="text" name="nimbus_no" class="form-control bg-dark text-white border-secondary" placeholder="Optional reference">
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <a href="/tracking?type=OUT&has_bill=1" class="btn btn-outline-info btn-sm">View Billed Dispatches</a>
+                        <a href="/tracking?type=OUT&has_bill=0" class="btn btn-outline-warning btn-sm">View Cash Dispatches</a>
+                    </div>
+
+                    <div class="p-3 bg-dark rounded border border-secondary mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-white-50 small fw-bold">Dispatch Date:</span>
+                            <input type="date" name="date" class="form-control bg-dark text-white border-0 p-0 text-end fw-bold datepicker" style="width: auto;" value="{{ today_date }}">
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="reset" class="btn btn-outline-secondary w-50 rounded-pill fw-bold">Reset</button>
+                        <button type="submit" class="btn btn-info text-dark w-50 rounded-pill fw-bold shadow"><i class="bi bi-send-check me-2"></i> Confirm</button>
+                    </div>
+                    <a href="/" class="btn btn-link w-100 text-white-50 text-decoration-none mt-2 small">Cancel and Return</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.AMS_KNOWN_MATERIAL_NAMES = new Set([
+        {% for m in materials %}
+        {{ (m.name or '')|tojson }}, {{ (m.name or '')|lower|tojson }},
+        {% endfor %}
+    ]);
+    document.getElementById('current_date_dispatch').innerText = new Date().toLocaleDateString('en-US', { 
+        month: 'long', day: 'numeric', year: 'numeric' 
+    });
+
+    // Toggle bill input based on 'Has Bill' checkbox
+    const hasBillDispatch = document.getElementById('hasBillDispatch');
+    const dispatchBillNo = document.getElementById('dispatchBillNo');
+    const createInvoiceChk = document.getElementById('createInvoice');
+    if (hasBillDispatch && dispatchBillNo) {
+        const setState = () => {
+            if (hasBillDispatch.checked) {
+                dispatchBillNo.readOnly = false;
+                if (createInvoiceChk) createInvoiceChk.disabled = false;
+                dispatchBillNo.classList.remove('text-muted');
+            } else {
+                dispatchBillNo.value = '';
+                dispatchBillNo.readOnly = true;
+                if (createInvoiceChk) { createInvoiceChk.checked = false; createInvoiceChk.disabled = true; }
+                dispatchBillNo.classList.add('text-muted');
+            }
+        }
+        setState();
+        hasBillDispatch.addEventListener('change', setState);
+    }
+</script>
+{% endblock %}

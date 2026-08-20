@@ -1,0 +1,275 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-truck me-2"></i>Delivery Person Rent</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/direct_sales" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Sales</a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('delivery_rents_page') }}" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="text-white-50 small fw-bold mb-1">FROM DATE</label>
+                <input type="date" name="date_from" class="form-control bg-dark text-white border-secondary" value="{{ date_from }}">
+            </div>
+            <div class="col-md-3">
+                <label class="text-white-50 small fw-bold mb-1">TO DATE</label>
+                <input type="date" name="date_to" class="form-control bg-dark text-white border-secondary" value="{{ date_to }}">
+            </div>
+            <div class="col-md-3">
+                <label class="text-white-50 small fw-bold mb-1">DELIVERY PERSON</label>
+                <select name="driver" class="form-select bg-dark text-white border-secondary">
+                    <option value="">All Drivers</option>
+                    {% for n in driver_names %}
+                    <option value="{{ n }}" {{ 'selected' if driver_filter == n }}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="text-white-50 small fw-bold mb-1">ROWS</label>
+                <select name="per_page" class="form-select bg-dark text-white border-secondary">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                    <option value="30" {% if per_page == 30 %}selected{% endif %}>30</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-warning text-dark fw-bold">Apply</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+            <div class="card-body text-center">
+                <div class="text-white-50 small">Total Bill-Linked Rent</div>
+                <div class="text-warning fw-bold fs-4">{{ currency_symbol }}{{ "%.2f"|format(total_rent) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+            <div class="card-body">
+                <div class="text-white-50 small mb-2">By Driver</div>
+                {% for name, amt in totals_by_driver %}
+                <div class="d-flex justify-content-between">
+                    <span class="text-info">{{ name }}</span>
+                    <span class="text-warning fw-bold">{{ currency_symbol }}{{ "%.2f"|format(amt or 0) }}</span>
+                </div>
+                {% else %}
+                <div class="text-white-50">No data</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+            <div class="card-body text-center">
+                <div class="text-white-50 small">Total Paid</div>
+                <div class="text-success fw-bold fs-4">{{ currency_symbol }}{{ "%.2f"|format(total_paid or 0) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+            <div class="card-body text-center">
+                <div class="text-white-50 small">Total Waive-Off (Profit)</div>
+                <div class="text-info fw-bold fs-4">{{ currency_symbol }}{{ "%.2f"|format(total_waived or 0) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+            <div class="card-body text-center">
+                <div class="text-white-50 small">Total Due</div>
+                <div class="text-danger fw-bold fs-4">{{ currency_symbol }}{{ "%.2f"|format(total_due or 0) }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+    <div class="px-4 py-2 border-bottom border-secondary d-flex justify-content-between align-items-center">
+        <div class="small text-white-50">
+            Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 if pagination.total else 0 }} -
+            {{ ((pagination.page - 1) * pagination.per_page) + (rows|length) if pagination.total else 0 }}
+            of {{ pagination.total }}
+        </div>
+        <div class="small text-white-50">Page {{ pagination.page }} / {{ pagination.pages or 1 }}</div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="py-3 ps-4 text-white-50">Date</th>
+                    <th class="py-3 text-white-50">Bill</th>
+                    <th class="py-3 text-white-50">Driver</th>
+                    <th class="py-3 text-white-50">Client</th>
+                    <th class="py-3 text-white-50">Bags</th>
+                    <th class="py-3 text-white-50">Rent</th>
+                    <th class="py-3 text-white-50">Paid</th>
+                    <th class="py-3 text-white-50">Due</th>
+                    <th class="py-3 pe-4 text-end text-white-50">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td class="ps-4">{{ (r.created_at or r.sale.date_posted).strftime('%Y-%m-%d') if (r.created_at or (r.sale and r.sale.date_posted)) else '' }}</td>
+                    <td>
+                        {% if r.sale %}
+                            {{ r.sale.manual_bill_no or (r.sale.invoice.invoice_no if r.sale.invoice else '') or r.sale.auto_bill_no or ('DS-' ~ r.sale.id) }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-info fw-bold">{{ r.delivery_person.name if r.delivery_person else '-' }}</td>
+                    <td>{{ r.sale.client_name if r.sale else '-' }}</td>
+                    <td class="text-white-50">{{ r.bags_delivered or 0 }}</td>
+                    <td class="text-warning fw-bold">{{ currency_symbol }}{{ "%.2f"|format(r.rent_amount or 0) }}</td>
+                    <td class="text-success fw-bold">{{ currency_symbol }}{{ "%.2f"|format(r.paid_total or 0) }}</td>
+                    <td class="text-danger fw-bold">{{ currency_symbol }}{{ "%.2f"|format(r.due_total or 0) }}</td>
+                    <td class="text-end pe-4">
+                        {% if current_user.can_manage_sales or current_user.role == 'admin' %}
+                        <button class="btn btn-outline-success btn-sm me-1" data-bs-toggle="modal" data-bs-target="#payRentModal{{ r.id }}">Pay Now</button>
+                        <form method="POST" action="{{ url_for('void_delivery_rent', id=r.id) }}" class="d-inline">
+                            <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Permanently delete this rent entry?')">Delete</button>
+                        </form>
+                        {% else %}
+                        <span class="text-white-50 small">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-center py-4 text-white-50">No delivery rent entries found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if pagination.pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center mb-0">
+        {% if pagination.has_prev %}
+        <li class="page-item">
+            <a class="page-link bg-dark border-secondary text-warning"
+               href="{{ url_for('delivery_rents_page', page=pagination.prev_num, per_page=per_page, date_from=date_from, date_to=date_to, driver=driver_filter) }}">Previous</a>
+        </li>
+        {% endif %}
+        <li class="page-item active">
+            <span class="page-link bg-warning border-warning text-dark">{{ pagination.page }}</span>
+        </li>
+        {% if pagination.has_next %}
+        <li class="page-item">
+            <a class="page-link bg-dark border-secondary text-warning"
+               href="{{ url_for('delivery_rents_page', page=pagination.next_num, per_page=per_page, date_from=date_from, date_to=date_to, driver=driver_filter) }}">Next</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% for r in rows %}
+<div class="modal fade" id="payRentModal{{ r.id }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content border-secondary" style="background: #1e293b;" method="POST" action="{{ url_for('pay_delivery_rent', alloc_id=r.id) }}">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Pay Delivery Rent</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2 text-white-50 small">Driver: <span class="text-info">{{ r.delivery_person.name if r.delivery_person else '-' }}</span></div>
+                <div class="mb-2 text-white-50 small">Bill: <span class="text-white">{{ r.sale.manual_bill_no or (r.sale.invoice.invoice_no if r.sale and r.sale.invoice else '') or r.sale.auto_bill_no or ('DS-' ~ r.sale.id) if r.sale else '-' }}</span></div>
+                <div class="mb-3 text-white-50 small">Due Now: <span class="text-danger fw-bold">{{ currency_symbol }}{{ "%.2f"|format(r.due_total or 0) }}</span></div>
+
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="text-white-50 small fw-bold mb-1">PAID AMOUNT</label>
+                        <input type="number" step="any" min="0" name="paid_amount" class="form-control bg-dark text-white border-secondary" value="0">
+                    </div>
+                    <div class="col-6">
+                        <label class="text-white-50 small fw-bold mb-1">WAIVE-OFF (PROFIT)</label>
+                        <input type="number" step="any" min="0" name="waive_off_amount" class="form-control bg-dark text-white border-secondary" value="0">
+                    </div>
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="text-white-50 small fw-bold mb-1">PAYMENT METHOD</label>
+                        <select name="method" class="form-select bg-dark text-white border-secondary rent-method">
+                            <option value="Cash">Cash</option>
+                            <option value="Bank">Bank</option>
+                            <option value="Check">Check</option>
+                            <option value="Online">Online</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="text-white-50 small fw-bold mb-1">PAY FROM ACCOUNT</label>
+                        <select name="payment_account_id" class="form-select bg-dark text-white border-secondary rent-account">
+                            <option value="">Select account…</option>
+                            {% for a in payment_accounts %}
+                            <option value="{{ a.id }}" data-category="{{ (a.category or '')|lower }}">[{{ (a.category or 'cash')|upper }}] {{ a.name }} (Rs. {{ "%.2f"|format(a.balance or 0) }})</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text text-white-50 small">Money leaves this account. Not required for a waive-off only.</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="text-white-50 small fw-bold mb-1">DATE</label>
+                    <input type="date" name="date" class="form-control bg-dark text-white border-secondary">
+                </div>
+                <div class="mt-3">
+                    <label class="text-white-50 small fw-bold mb-1">REFERENCE (OPTIONAL)</label>
+                    <input type="text" name="reference" class="form-control bg-dark text-white border-secondary" placeholder="Voucher / slip no.">
+                </div>
+                <div class="mt-3">
+                    <label class="text-white-50 small fw-bold mb-1">NOTE (OPTIONAL)</label>
+                    <input type="text" name="note" class="form-control bg-dark text-white border-secondary" placeholder="Reason or remark">
+                </div>
+                <input type="hidden" name="idempotency_key" value="rent-{{ r.id }}-{{ submission_token }}">
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning text-dark fw-bold w-100 py-2 rounded-pill">Save Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+// Keep the selectable account list consistent with the chosen method, and stop
+// an impatient second click from posting the same form twice.  Server-side
+// idempotency remains the real guard.
+document.querySelectorAll('#content form, form').forEach(function (form) {
+  var method = form.querySelector('.rent-method');
+  var account = form.querySelector('.rent-account');
+  if (method && account) {
+    var sync = function () {
+      var want = method.value === 'Cash' ? 'cash' : 'bank';
+      Array.prototype.forEach.call(account.options, function (opt) {
+        if (!opt.value) { return; }
+        var ok = opt.dataset.category === want;
+        opt.hidden = !ok;
+        opt.disabled = !ok;
+      });
+      var sel = account.selectedOptions[0];
+      if (sel && sel.value && sel.disabled) { account.value = ''; }
+    };
+    method.addEventListener('change', sync);
+    sync();
+  }
+  form.addEventListener('submit', function () {
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) { setTimeout(function () { btn.disabled = true; }, 0); }
+  });
+});
+</script>
+{% endblock %}

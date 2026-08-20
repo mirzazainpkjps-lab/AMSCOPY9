@@ -1,0 +1,1567 @@
+{
+  "after": "/home/user/ams-arena/instance/ahmed_cement.db",
+  "after_metrics": {
+    "archive_rows": 190,
+    "booking_allocation_rows": 1119,
+    "business_tables": {
+      "account": {
+        "rows": 12,
+        "sha256": "a15693f40f48a292d4aa811c363d4f123a773780c33e9ac3bb859eaba9928be1",
+        "sums": {
+          "balance": 207944641.61
+        }
+      },
+      "account_transaction": {
+        "rows": 838,
+        "sha256": "118608178dc462ae2d27efd0f209eec0ab5a79c5551c9f76a73f465fc56c8b39",
+        "sums": {
+          "amount": 303462202.13
+        }
+      },
+      "booking": {
+        "rows": 398,
+        "sha256": "984bf9ff179b58923d8a19b2bd3cf193446cb32857063ed47ee432b0ae4533f9",
+        "sums": {
+          "amount": 140811320.72815,
+          "discount": 31615.2005,
+          "paid_amount": 91026720.99
+        }
+      },
+      "booking_item": {
+        "rows": 905,
+        "sha256": "95af137daae52ee2f6cc9810664890f719d45c8f4d5879b2df4ec0db46779c03",
+        "sums": {
+          "qty": 476271.99999
+        }
+      },
+      "cash_flow_entry": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sums": {
+          "amount": 0.0
+        }
+      },
+      "client": {
+        "rows": 305,
+        "sha256": "7a1dac76ed2a445db3fa90035b35bbb0ed43b526a13792cc468d30462b115a8d",
+        "sums": {}
+      },
+      "direct_sale": {
+        "rows": 2452,
+        "sha256": "4c819b41f81a8b8509a6067a48eeb1f9760a134cbf9ae30968099e6c5c9fa154",
+        "sums": {
+          "amount": 25632350.5,
+          "discount": 37769.8,
+          "paid_amount": 7413009.5
+        }
+      },
+      "direct_sale_item": {
+        "rows": 4503,
+        "sha256": "e0b418e33e689ce560865adaa75d175538b757371741da522046784afc1bad5b",
+        "sums": {
+          "qty": 404991.04999
+        }
+      },
+      "entry": {
+        "rows": 9919,
+        "sha256": "cb528a360e4a01148e7b1b294598cf7b1d58146f0ba379585715c5440f052d6e",
+        "sums": {
+          "qty": 1038787.65998
+        }
+      },
+      "grn": {
+        "rows": 58,
+        "sha256": "5ca94f54cd57f9d6aa56623f370eeefc9c5397179b12e2c2a35918c303a73e23",
+        "sums": {
+          "paid_amount": 0.0
+        }
+      },
+      "grn_allocation": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sums": {
+          "cost_rate": 0.0,
+          "qty": 0.0
+        }
+      },
+      "grn_item": {
+        "rows": 57,
+        "sha256": "ce593f3778277df577abc3a370e26a924328a7385b2e214cbe895a02ddd72f18",
+        "sums": {
+          "qty": 90715.0
+        }
+      },
+      "invoice": {
+        "rows": 2197,
+        "sha256": "9390671656df6bde352f93912d097e6dd45f7c84581211d17ef6b66924e478e6",
+        "sums": {}
+      },
+      "material": {
+        "rows": 66,
+        "sha256": "5fd35eb6baafb88542a2d170c422cb2c46c7e47a856d7bbb0b652e4e339e505a",
+        "sums": {}
+      },
+      "material_return": {
+        "rows": 83,
+        "sha256": "cfb4ecaa5df5576c3b2c0320e144c3863d9414a6f8964cddbb3aacda1a92d4bb",
+        "sums": {}
+      },
+      "material_return_item": {
+        "rows": 113,
+        "sha256": "766ace52ea593eb78718ebb974efa2fb419b806dc13ecebbd49deee66659a6e0",
+        "sums": {
+          "qty": 7187.6
+        }
+      },
+      "payment": {
+        "rows": 724,
+        "sha256": "a608a8d968183a0939edfeeef4dab3956fd6c252e7a8a86dfbd3c8bbc26be713",
+        "sums": {
+          "amount": 56924319.95,
+          "discount": 372011.39
+        }
+      },
+      "pending_bill": {
+        "rows": 6812,
+        "sha256": "8182dee5c49b71db3bdd46e65cf3af2accf6855e1880f5d87f75c40fafc7d61c",
+        "sums": {
+          "amount": 97106597.74
+        }
+      },
+      "supplier": {
+        "rows": 6,
+        "sha256": "77bc9d5947ccd83173fccc9bc251a51c57c79fd2e879c1a2634a802f51e2047b",
+        "sums": {
+          "opening_balance": 3929159.0
+        }
+      },
+      "supplier_payment": {
+        "rows": 78,
+        "sha256": "18fb22e819879bfcc3d7ce5c8de1da54f303e5523ae929486641a2745de7f891",
+        "sums": {
+          "amount": 28392809.99
+        }
+      },
+      "waive_off": {
+        "rows": 377,
+        "sha256": "852bf5d3d179387d41a260f1081f0e58537f85c7d1e62bc76555d3096855d694",
+        "sums": {
+          "amount": 352125.19
+        }
+      }
+    },
+    "foreign_key_violations": [],
+    "integrity_check": [
+      "ok"
+    ]
+  },
+  "authoritative_business_state_unchanged": true,
+  "before": "/home/user/ams-arena/instance/reconcile_backups/pre_repair_repair_booking_allocation_fks_20260816_091634.db",
+  "before_metrics": {
+    "archive_rows": 0,
+    "booking_allocation_rows": 1309,
+    "business_tables": {
+      "account": {
+        "rows": 12,
+        "sha256": "a15693f40f48a292d4aa811c363d4f123a773780c33e9ac3bb859eaba9928be1",
+        "sums": {
+          "balance": 207944641.61
+        }
+      },
+      "account_transaction": {
+        "rows": 838,
+        "sha256": "118608178dc462ae2d27efd0f209eec0ab5a79c5551c9f76a73f465fc56c8b39",
+        "sums": {
+          "amount": 303462202.13
+        }
+      },
+      "booking": {
+        "rows": 398,
+        "sha256": "984bf9ff179b58923d8a19b2bd3cf193446cb32857063ed47ee432b0ae4533f9",
+        "sums": {
+          "amount": 140811320.72815,
+          "discount": 31615.2005,
+          "paid_amount": 91026720.99
+        }
+      },
+      "booking_item": {
+        "rows": 905,
+        "sha256": "95af137daae52ee2f6cc9810664890f719d45c8f4d5879b2df4ec0db46779c03",
+        "sums": {
+          "qty": 476271.99999
+        }
+      },
+      "cash_flow_entry": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sums": {
+          "amount": 0.0
+        }
+      },
+      "client": {
+        "rows": 305,
+        "sha256": "7a1dac76ed2a445db3fa90035b35bbb0ed43b526a13792cc468d30462b115a8d",
+        "sums": {}
+      },
+      "direct_sale": {
+        "rows": 2452,
+        "sha256": "4c819b41f81a8b8509a6067a48eeb1f9760a134cbf9ae30968099e6c5c9fa154",
+        "sums": {
+          "amount": 25632350.5,
+          "discount": 37769.8,
+          "paid_amount": 7413009.5
+        }
+      },
+      "direct_sale_item": {
+        "rows": 4503,
+        "sha256": "e0b418e33e689ce560865adaa75d175538b757371741da522046784afc1bad5b",
+        "sums": {
+          "qty": 404991.04999
+        }
+      },
+      "entry": {
+        "rows": 9919,
+        "sha256": "cb528a360e4a01148e7b1b294598cf7b1d58146f0ba379585715c5440f052d6e",
+        "sums": {
+          "qty": 1038787.65998
+        }
+      },
+      "grn": {
+        "rows": 58,
+        "sha256": "5ca94f54cd57f9d6aa56623f370eeefc9c5397179b12e2c2a35918c303a73e23",
+        "sums": {
+          "paid_amount": 0.0
+        }
+      },
+      "grn_allocation": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sums": {
+          "cost_rate": 0.0,
+          "qty": 0.0
+        }
+      },
+      "grn_item": {
+        "rows": 57,
+        "sha256": "ce593f3778277df577abc3a370e26a924328a7385b2e214cbe895a02ddd72f18",
+        "sums": {
+          "qty": 90715.0
+        }
+      },
+      "invoice": {
+        "rows": 2197,
+        "sha256": "9390671656df6bde352f93912d097e6dd45f7c84581211d17ef6b66924e478e6",
+        "sums": {}
+      },
+      "material": {
+        "rows": 66,
+        "sha256": "5fd35eb6baafb88542a2d170c422cb2c46c7e47a856d7bbb0b652e4e339e505a",
+        "sums": {}
+      },
+      "material_return": {
+        "rows": 83,
+        "sha256": "cfb4ecaa5df5576c3b2c0320e144c3863d9414a6f8964cddbb3aacda1a92d4bb",
+        "sums": {}
+      },
+      "material_return_item": {
+        "rows": 113,
+        "sha256": "766ace52ea593eb78718ebb974efa2fb419b806dc13ecebbd49deee66659a6e0",
+        "sums": {
+          "qty": 7187.6
+        }
+      },
+      "payment": {
+        "rows": 724,
+        "sha256": "a608a8d968183a0939edfeeef4dab3956fd6c252e7a8a86dfbd3c8bbc26be713",
+        "sums": {
+          "amount": 56924319.95,
+          "discount": 372011.39
+        }
+      },
+      "pending_bill": {
+        "rows": 6812,
+        "sha256": "8182dee5c49b71db3bdd46e65cf3af2accf6855e1880f5d87f75c40fafc7d61c",
+        "sums": {
+          "amount": 97106597.74
+        }
+      },
+      "supplier": {
+        "rows": 6,
+        "sha256": "77bc9d5947ccd83173fccc9bc251a51c57c79fd2e879c1a2634a802f51e2047b",
+        "sums": {
+          "opening_balance": 3929159.0
+        }
+      },
+      "supplier_payment": {
+        "rows": 78,
+        "sha256": "18fb22e819879bfcc3d7ce5c8de1da54f303e5523ae929486641a2745de7f891",
+        "sums": {
+          "amount": 28392809.99
+        }
+      },
+      "waive_off": {
+        "rows": 377,
+        "sha256": "852bf5d3d179387d41a260f1081f0e58537f85c7d1e62bc76555d3096855d694",
+        "sums": {
+          "amount": 352125.19
+        }
+      }
+    },
+    "foreign_key_violations": [
+      [
+        "booking_allocation",
+        7,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        51,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        52,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        53,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        54,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        55,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        56,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        62,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        63,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        64,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        78,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        87,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        90,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        91,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        92,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        104,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        114,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        115,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        136,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        138,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        145,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        148,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        154,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        155,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        156,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        166,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        181,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        185,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        197,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        231,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        232,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        233,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        234,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        235,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        236,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        260,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        285,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        304,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        338,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        339,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        344,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        345,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        378,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        379,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        383,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        384,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        446,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        447,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        453,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        454,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        454,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        455,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        455,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        468,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        486,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        487,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        529,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        530,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        539,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        540,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        541,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        543,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        544,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        577,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        578,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        579,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        596,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        597,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        615,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        616,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        707,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        781,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        782,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        799,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        800,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        810,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        811,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        825,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        826,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        868,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        868,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        869,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        869,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        870,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        870,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        871,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        872,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        873,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        874,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        875,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        878,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        879,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        880,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        881,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        882,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        883,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        884,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        885,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        886,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        887,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        888,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        889,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        890,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        891,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        892,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        919,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        919,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        920,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        920,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        921,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        922,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        923,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        924,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        925,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        926,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        927,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        928,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        929,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        930,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        931,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        938,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        939,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        940,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        941,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        942,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        943,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        944,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        945,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        946,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        947,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        948,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        949,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        950,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        951,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        952,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        953,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        956,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        956,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        957,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        957,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        958,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        962,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        963,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        964,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        965,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        966,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        967,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        968,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        969,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1015,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1016,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1018,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1019,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1020,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1020,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1021,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1021,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1022,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1022,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1023,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1023,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1024,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1025,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1025,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1026,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1026,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1027,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1027,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1028,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1029,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1030,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1030,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1031,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1031,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1032,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1033,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1034,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1035,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1036,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1037,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1038,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1039,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1040,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1041,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1042,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1043,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1044,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1054,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1055,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1101,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1102,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1134,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1137,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1168,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1169,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1170,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1171,
+        "booking_item",
+        0
+      ],
+      [
+        "booking_allocation",
+        1178,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1191,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1231,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1232,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1233,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1234,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1257,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1258,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1276,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1277,
+        "direct_sale_item",
+        1
+      ],
+      [
+        "booking_allocation",
+        1278,
+        "direct_sale_item",
+        1
+      ]
+    ],
+    "integrity_check": [
+      "ok"
+    ]
+  },
+  "business_tables_compared": 21,
+  "changed_business_tables": [],
+  "generated_at_utc": "2026-08-16T09:17:23.688787+00:00"
+}

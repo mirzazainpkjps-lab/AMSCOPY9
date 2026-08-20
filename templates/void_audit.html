@@ -1,0 +1,125 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0">
+        <i class="bi bi-shield-check me-2"></i>Deleted / Suspended Audit
+    </h2>
+    <a href="{{ url_for('settings') }}" class="btn btn-outline-light btn-sm fw-bold">
+        <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm" style="background:#1e293b;border:2px solid #475569 !important;">
+            <div class="card-body py-2">
+                <div class="small text-white-50">Total</div>
+                <div class="h4 text-warning mb-0">{{ counts.total }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm" style="background:#1e293b;border:2px solid #475569 !important;">
+            <div class="card-body py-2">
+                <div class="small text-white-50">Deleted</div>
+                <div class="h4 text-danger mb-0">{{ counts.voided }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm" style="background:#1e293b;border:2px solid #475569 !important;">
+            <div class="card-body py-2">
+                <div class="small text-white-50">Suspended</div>
+                <div class="h4 text-secondary mb-0">{{ counts.suspended }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3" style="background:#1e293b;border:2px solid #475569 !important;">
+    <div class="card-body py-2">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="text-white-50 small fw-bold mb-1">Section</label>
+                <select name="section" class="form-select form-select-sm bg-dark text-white border-secondary">
+                    <option value="all" {{ 'selected' if section == 'all' }}>All</option>
+                    <option value="voided" {{ 'selected' if section == 'voided' }}>Deleted Only</option>
+                    <option value="suspended" {{ 'selected' if section == 'suspended' }}>Suspended Only</option>
+                    <option value="transactions" {{ 'selected' if section == 'transactions' }}>Transactions</option>
+                    <option value="directory" {{ 'selected' if section == 'directory' }}>Directory</option>
+                </select>
+            </div>
+            <div class="col-md-7">
+                <label class="text-white-50 small fw-bold mb-1">Search</label>
+                <input type="text" name="q" value="{{ q or '' }}" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Entity, client, bill, material...">
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-warning btn-sm text-dark fw-bold">Apply</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="background:#1e293b;border:2px solid #475569 !important; border-radius:15px; overflow:hidden;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background:#0f172a;">
+                <tr>
+                    <th class="py-3 ps-4 text-white-50">When</th>
+                    <th class="py-3 text-white-50">Type</th>
+                    <th class="py-3 text-white-50">Title</th>
+                    <th class="py-3 text-white-50">Details</th>
+                    <th class="py-3 text-white-50">Status</th>
+                    <th class="py-3 pe-4 text-end text-white-50">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td class="ps-4">{{ r.when.strftime('%Y-%m-%d %I:%M %p') if r.when else '-' }}</td>
+                    <td><span class="badge bg-dark border border-secondary text-info">{{ r.entity }}</span></td>
+                    <td class="fw-bold text-white">{{ r.title }}</td>
+                    <td class="text-white-50 small">{{ r.details }}</td>
+                    <td>
+                        <span class="badge {{ 'bg-warning text-dark' if ('by edit' in (r.status|lower)) else ('bg-danger' if r.is_void else 'bg-secondary') }}">{{ r.status }}</span>
+                    </td>
+                    <td class="text-end pe-4">
+                        <form method="POST" action="{{ url_for('restore_audit_record', entity=r.entity, record_id=r.id) }}" class="d-inline">
+                            <input type="hidden" name="next" value="{{ request.full_path }}">
+                            <button class="btn btn-outline-success btn-sm fw-bold" onclick="return confirm('Restore this record?')">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-white-50">No records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pages > 1 %}
+    <div class="card-footer bg-transparent border-0 py-3">
+        <nav>
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('void_audit_page', section=section, q=q, page=page-1) }}">Previous</a>
+                </li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link bg-warning border-warning text-dark">{{ page }}</span>
+                </li>
+                {% if page < pages %}
+                <li class="page-item">
+                    <a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('void_audit_page', section=section, q=q, page=page+1) }}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

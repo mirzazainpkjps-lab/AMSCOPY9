@@ -1,0 +1,150 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold text-warning"><i class="bi bi-arrow-left-right me-2"></i>Jumble Data Import</h2>
+    <p class="text-white-50">Upload your file, review/edit missing fields, and confirm to load into Pending Bills and Dispatches.</p>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-body p-4">
+        <div class="mb-4">
+            <label class="text-white-50 small fw-bold mb-2">SELECT FILE (CSV/EXCEL)</label>
+            <div class="input-group">
+                <input type="file" id="jumbleFile" class="form-control bg-dark text-white border-secondary" accept=".csv, .xlsx, .xls">
+                <button class="btn btn-warning fw-bold" onclick="parseFile()">Parse File</button>
+            </div>
+        </div>
+
+        <div id="importTableContainer" style="display: none;">
+            <div class="table-responsive rounded border border-secondary mb-3">
+                <table class="table table-dark table-hover mb-0 align-middle" id="jumbleTable">
+                    <thead style="background: #0f172a;">
+                        <tr class="small text-uppercase">
+                            <th>Bill No *</th>
+                            <th>Client Name *</th>
+                            <th>Client Code *</th>
+                            <th>Material *</th>
+                            <th>Qty *</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between">
+                <button class="btn btn-outline-info" onclick="addRow()">+ Add Manual Row</button>
+                <button class="btn btn-success px-5 fw-bold" id="loadBtn" onclick="processImport()">Process & Load Entries</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+let importData = [];
+
+async function parseFile() {
+    const file = document.getElementById('jumbleFile').files[0];
+    if (!file) return alert("Please select a file");
+    
+    showLoading();
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+        
+        displayData(json);
+        hideLoading();
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function displayData(data) {
+    const tbody = document.querySelector('#jumbleTable tbody');
+    tbody.innerHTML = '';
+    document.getElementById('importTableContainer').style.display = 'block';
+    
+    data.forEach((row, index) => {
+        addRow(row);
+    });
+}
+
+function addRow(rowData = {}) {
+    const tbody = document.querySelector('#jumbleTable tbody');
+    const tr = document.createElement('tr');
+    
+    const bill = rowData['Bill No'] || rowData['bill_no'] || '';
+    const name = rowData['Client Name'] || rowData['ClientName'] || '';
+    const code = rowData['Client Code'] || rowData['ClientCode'] || '';
+    const mat = rowData['Material'] || rowData['Material Name'] || '';
+    const qty = rowData['Quantity'] || rowData['Qty'] || '';
+
+    tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary bill-input" value="${bill}" placeholder="Bill No *"></td>
+        <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary name-input" value="${name}" placeholder="Client Name *"></td>
+        <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary code-input" value="${code}" placeholder="Client Code *"></td>
+        <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary mat-input" value="${mat}" placeholder="Material *"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm bg-dark text-white border-secondary qty-input" value="${qty}" placeholder="0.00"></td>
+        <td><button class="btn btn-link text-danger p-0" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+async function processImport() {
+    const rows = document.querySelectorAll('#jumbleTable tbody tr');
+    const processedData = [];
+    let valid = true;
+
+    rows.forEach(tr => {
+        const row = {
+            bill_no: tr.querySelector('.bill-input').value.trim(),
+            client_name: tr.querySelector('.name-input').value.trim(),
+            client_code: tr.querySelector('.code-input').value.trim(),
+            material_name: tr.querySelector('.mat-input').value.trim(),
+            qty: tr.querySelector('.qty-input').value.trim()
+        };
+
+        if (!row.bill_no || !row.client_name || !row.client_code || !row.material_name || !row.qty) {
+            tr.classList.add('table-danger');
+            valid = false;
+        } else {
+            tr.classList.remove('table-danger');
+            processedData.push(row);
+        }
+    });
+
+    if (!valid) {
+        return alert("Some rows have missing mandatory fields (highlighted in red). Please fill them manually.");
+    }
+
+    if (processedData.length === 0) return alert("No data to import.");
+
+    showLoading();
+    try {
+        const response = await fetch('/process_jumble_import', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({rows: processedData})
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert("Successfully imported " + processedData.length + " entries to Pending Bills and Dispatching!");
+            window.location.href = '/pending_bills';
+        } else {
+            alert("Error: " + result.error);
+        }
+    } catch (e) {
+        alert("Failed to connect to server.");
+    } finally {
+        hideLoading();
+    }
+}
+</script>
+
+<style>
+.table-dark { --bs-table-bg: #0f172a; }
+.form-control:focus { background-color: #0f172a; color: white; border-color: var(--accent); box-shadow: none; }
+</style>
+{% endblock %}

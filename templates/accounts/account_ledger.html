@@ -1,0 +1,150 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ account.name }} Ledger{% endblock %}
+
+{% block content %}
+<style>
+.acc-page-header{
+    background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(236,72,153,0.18));
+    border: 1px solid rgba(148,163,184,0.18);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.acc-page-header h2{ margin:0; font-weight:700; }
+.acc-page-header .subtitle{ color: var(--text-muted); font-size: .9rem; margin-top: 4px; }
+.led-stat{ border:0; border-radius:14px; color:#fff; min-height:96px; box-shadow:0 8px 20px rgba(2,6,23,.22); position:relative; overflow:hidden; }
+.led-stat .card-body{ padding:14px 16px; }
+.led-stat .lab{ text-transform:uppercase; font-size:.7rem; letter-spacing:.8px; font-weight:700; opacity:.92; }
+.led-stat .val{ font-size:1.5rem; font-weight:800; margin-top:4px; }
+.led-stat .ico{ position:absolute; right:-8px; bottom:-12px; font-size:4.2rem; opacity:.18; }
+.s-violet{ background:linear-gradient(135deg,#8b5cf6,#6d28d9); }
+.s-emerald{ background:linear-gradient(135deg,#10b981,#047857); }
+.s-rose{ background:linear-gradient(135deg,#ef4444,#b91c1c); }
+.s-blue{ background:linear-gradient(135deg,#3b82f6,#1d4ed8); }
+.s-cyan{ background:linear-gradient(135deg,#06b6d4,#0e7490); }
+
+.led-card{ border:1px solid var(--border-color); border-radius:14px; background:var(--surface-1); overflow:hidden; }
+.led-card .card-header{ background:linear-gradient(180deg, rgba(99,102,241,.08), transparent); border-bottom:1px solid var(--border-color); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+.filter-bar{ display:flex; gap:10px; flex-wrap:wrap; align-items:end; padding:14px 18px; border-bottom:1px solid var(--border-color); background:var(--surface-2); }
+.filter-bar .form-label{ font-size:.75rem; text-transform:uppercase; letter-spacing:.6px; font-weight:700; color:var(--text-muted); margin-bottom:4px;}
+.led-table{ width:100%; }
+.led-table th{ font-size:.75rem; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); font-weight:700; }
+.led-table td{ vertical-align:middle; }
+.led-amt-in{ color:#10b981; font-weight:700; }
+.led-amt-out{ color:#ef4444; font-weight:700; }
+.led-running{ font-weight:700; }
+.led-running.neg{ color:#ef4444; }
+.tx-type-badge{ display:inline-block; font-size:.72rem; padding:3px 8px; border-radius:999px; font-weight:600; }
+.tt-Receipt{ background: rgba(16,185,129,.15); color:#10b981; }
+.tt-Payment{ background: rgba(239,68,68,.15); color:#ef4444; }
+.tt-Transfer{ background: rgba(59,130,246,.15); color:#3b82f6; }
+.tt-Supplier{ background: rgba(245,158,11,.15); color:#f59e0b; }
+.tt-Expense{ background: rgba(236,72,153,.15); color:#ec4899; }
+.tt-Loss{ background: rgba(120,113,108,.15); color:#a8a29e; }
+.tt-Adjustment{ background: rgba(139,92,246,.15); color:#8b5cf6; }
+.row-voided{ opacity:.55; text-decoration:line-through; }
+</style>
+
+<div class="container-fluid">
+    <div class="acc-page-header">
+        <div>
+            <h2><i class="bi bi-journal-text me-2 text-info"></i>{{ account.name }}</h2>
+            <div class="subtitle">{{ account.source_category or '—' }} • {{ account.account_type|title }} • {{ account.category|upper }}{% if account.bank_name %} • {{ account.bank_name }}{% endif %}</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('accounts.manage_accounts') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Manage Accounts</a>
+            <a href="{{ url_for('accounts.reconcile_account', account_id=account.id) }}" class="btn btn-outline-success"><i class="bi bi-check2-square me-1"></i>Reconcile</a>
+            <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-info"><i class="bi bi-house me-1"></i>Dashboard</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3"><div class="card led-stat s-violet"><div class="card-body"><div class="lab">Current Balance</div><div class="val">Rs. {{ "%.2f"|format(account.balance or 0) }}</div></div><i class="bi bi-wallet2 ico"></i></div></div>
+        <div class="col-md-3"><div class="card led-stat s-cyan"><div class="card-body"><div class="lab">Opening (Period)</div><div class="val">Rs. {{ "%.2f"|format(opening_balance) }}</div></div><i class="bi bi-flag ico"></i></div></div>
+        <div class="col-md-3"><div class="card led-stat s-emerald"><div class="card-body"><div class="lab">Money In</div><div class="val">Rs. {{ "%.2f"|format(period_in) }}</div></div><i class="bi bi-arrow-down-circle ico"></i></div></div>
+        <div class="col-md-3"><div class="card led-stat s-rose"><div class="card-body"><div class="lab">Money Out</div><div class="val">Rs. {{ "%.2f"|format(period_out) }}</div></div><i class="bi bi-arrow-up-circle ico"></i></div></div>
+    </div>
+
+    <div class="led-card mb-3">
+        <form class="filter-bar" method="get">
+            <div><div class="form-label">From</div><input type="date" name="from" class="form-control form-control-sm" value="{{ date_from.strftime('%Y-%m-%d') }}"></div>
+            <div><div class="form-label">To</div><input type="date" name="to" class="form-control form-control-sm" value="{{ date_to.strftime('%Y-%m-%d') }}"></div>
+            <div><div class="form-label">Type</div>
+                <select name="type" class="form-select form-select-sm">
+                    <option value="">All Types</option>
+                    {% for t in types %}<option value="{{ t }}" {% if t==type_f %}selected{% endif %}>{{ t }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="flex-grow-1"><div class="form-label">Search</div><input type="text" name="q" class="form-control form-control-sm" placeholder="Description or note..." value="{{ search }}"></div>
+            <div class="d-none"></div>
+            <div><button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Apply</button></div>
+            <div><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('accounts.account_ledger', account_id=account.id) }}">Reset</a></div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table led-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:140px">Date</th>
+                        <th>Type</th>
+                        <th>Counter Account</th>
+                        <th>Description</th>
+                        <th class="text-end">In</th>
+                        <th class="text-end">Out</th>
+                        <th class="text-end">Running</th>
+                        <th class="text-end" style="width:80px">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in page_rows %}
+                {% set tx = r.tx %}
+                {% set incoming = (tx.to_account_id == account.id) %}
+                {% set outgoing = (tx.from_account_id == account.id) %}
+                <tr class="{% if tx.is_void %}row-voided{% endif %}">
+                    <td class="small">{{ tx.date_posted.strftime('%Y-%m-%d %H:%M') if tx.date_posted else '' }}</td>
+                    <td>
+                        {% set t = (tx.transaction_type or '').replace(' ','') %}
+                        <span class="tx-type-badge tt-{{ t or 'Adjustment' }}">{{ tx.transaction_type or '—' }}</span>
+                        {% if tx.is_void %}<span class="badge bg-danger ms-1">DELETED</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if incoming and tx.from_account %}<i class="bi bi-arrow-down-left text-success me-1"></i>{{ tx.from_account.name }}
+                        {% elif outgoing and tx.to_account %}<i class="bi bi-arrow-up-right text-primary me-1"></i>{{ tx.to_account.name }}
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        <div>{{ tx.description or '' }}</div>
+                        {% if tx.note %}<div class="small text-muted">{{ tx.note }}</div>{% endif %}
+                    </td>
+                    <td class="text-end">{% if incoming and not tx.is_void %}<span class="led-amt-in">Rs. {{ "%.2f"|format(tx.amount or 0) }}</span>{% endif %}</td>
+                    <td class="text-end">{% if outgoing and not tx.is_void %}<span class="led-amt-out">Rs. {{ "%.2f"|format(tx.amount or 0) }}</span>{% endif %}</td>
+                    <td class="text-end"><span class="led-running {% if r.running < 0 %}neg{% endif %}">Rs. {{ "%.2f"|format(r.running) }}</span></td>
+                    <td class="text-end">
+                        {% if not tx.is_void %}
+                        <form method="POST" action="{{ url_for('accounts.void_transaction', tx_id=tx.id) }}" style="display:inline" onsubmit="return confirm('Permanently delete this transaction? Account balances will be reversed.');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-x-octagon"></i></button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-4">No ledger entries in this range.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if has_prev or has_next %}
+        <nav class="p-3 d-flex justify-content-between align-items-center">
+            <div class="small text-muted">Showing page {{ page }} of {{ ((total_rows + per_page - 1)//per_page) or 1 }} • {{ total_rows }} entries</div>
+            <ul class="pagination mb-0">
+                <li class="page-item {% if not has_prev %}disabled{% endif %}"><a class="page-link" href="?{% if request.query_string %}{{ request.query_string.decode() | replace('page='~page,'') }}&{% endif %}page={{ page-1 }}">Previous</a></li>
+                <li class="page-item {% if not has_next %}disabled{% endif %}"><a class="page-link" href="?{% if request.query_string %}{{ request.query_string.decode() | replace('page='~page,'') }}&{% endif %}page={{ page+1 }}">Next</a></li>
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

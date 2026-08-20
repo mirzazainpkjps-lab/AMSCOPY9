@@ -1,0 +1,270 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-person-lines-fill me-2"></i>Client Follow-up Detail</h2>
+    <a href="{{ url_for('notifications_page') }}" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i>Back to Notifications</a>
+</div>
+
+<div class="card bg-dark border-secondary mb-3">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="small text-white-50">Client</div>
+                <div class="fw-bold text-warning">{{ bill.client_name or 'Unknown Client' }}</div>
+                <div class="small text-white-50">{{ bill.client_code or 'No Code' }}</div>
+            </div>
+            <div class="col-md-2">
+                <div class="small text-white-50">Bill</div>
+                <div class="fw-bold">{{ bill.bill_no or '---' }}</div>
+            </div>
+            <div class="col-md-2">
+                <div class="small text-white-50">Amount</div>
+                <div class="fw-bold">{{ "{:,.0f}".format(bill.amount or 0) }}</div>
+            </div>
+            <div class="col-md-2">
+                <div class="small text-white-50">Category</div>
+                <div class="fw-bold">{{ category }}</div>
+            </div>
+            <div class="col-md-2">
+                <div class="small text-white-50">Risk</div>
+                <span class="badge {% if risk_level == 'Very High' %}bg-danger{% elif risk_level == 'High' %}bg-danger{% elif risk_level == 'Medium' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                    {{ risk_level }}
+                </span>
+            </div>
+        </div>
+        <div class="row g-3 mt-1">
+            <div class="col-md-6">
+                <form method="POST" action="{{ url_for('notifications_set_severity', bill_id=bill.id) }}" class="d-flex gap-2 align-items-end">
+                    <div class="w-100">
+                        <label class="small text-white-50 mb-1">Severity Override</label>
+                        <select name="severity" class="form-select form-select-sm bg-dark text-white border-secondary">
+                            <option value="auto" {% if severity_override == 'auto' %}selected{% endif %}>Auto</option>
+                            <option value="medium" {% if severity_override == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="high" {% if severity_override == 'high' %}selected{% endif %}>High</option>
+                            <option value="very_high" {% if severity_override == 'very_high' %}selected{% endif %}>Very High</option>
+                            <option value="low" {% if severity_override == 'low' %}selected{% endif %}>Low</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-sm btn-outline-warning fw-bold">Update</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card bg-dark border-secondary mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="text-warning fw-bold">Client Open Due Bills</span>
+        <span class="badge bg-warning text-dark">{{ client_open_bills|length }} bill(s) | Due {{ "{:,.0f}".format(client_total_due or 0) }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Bill No</th>
+                        <th>Reason</th>
+                        <th class="text-end">Amount</th>
+                        <th>Created</th>
+                        <th class="text-end">Open</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for b in client_open_bills %}
+                    <tr {% if b.id == bill.id %}class="table-warning text-dark"{% endif %}>
+                        <td class="fw-bold">{{ b.bill_no or '---' }}</td>
+                        <td>{{ b.reason or '---' }}</td>
+                        <td class="text-end fw-bold">{{ "{:,.0f}".format(b.amount or 0) }}</td>
+                        <td class="small">{{ b.created_at or '-' }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('notifications_bill_detail', bill_id=b.id) }}" class="btn btn-sm btn-outline-info fw-bold">Open</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="text-center text-white-50 py-4">No open credit bills found for this client.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="card bg-dark border-secondary h-100">
+            <div class="card-header text-warning fw-bold">Set / Update Reminder</div>
+            <div class="card-body">
+                {% if active_reminder %}
+                <div class="small text-white-50 mb-2">Current Reminder</div>
+                <div class="fw-bold text-warning">{{ active_reminder.remind_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                <div class="small text-white-50 mb-3">{{ active_reminder.note or 'No note' }}</div>
+                {% else %}
+                <div class="small text-white-50 mb-3">No active reminder.</div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('notifications_set_reminder', bill_id=bill.id) }}" class="row g-2">
+                    <div class="col-12">
+                        <label class="small text-white-50 mb-1">Next reminder date/time</label>
+                        <input type="datetime-local" name="remind_at" class="form-control form-control-sm bg-dark text-white border-secondary" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="small text-white-50 mb-1">Reminder note</label>
+                        <input type="text" name="note" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Example: Follow up after Friday prayer">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-outline-warning fw-bold">Save Reminder</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card bg-dark border-secondary h-100">
+            <div class="card-header text-info fw-bold">Log Contact Attempt</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('notifications_log_contact', bill_id=bill.id) }}" class="row g-2">
+                    <div class="col-12 col-md-4">
+                        <label class="small text-white-50 mb-1">Method</label>
+                        <select name="channel" class="form-select form-select-sm bg-dark text-white border-secondary">
+                            <option value="Call">Call</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                            <option value="SMS">SMS</option>
+                            <option value="Email">Email</option>
+                            <option value="Visit">Visit</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-8">
+                        <label class="small text-white-50 mb-1">Customer response (required)</label>
+                        <input type="text" name="response" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="What customer said" required>
+                    </div>
+                    <div class="col-12 col-md-5">
+                        <label class="small text-white-50 mb-1">Contact date/time</label>
+                        <input type="datetime-local" name="contacted_at" class="form-control form-control-sm bg-dark text-white border-secondary">
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <label class="small text-white-50 mb-1">Internal note</label>
+                        <input type="text" name="note" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Any extra note">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-outline-info fw-bold">Save Contact History</button>
+                    </div>
+                </form>
+
+                {% if active_reminder %}
+                <hr class="border-secondary my-3">
+                <div class="small text-success fw-bold mb-2">Close Active Reminder (Done)</div>
+                <form method="POST" action="{{ url_for('notifications_close_reminder', id=active_reminder.id) }}" class="row g-2">
+                    <div class="col-12 col-md-4">
+                        <label class="small text-white-50 mb-1">Method</label>
+                        <select name="channel" class="form-select form-select-sm bg-dark text-white border-secondary">
+                            <option value="Call">Call</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                            <option value="SMS">SMS</option>
+                            <option value="Email">Email</option>
+                            <option value="Visit">Visit</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-8">
+                        <label class="small text-white-50 mb-1">Customer response (required)</label>
+                        <input type="text" name="response" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="What customer said before closing" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="small text-white-50 mb-1">Closure note</label>
+                        <input type="text" name="note" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Optional note">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-outline-success fw-bold">Done + Save History</button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card bg-dark border-secondary mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="text-warning fw-bold">Notification History (One Row Per Reminder)</span>
+        <span class="badge bg-warning text-dark">{{ reminders|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 180px;">Reminder At</th>
+                        <th>Reminder Note</th>
+                        <th style="width: 130px;">Status</th>
+                        <th style="width: 180px;">Closed At</th>
+                        <th style="width: 120px;">Method</th>
+                        <th>Customer Response</th>
+                        <th>Internal Note</th>
+                        <th style="width: 120px;">By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reminders %}
+                    {% set rc = reminder_contact_by_id.get(r.id) %}
+                    <tr>
+                        <td class="text-warning">{{ r.remind_at.strftime('%Y-%m-%d %H:%M') if r.remind_at else '' }}</td>
+                        <td>{{ r.note or 'No note' }}</td>
+                        <td>
+                            {% if r.is_done %}
+                            <span class="badge bg-success">Done</span>
+                            {% else %}
+                            <span class="badge bg-danger">Open</span>
+                            {% endif %}
+                        </td>
+                        <td class="small text-white-50">{{ r.acknowledged_at.strftime('%Y-%m-%d %H:%M') if r.acknowledged_at else '-' }}</td>
+                        <td>{{ rc.channel if rc else '-' }}</td>
+                        <td>{{ rc.response if rc else ( 'Pending reminder' if not r.is_done else 'No response recorded' ) }}</td>
+                        <td>{{ rc.note if rc else '-' }}</td>
+                        <td class="small text-white-50">{{ rc.created_by if rc else '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="text-center text-white-50 py-4">No reminder history.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if additional_contacts %}
+<div class="card bg-dark border-secondary">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="text-info fw-bold">Additional Contact Logs (Not Linked To Reminder)</span>
+        <span class="badge bg-info text-dark">{{ additional_contacts|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 180px;">Date/Time</th>
+                        <th style="width: 120px;">Method</th>
+                        <th>Customer Response</th>
+                        <th>Internal Note</th>
+                        <th style="width: 120px;">By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in additional_contacts %}
+                    <tr>
+                        <td class="text-info">{{ c.contacted_at.strftime('%Y-%m-%d %H:%M') if c.contacted_at else '' }}</td>
+                        <td>{{ c.channel or 'N/A' }}</td>
+                        <td>{{ c.response or 'No response recorded' }}</td>
+                        <td>{{ c.note or 'No note' }}</td>
+                        <td class="small text-white-50">{{ c.created_by or 'system' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

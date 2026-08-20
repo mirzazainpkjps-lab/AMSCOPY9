@@ -1,0 +1,143 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-truck me-2"></i>Supplier Ledger</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        <a href="{{ url_for('pay_supplier_page') }}" class="btn btn-success btn-sm fw-bold">
+            <i class="bi bi-cash-stack me-1"></i> Pay Supplier
+        </a>
+        <button class="btn btn-warning btn-sm text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+            <i class="bi bi-plus-lg"></i> Add Supplier
+        </button>
+    </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    {% for s in suppliers %}
+    <div class="col">
+        <div class="card h-100 border-secondary bg-dark text-white shadow-sm" style="border-radius: 15px;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="card-title text-warning fw-bold mb-0 text-truncate" title="{{ s.name }}">{{ s.name }}</h5>
+                    <span class="badge {{ 'bg-success' if s.is_active else 'bg-secondary' }} rounded-pill">
+                        {{ 'Active' if s.is_active else 'Inactive' }}
+                    </span>
+                </div>
+                <p class="card-text text-white-50 small mb-3">
+                    <i class="bi bi-telephone me-2"></i>{{ s.phone or 'No Phone' }}<br>
+                    <i class="bi bi-geo-alt me-2"></i>{{ s.address or 'No Address' }}
+                </p>
+                {% set _cur_bal = supplier_balances.get(s.id, s.opening_balance or 0) %}
+                <div class="small fw-bold mb-1 text-white-50">
+                    <i class="bi bi-wallet2 me-1"></i>Opening: {{ "{:,.2f}".format(s.opening_balance or 0) }}
+                </div>
+                <div class="small fw-bold mb-3 {{ 'text-danger' if _cur_bal > 0.009 else ('text-success' if _cur_bal < -0.009 else 'text-white-50') }}">
+                    <i class="bi bi-cash-coin me-1"></i>Current Payable: <span class="fs-6">Rs {{ "{:,.2f}".format(_cur_bal) }}</span>
+                </div>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('pay_supplier_page') }}" class="btn btn-success fw-bold">
+                        <i class="bi bi-cash-stack me-2"></i>Pay Supplier
+                    </a>
+                    <a href="{{ url_for('supplier_ledger', id=s.id) }}" class="btn btn-info fw-bold">
+                        <i class="bi bi-journal-text me-2"></i>View Ledger
+                    </a>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-warning flex-grow-1" data-bs-toggle="modal" data-bs-target="#editSupplierModal{{ s.id }}">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <form action="{{ url_for('delete_supplier', id=s.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete supplier?')">
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Supplier Modal -->
+    <div class="modal fade" id="editSupplierModal{{ s.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <form action="{{ url_for('edit_supplier', id=s.id) }}" method="POST" class="modal-content bg-dark text-white border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-warning">Edit Supplier</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" name="name" class="form-control bg-dark text-white border-secondary" value="{{ s.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="text" name="phone" class="form-control bg-dark text-white border-secondary" value="{{ s.phone or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea name="address" class="form-control bg-dark text-white border-secondary" rows="2">{{ s.address or '' }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Opening Balance</label>
+                        <input type="number" step="0.01" name="opening_balance" class="form-control bg-dark text-white border-secondary" value="{{ '%.2f'|format(s.opening_balance or 0) }}">
+                        <small class="text-white-50">Use + for payable due, - for advance/prepaid.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Opening Balance Date</label>
+                        <input type="date" name="opening_balance_date" class="form-control bg-dark text-white border-secondary" value="{{ (s.opening_balance_date or s.created_at).strftime('%Y-%m-%d') if (s.opening_balance_date or s.created_at) else '' }}">
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="isActive{{ s.id }}" {{ 'checked' if s.is_active else '' }}>
+                        <label class="form-check-label" for="isActive{{ s.id }}">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-bold">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Add Supplier Modal -->
+<div class="modal fade" id="addSupplierModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('add_supplier') }}" method="POST" class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-warning">Add New Supplier</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-control bg-dark text-white border-secondary" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Phone</label>
+                    <input type="text" name="phone" class="form-control bg-dark text-white border-secondary">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Address</label>
+                    <textarea name="address" class="form-control bg-dark text-white border-secondary" rows="2"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Opening Balance</label>
+                    <input type="number" step="0.01" name="opening_balance" class="form-control bg-dark text-white border-secondary" value="0">
+                    <small class="text-white-50">Use + for payable due, - for advance/prepaid.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Opening Balance Date</label>
+                    <input type="date" name="opening_balance_date" class="form-control bg-dark text-white border-secondary" value="">
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold">Save Supplier</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

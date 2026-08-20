@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-warning mb-0"><i class="bi bi-shuffle me-2"></i>Mixed Transactions Report</h2>
+        <p class="text-white-50 small mb-0">Sales containing both Booked (Reserved) and Due/Cash items in one bill.</p>
+    </div>
+    <a href="/direct_sales" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back to Sales</a>
+</div>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="ps-4 text-white-50">Date</th>
+                    <th class="text-white-50">Bill No</th>
+                    <th class="text-white-50">Client</th>
+                    <th class="text-white-50">Booked Items (Qty)</th>
+                    <th class="text-white-50">Due Items (Qty @ Rate)</th>
+                    <th class="text-end pe-4 text-white-50">Due Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales %}
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td class="ps-4">{{ sale.date_posted.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <a href="/view_bill/{{ (sale.manual_bill_no or sale.auto_bill_no)|replace('#', '%23') }}" class="text-warning text-decoration-none fw-bold">
+                            {{ sale.manual_bill_no or sale.auto_bill_no }}
+                        </a>
+                    </td>
+                    <td class="text-white fw-bold">{{ sale.client_name }}</td>
+                    <td>
+                        <ul class="list-unstyled mb-0 small text-warning">
+                        {% for item in sale.items if item.price_at_time == 0 %}
+                            <li><i class="bi bi-bookmark-check me-1"></i>{{ item.product_name }}: <strong>{{ item.qty }}</strong></li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                    <td>
+                        <ul class="list-unstyled mb-0 small text-info">
+                        {% for item in sale.items if item.price_at_time > 0 %}
+                            <li><i class="bi bi-credit-card me-1"></i>{{ item.product_name }}: <strong>{{ item.qty }}</strong> @ {{ item.price_at_time }}</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                    <td class="text-end pe-4 fw-bold text-success fs-5">
+                        {{ "{:,.2f}".format(sale.amount) }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center py-5 text-white-50">No mixed transactions found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

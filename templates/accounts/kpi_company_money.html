@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+
+{% block title %}Company Money (KPI){% endblock %}
+
+{% block content %}
+<style>
+.acc-page-header{ background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(79,70,229,0.18)); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:20px 24px; margin-bottom:24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.acc-page-header h2{ margin:0; font-weight:700; } .acc-page-header .subtitle{ color:var(--text-muted); font-size:.9rem; margin-top:4px;}
+.kpi{ border:0; border-radius:14px; color:#fff; min-height:96px; box-shadow:0 8px 20px rgba(2,6,23,.22); position:relative; overflow:hidden; }
+.kpi .card-body{ padding:14px 16px; }
+.kpi .lab{ text-transform:uppercase; font-size:.7rem; letter-spacing:.8px; font-weight:700; opacity:.92; }
+.kpi .val{ font-size:1.5rem; font-weight:800; margin-top:4px; }
+.kpi .ico{ position:absolute; right:-8px; bottom:-12px; font-size:4.2rem; opacity:.18; }
+.s-violet{ background:linear-gradient(135deg,#8b5cf6,#4f46e5);} .s-cyan{ background:linear-gradient(135deg,#06b6d4,#0e7490);}
+.data-card{ border:1px solid var(--border-color); border-radius:14px; background:var(--surface-1); }
+</style>
+
+<div class="container-fluid">
+  <div class="acc-page-header">
+    <div>
+      <h2><i class="bi bi-piggy-bank me-2 text-primary"></i>Company Money (KPI Drill-Down)</h2>
+      <div class="subtitle">Sum of all active company account balances.</div>
+    </div>
+    <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="card kpi s-violet">
+        <div class="card-body">
+          <div class="lab">Total Money Available</div>
+          <div class="val">Rs. {{ "%.2f"|format(total_money) }}</div>
+        </div>
+        <i class="bi bi-cash-coin ico"></i>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card kpi s-cyan">
+        <div class="card-body">
+          <div class="lab">Company Accounts</div>
+          <div class="val">{{ total_count }}</div>
+        </div>
+        <i class="bi bi-bank ico"></i>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    {% for it in items %}
+    <div class="col-md-6 col-xl-4">
+      <div class="card data-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="fw-bold text-truncate"><a class="text-decoration-none" href="{{ it.link }}">{{ it.name }}</a></div>
+            <div class="fw-bold text-primary">Rs. {{ "%.2f"|format(it.balance) }}</div>
+          </div>
+          <div class="small text-muted mt-1">
+            <span class="badge bg-dark me-1">{{ (it.account_type or '') }}</span>
+            <span class="badge bg-secondary">{{ (it.category or '').upper() }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-12"><div class="text-center text-muted py-4">No company accounts found.</div></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

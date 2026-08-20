@@ -1,0 +1,20 @@
+{# Shared KPI tile — clickable, drills into detail page.
+   Args:
+     href     — drill-down URL (REQUIRED — every tile must drill down)
+     label    — uppercase mini-label
+     value    — main value (string or formatted number)
+     icon     — bootstrap icon class (background watermark)
+     colour   — one of: amber, green, red, cyan, violet, indigo, slate, teal, rose, sky, lime
+     sub      — optional small subtitle below value
+     cta      — optional call-to-action label (default "View details")  #}
+{% macro tile(href, label, value, icon='bi-bar-chart-line', colour='amber', sub=None, cta='View details') -%}
+<a class="ui-kpi {{ colour }}" href="{{ href }}" aria-label="{{ label }}: {{ value }}">
+  <div class="ui-kpi-label">{{ label }}</div>
+  <div class="ui-kpi-value">{{ value|safe }}</div>
+  {% if sub %}<div class="ui-kpi-sub">{{ sub|safe }}</div>{% endif %}
+  <span class="ui-kpi-cta">
+    <i class="bi bi-arrow-right-circle"></i> {{ cta }}
+  </span>
+  <i class="bi {{ icon }} ui-kpi-icon"></i>
+</a>
+{%- endmacro %}

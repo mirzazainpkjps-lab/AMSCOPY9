@@ -1,0 +1,166 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="ui-v2">
+  {% from "_ui/page_header.html" import render as ui_header %}
+  {% set toolbar %}
+    <a href="{{ url_for('cash_flow_differences') }}" class="btn btn-outline-secondary btn-pill fw-bold">
+      <i class="bi bi-arrow-left me-1"></i> Back to List
+    </a>
+  {% endset %}
+  {{ ui_header('bi-receipt-cutoff', 'Reconciliation Detail', subtitle='Date: ' + reconciliation.adjustment_date|string, toolbar=toolbar) }}
+
+  {# Summary info #}
+  <div class="ui-card mb-4">
+    <div class="ui-card-header">
+      <h5 class="mb-0">Reconciliation Summary</h5>
+    </div>
+    <div class="ui-card-body">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label" style="font-weight:bold;color:#6b7280;">Workflow</label>
+            <p class="mb-0">
+              {% if reconciliation.physical_cash_available is not none %}
+              <span class="badge bg-success fs-6">New (Physical Cash Available)</span>
+              {% else %}
+              <span class="badge bg-warning fs-6">Legacy (Difference Entry)</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label" style="font-weight:bold;color:#6b7280;">Total Edits</label>
+            <p class="mb-0"><strong>{{ reconciliation.edit_count or 1 }}</strong></p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label" style="font-weight:bold;color:#6b7280;">Created By</label>
+            <p class="mb-0">{{ reconciliation.created_by or "System" }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <hr>
+      
+      <div class="row">
+        <div class="col-md-6">
+          <label class="form-label" style="font-weight:bold;color:#6b7280;">Current State</label>
+          {% if reconciliation.physical_cash_available is not none %}
+          <div class="bg-light p-3 rounded">
+            <div class="row mb-2">
+              <div class="col-6">Calculated Closing:</div>
+              <div class="col-6 text-end"><strong>Rs. {{ "{:,.0f}".format(reconciliation.calculated_closing or 0) }}</strong></div>
+            </div>
+            <div class="row mb-2">
+              <div class="col-6">Physical Cash:</div>
+              <div class="col-6 text-end"><strong style="color:#0369a1;">Rs. {{ "{:,.0f}".format(reconciliation.physical_cash_available) }}</strong></div>
+            </div>
+            <div class="row mb-2 border-top pt-2">
+              <div class="col-6">Difference:</div>
+              <div class="col-6 text-end"><strong style="color:{{ '#dc2626' if reconciliation.difference < 0 else '#16a34a' }};">Rs. {{ "{:,.0f}".format(reconciliation.difference) }}</strong></div>
+            </div>
+          </div>
+          <p class="mt-2"><small class="text-muted">Next day opening = Physical Cash = Rs. {{ "{:,.0f}".format(reconciliation.physical_cash_available) }}</small></p>
+          {% else %}
+          <div class="bg-light p-3 rounded">
+            <div class="row mb-2">
+              <div class="col-6">Difference (Legacy):</div>
+              <div class="col-6 text-end"><strong>Rs. {{ "{:,.0f}".format(reconciliation.amount or 0) }}</strong></div>
+            </div>
+          </div>
+          <p class="mt-2"><small class="text-muted">Legacy workflow - no physical cash data</small></p>
+          {% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" style="font-weight:bold;color:#6b7280;">Reason</label>
+          <div class="bg-light p-3 rounded">
+            <p class="mb-0">{{ reconciliation.reason or reconciliation.note or "(No reason provided)" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Audit trail #}
+  <div class="ui-card">
+    <div class="ui-card-header">
+      <h5><i class="bi bi-clock-history me-2"></i> Audit Trail</h5>
+      <small class="text-muted">All changes to this reconciliation</small>
+    </div>
+    <div class="table-responsive">
+      <table class="ui-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Change Type</th>
+            <th>Changed By</th>
+            <th class="text-end">Old Physical Cash</th>
+            <th class="text-end">New Physical Cash</th>
+            <th class="text-end">Old Difference</th>
+            <th class="text-end">New Difference</th>
+            <th>Old Reason</th>
+            <th>New Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for audit in audit_trail %}
+          <tr>
+            <td><small>{{ audit.changed_at.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+            <td>
+              {% if audit.change_type == 'CREATE' %}
+              <span class="badge bg-success">CREATE</span>
+              {% elif audit.change_type == 'EDIT' %}
+              <span class="badge bg-warning">EDIT</span>
+              {% elif audit.change_type == 'DELETE' %}
+              <span class="badge bg-danger">DELETE</span>
+              {% elif audit.change_type == 'MIGRATE' %}
+              <span class="badge bg-info">MIGRATE</span>
+              {% endif %}
+            </td>
+            <td><small>{{ audit.changed_by or "—" }}</small></td>
+            <td class="text-end">
+              {% if audit.old_physical_cash is not none %}
+              <small>Rs. {{ "{:,.0f}".format(audit.old_physical_cash) }}</small>
+              {% else %}
+              <small class="text-muted">—</small>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if audit.new_physical_cash is not none %}
+              <small><strong>Rs. {{ "{:,.0f}".format(audit.new_physical_cash) }}</strong></small>
+              {% else %}
+              <small class="text-muted">—</small>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if audit.old_difference is not none %}
+              <small>Rs. {{ "{:,.0f}".format(audit.old_difference) }}</small>
+              {% else %}
+              <small class="text-muted">—</small>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if audit.new_difference is not none %}
+              <small><strong>Rs. {{ "{:,.0f}".format(audit.new_difference) }}</strong></small>
+              {% else %}
+              <small class="text-muted">—</small>
+              {% endif %}
+            </td>
+            <td><small>{{ audit.old_reason or "—" }}</small></td>
+            <td><small><strong>{{ audit.new_reason or "—" }}</strong></small></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="ui-empty">No audit records found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

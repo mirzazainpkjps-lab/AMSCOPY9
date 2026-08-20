@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-success mb-0"><i class="bi bi-clock-history me-2"></i>Upcoming Reminders</h2>
+    <div class="d-flex gap-2">
+        <span class="badge bg-warning text-dark fs-6">Total: {{ reminders|length }}</span>
+        <a href="{{ url_for('notifications_page') }}" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i>Back to Notifications</a>
+    </div>
+</div>
+
+<div class="card bg-dark border-secondary">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="text-white">All Active Reminders</span>
+        <small class="text-white-50">Live countdown updates automatically</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Client</th>
+                        <th>Bill</th>
+                        <th>Reminder Time</th>
+                        <th>Countdown</th>
+                        <th>Note</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reminders %}
+                    {% set client_name = r.pending_bill.client_name if r.pending_bill else 'Unknown Client' %}
+                    {% set bill_no = r.pending_bill.bill_no if r.pending_bill else '---' %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-warning">{{ client_name }}</div>
+                            <div class="small text-white-50">{{ r.pending_bill.client_code if r.pending_bill else '' }}</div>
+                        </td>
+                        <td>{{ bill_no }}</td>
+                        <td class="text-info">{{ r.remind_at.strftime('%Y-%m-%d %H:%M') if r.remind_at else '' }}</td>
+                        <td>
+                            <span class="badge bg-secondary countdown-badge" data-remind-at="{{ r.remind_at.strftime('%Y-%m-%dT%H:%M:%S') if r.remind_at else '' }}" id="countdown-{{ r.id }}">
+                                Calculating...
+                            </span>
+                        </td>
+                        <td class="small text-white-50">{{ r.note or 'No note' }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('notifications_bill_detail', bill_id=r.pending_bill_id) }}" class="btn btn-sm btn-outline-info">Open Detail</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-white-50 py-4">No active reminders.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function formatCountdown(diffMs) {
+    if (diffMs <= 0) return 'Due now';
+    const totalSec = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    if (days > 0) return `${days}d ${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
+    return `${mins}m ${secs}s`;
+}
+
+function updateCountdowns() {
+    const now = new Date();
+    document.querySelectorAll('.countdown-badge').forEach(el => {
+        const remindAtRaw = el.getAttribute('data-remind-at');
+        if (!remindAtRaw) {
+            el.textContent = 'Unknown';
+            el.className = 'badge bg-secondary countdown-badge';
+            return;
+        }
+        const target = new Date(remindAtRaw);
+        const diff = target.getTime() - now.getTime();
+        el.textContent = formatCountdown(diff);
+        if (diff <= 0) {
+            el.className = 'badge bg-danger countdown-badge';
+        } else if (diff <= 3600000) {
+            el.className = 'badge bg-warning text-dark countdown-badge';
+        } else {
+            el.className = 'badge bg-success countdown-badge';
+        }
+    });
+}
+
+updateCountdowns();
+setInterval(updateCountdowns, 1000);
+</script>
+{% endblock %}

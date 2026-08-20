@@ -1,0 +1,196 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .ledger-material-badge {
+        padding: 12px 14px;
+        min-width: 150px;
+        border-radius: 10px;
+    }
+    .ledger-material-title {
+        font-size: 0.9rem;
+        letter-spacing: 0.02em;
+    }
+    .ledger-material-line {
+        font-size: 0.78rem;
+    }
+    @media (max-width: 575.98px) {
+        .ledger-material-badge {
+            min-width: 100%;
+        }
+    }
+</style>
+<div class="mb-4">
+    <h2 class="fw-bold text-warning"><i class="bi bi-clipboard-data me-2"></i>Decision Ledger</h2>
+    <p class="text-white-50">Consolidated view of all client financials and material status.</p>
+</div>
+
+<!-- Overall Material Summary -->
+<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-header bg-transparent border-secondary py-3">
+        <h5 class="fw-bold text-white mb-0">Overall Material Summary</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0 text-center">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="text-start ps-4 text-white-50">Metric</th>
+                    {% for item in overall_material_summary %}
+                    <th class="text-warning">{{ item.name }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-start ps-4 fw-bold text-white">Total Booked</td>
+                    {% for item in overall_material_summary %}
+                    <td class="text-info">{{ item.booked|int }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-start ps-4 fw-bold text-white">Total Dispatched</td>
+                    {% for item in overall_material_summary %}
+                    <td class="text-success">{{ item.dispatched|int }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-start ps-4 fw-bold text-white">Total Remaining</td>
+                    {% for item in overall_material_summary %}
+                    <td class="text-danger">{{ item.remaining|int }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-start ps-4 fw-bold text-white">Overall Remaining (All)</td>
+                    <td class="text-warning fw-bold" colspan="{{ overall_material_summary|length }}">{{ overall_remaining_total|int }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Client Ledger Table -->
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-header bg-transparent border-secondary py-3">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <h5 class="fw-bold text-white mb-0">Client Financials & Material Status</h5>
+            <span class="text-white-50 small">Showing {{ data|length }} of {{ total }}</span>
+        </div>
+    </div>
+    <div class="card-body border-bottom border-secondary">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="text-white-50 small fw-bold mb-1">Search Client</label>
+                <input type="text" name="q" class="form-control bg-dark text-white border-secondary" placeholder="Name or code..." value="{{ q or '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="text-white-50 small fw-bold mb-1">Category</label>
+                <select name="category" class="form-select bg-dark text-white border-secondary">
+                    <option value="">All</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}" {% if category_filter == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="text-white-50 small fw-bold mb-1">Pending Filter</label>
+                <select name="balance" class="form-select bg-dark text-white border-secondary">
+                    <option value="all" {% if balance_filter == 'all' %}selected{% endif %}>All</option>
+                    <option value="debit" {% if balance_filter == 'debit' %}selected{% endif %}>Due (Owed)</option>
+                    <option value="credit" {% if balance_filter == 'credit' %}selected{% endif %}>Advance (Paid Extra)</option>
+                    <option value="zero" {% if balance_filter == 'zero' %}selected{% endif %}>Settled</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="text-white-50 small fw-bold mb-1">Per Page</label>
+                <select name="per_page" class="form-select bg-dark text-white border-secondary">
+                    {% for n in [10, 20, 50, 100] %}
+                    <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-12 d-flex gap-2">
+                <button type="submit" class="btn btn-warning fw-bold text-dark">
+                    <i class="bi bi-filter me-2"></i>Apply
+                </button>
+                <a href="{{ url_for('decision_ledger') }}" class="btn btn-outline-secondary fw-bold">Reset</a>
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="ps-4 py-3 text-white-50">Client</th>
+                    <th class="py-3 text-white-50">Category</th>
+                    <th class="py-3 text-end text-white-50">Pending</th>
+                    <th class="py-3 text-white-50">Material Status (Booked / Disp / Rem)</th>
+                    <th class="py-3 text-end pe-4 text-white-50">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data %}
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td class="ps-4">
+                        <div class="fw-bold text-white">{{ row.client.name }}</div>
+                        <div class="small text-white-50">{{ row.client.code }}</div>
+                    </td>
+                    <td><span class="badge bg-secondary">{{ row.client.category }}</span></td>
+                    <td class="text-end fw-bold {{ 'text-danger' if row.financial.balance > 0 else 'text-success' }}">
+                        {{ "{:,.0f}".format(row.financial.balance) }}
+                    </td>
+                    <td>
+                        {% if row.materials %}
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for mat in row.materials %}
+                            <div class="badge bg-dark border border-secondary text-start ledger-material-badge">
+                                <div class="text-warning mb-2 fw-bold ledger-material-title">{{ mat.name }}</div>
+                                <div class="d-flex gap-2 ledger-material-line">
+                                    <span class="text-white-50" title="Booked">B:{{ mat.booked|int }}</span>
+                                    <span class="text-success" title="Dispatched">D:{{ mat.dispatched|int }}</span>
+                                    <span class="text-danger" title="Remaining">R:{{ mat.remaining|int }}</span>
+                                </div>
+                                <div class="d-flex gap-2 ledger-material-line mt-2">
+                                    <span class="text-white-50" title="Unit Rate">Rate: {{ currency_symbol }}{{ "{:,.2f}".format(mat.unit_price or 0) }}</span>
+                                </div>
+                                <div class="d-flex gap-2 ledger-material-line">
+                                    <span class="text-info" title="Booked Cost">B Cost: {{ currency_symbol }}{{ "{:,.0f}".format(mat.booked_cost or 0) }}</span>
+                                </div>
+                                <div class="d-flex gap-2 ledger-material-line">
+                                    <span class="text-success" title="Dispatched Cost">D Cost: {{ currency_symbol }}{{ "{:,.0f}".format(mat.dispatched_cost or 0) }}</span>
+                                </div>
+                                <div class="d-flex gap-2 ledger-material-line">
+                                    <span class="text-danger" title="Remaining Cost">R Cost: {{ currency_symbol }}{{ "{:,.0f}".format(mat.remaining_cost or 0) }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="small text-white-50 mt-2">
+                            Total Remaining: <span class="text-danger fw-bold">{{ row.material_totals.total_remaining_qty|int }}</span>
+                            <span class="ms-2">Reserved Cost: <span class="text-warning fw-bold">{{ currency_symbol }}{{ "{:,.0f}".format(row.material_totals.total_reserved_cost or 0) }}</span></span>
+                        </div>
+                        {% else %}
+                        <span class="text-white-50 small">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4">
+                        <a href="{{ url_for('financial_ledger', client_id=row.client.id) }}" class="btn btn-sm btn-outline-info rounded-pill fw-bold">
+                            <i class="bi bi-eye me-1"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-transparent border-secondary d-flex justify-content-between align-items-center">
+        <div class="text-white-50 small">Page {{ page }} of {{ total_pages }}</div>
+        <div class="d-flex gap-2">
+            {% if page > 1 %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('decision_ledger', page=page-1, q=q, category=category_filter, balance=balance_filter, per_page=per_page) }}">Prev</a>
+            {% endif %}
+            {% if page < total_pages %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('decision_ledger', page=page+1, q=q, category=category_filter, balance=balance_filter, per_page=per_page) }}">Next</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

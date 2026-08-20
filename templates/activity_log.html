@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="fw-bold text-warning mb-0">Activity Log</h2>
+        <p class="text-white-50 small mb-0">Create, edit, delete and import/export — who performed each action.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('login_sessions_page') }}" class="btn btn-outline-success btn-sm fw-bold">Live logins</a>
+        <a href="{{ url_for('settings') }}" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Settings</a>
+    </div>
+</div>
+<form class="d-flex gap-2 mb-3" method="get">
+    <input type="text" name="q" value="{{ q or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Search user, action, details...">
+    <button class="btn btn-warning fw-bold">Search</button>
+</form>
+<div class="card border-secondary bg-dark">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows.items %}
+                <tr>
+                    <td class="small text-white-50">{{ r.timestamp.strftime('%Y-%m-%d %H:%M:%S') if r.timestamp else '' }}</td>
+                    <td class="fw-bold text-warning">{{ r.username or '—' }}</td>
+                    <td class="small">{{ r.action }}</td>
+                    <td class="small text-white-50">{{ r.details or '' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-white-50 py-4">No activity recorded.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if rows.pages > 1 %}
+    <div class="p-3">
+        <nav>
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                {% if rows.has_prev %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('activity_log_page', page=rows.prev_num, q=q) }}">Previous</a></li>
+                {% endif %}
+                <li class="page-item active"><span class="page-link">{{ rows.page }} / {{ rows.pages }}</span></li>
+                {% if rows.has_next %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('activity_log_page', page=rows.next_num, q=q) }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

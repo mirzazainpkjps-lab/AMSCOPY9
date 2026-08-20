@@ -1,0 +1,173 @@
+{% extends "layout.html" %}
+
+{% block title %}Supplier Payments{% endblock %}
+
+{% block content %}
+{% include 'accounts/_acc_styles.html' %}
+{% from 'accounts/_entity_combobox.html' import entity_combobox %}
+<style>
+.acc-page-header{ background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(245,158,11,0.18)); }
+</style>
+
+<div class="container-fluid">
+    <div class="acc-page-header">
+        <div>
+            <h2><i class="bi bi-truck me-2 text-danger"></i>Supplier Payments</h2>
+            <div class="subtitle">Money paid out to suppliers.</div>
+        </div>
+        <div class="acc-toolbar">
+            <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+            {% if not payments_readonly %}
+            <button type="button" class="btn btn-danger btn-sm" onclick="openSupplierPaymentModal()"><i class="bi bi-plus-lg me-1"></i>New Payment</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6"><div class="card kpi-card kpi-rose"><div class="card-body"><div class="kpi-label">Total Paid</div><div class="kpi-value">Rs. {{ "%.2f"|format(total_amount) }}</div></div><i class="bi bi-cash-stack kpi-icon"></i></div></div>
+        <div class="col-md-6"><div class="card kpi-card kpi-amber"><div class="card-body"><div class="kpi-label">Payments in Period</div><div class="kpi-value">{{ total_count }}</div></div><i class="bi bi-list-ol kpi-icon"></i></div></div>
+    </div>
+
+    <div class="acc-section-card">
+        <form class="filter-bar align-items-end" method="get">
+            <input type="hidden" name="show" value="{{ show_mode }}">
+            <div><label>From</label><input type="date" name="from" class="form-control form-control-sm" value="{{ date_from.strftime('%Y-%m-%d') }}"></div>
+            <div><label>To</label><input type="date" name="to" class="form-control form-control-sm" value="{{ date_to.strftime('%Y-%m-%d') }}"></div>
+            <div style="min-width:210px">{{ entity_combobox('spFilterSupplier', filter_party_options, code_attr='id', name_attr='label', value_input_id='party_id', label='Supplier', selected_code=party_id_f or '', selected_name=filter_party_name, placeholder='All suppliers…') }}</div>
+            <div style="min-width:240px">{{ entity_combobox('spFilterAccount', filter_account_options, code_attr='id', name_attr='label', value_input_id='account_id', label='Account', selected_code=account_id_f or '', selected_name=filter_account_name, placeholder='All accounts…') }}</div>
+            <div><label>Method</label>
+                <select name="method" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for m in ['Cash','Bank','Check','Card','Online'] %}<option value="{{ m }}" {% if m==method_f %}selected{% endif %}>{{ m }}</option>{% endfor %}
+                </select>
+            </div>
+            <div><label>Rows</label><select name="per_page" class="form-select form-select-sm">{% for n in [10,25,50,100] %}<option value="{{ n }}" {% if per_page==n %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+            <div class="flex-grow-1"><label>Search</label><input type="search" name="q" class="form-control form-control-sm" placeholder="Name, bill, reference, account, note…" value="{{ search }}"></div>
+            <div><button class="btn btn-sm btn-danger"><i class="bi bi-funnel me-1"></i>Apply</button></div>
+            <div><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('accounts.supplier_payments') }}">Reset</a></div>
+        </form>
+
+        <div class="filter-bar">
+            <div><label>Status</label>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('accounts.supplier_payments', show='active', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'active' %}btn-success text-dark{% else %}btn-outline-success{% endif %}">Active</a>
+                    <a href="{{ url_for('accounts.supplier_payments', show='voided', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'voided' %}btn-danger{% else %}btn-outline-danger{% endif %}">Deleted</a>
+                    <a href="{{ url_for('accounts.supplier_payments', show='all', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'all' %}btn-info text-dark{% else %}btn-outline-info{% endif %}">All</a>
+                </div>
+            </div>
+            {% if payments_readonly %}
+            <div class="ms-auto small text-muted align-self-end">Payment controls disabled for your role.</div>
+            {% endif %}
+        </div>
+
+        <div class="table-responsive">
+            <table class="table acc-table align-middle mb-0">
+                <thead><tr>
+                    <th style="width:140px">Date</th><th>Supplier</th><th>Account</th>
+                    <th class="text-end">Amount</th><th>Method</th><th>Bill #</th><th>Note</th><th class="text-end">Actions</th>
+                </tr></thead>
+                <tbody>
+                {% for p in payments.items %}
+                <tr class="{% if p.is_void %}table-danger{% endif %}">
+                    <td class="small">{{ p.date_posted.strftime('%Y-%m-%d %H:%M') }}</td>
+                    {% set meta = payment_meta.get(p.id, {}) %}
+                    <td><strong>{{ p.supplier.name if p.supplier else '—' }}</strong>{% if p.is_void %} <span class="badge bg-danger ms-1">VOIDED</span>{% endif %}{% if meta.source_type %}<div class="small text-muted">{{ meta.source_type }} #{{ meta.source_id }} (linked)</div>{% endif %}</td>
+                    <td>{{ p.payment_account.name if p.payment_account else (p.account_name or '—') }}</td>
+                    <td class="text-end fw-bold text-danger">Rs. {{ "%.2f"|format(p.amount) }}</td>
+                    <td><span class="badge bg-secondary">{{ p.method }}</span></td>
+                    <td class="small">{{ p.manual_bill_no or p.auto_bill_no or '' }}</td>
+                    <td class="small text-muted">{{ p.note or '' }}</td>
+                    <td class="text-end text-nowrap">
+                        <a href="{{ url_for('download_supplier_payment', payment_id=p.id, action='print') }}" class="btn btn-outline-info btn-sm me-1" title="View"><i class="bi bi-eye"></i></a>
+                        {% if meta.source_type %}
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Controlled by {{ meta.source_type }} #{{ meta.source_id }}"><i class="bi bi-link-45deg"></i></button>
+                        {% elif not payments_readonly and not p.is_void %}
+                            <button type="button" class="btn btn-outline-warning btn-sm me-1" title="Edit in the shared supplier-payment form" onclick="openSupplierPaymentModal({{ p.id }})"><i class="bi bi-pencil-square"></i></button>
+                            <form id="delSupplierPaymentForm{{ p.id }}" action="{{ url_for('accounts.supplier_payment_delete', id=p.id) }}" method="POST" class="d-inline"></form>
+                            <button type="button" class="btn btn-outline-danger btn-sm me-1" title="Delete / reverse" onclick="if(confirm('Delete this supplier payment? Its accounting effects will be reversed and its history retained.')) { document.getElementById('delSupplierPaymentForm{{ p.id }}').submit(); }"><i class="bi bi-trash"></i></button>
+                        {% elif not payments_readonly and p.is_void %}
+                            <form action="{{ url_for('accounts.supplier_payment_restore', id=p.id) }}" method="POST" class="d-inline">
+                                <button class="btn btn-outline-success btn-sm me-1" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="empty-state"><i class="bi bi-inbox"></i><div class="mt-2">No payments in this range.</div></td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if payments.pages > 1 %}
+        {% set page_args = {'show':show_mode,'from':date_from.strftime('%Y-%m-%d'),'to':date_to.strftime('%Y-%m-%d'),'q':search,'method':method_f,'party_id':party_id_f or '','account_id':account_id_f or '','per_page':per_page} %}
+        <nav class="p-3" aria-label="Supplier payment pages"><ul class="pagination pagination-sm justify-content-center mb-0">
+            <li class="page-item {% if not payments.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.supplier_payments', page=1, **page_args) }}" aria-label="First">«</a></li>
+            <li class="page-item {% if not payments.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.supplier_payments', page=payments.prev_num or 1, **page_args) }}">Previous</a></li>
+            {% for n in payments.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}{% if n %}<li class="page-item {% if n==payments.page %}active{% endif %}"><a class="page-link" href="{{ url_for('accounts.supplier_payments', page=n, **page_args) }}">{{ n }}</a></li>{% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+            <li class="page-item {% if not payments.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.supplier_payments', page=payments.next_num or payments.pages, **page_args) }}">Next</a></li>
+            <li class="page-item {% if not payments.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.supplier_payments', page=payments.pages, **page_args) }}" aria-label="Last">»</a></li>
+        </ul></nav>
+        {% endif %}
+    </div>
+</div>
+
+{% if not payments_readonly %}
+<!-- Single shared Create/Edit modal -->
+<div class="modal fade" id="supplierPaymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        {% include 'accounts/_supplier_payment_form.html' %}
+    </div>
+</div>
+
+<script>
+function supplierSubmissionKey() {
+    if (window.crypto && window.crypto.randomUUID) return 'supplier-payment:' + window.crypto.randomUUID();
+    return 'supplier-payment:' + Date.now() + ':' + Math.random().toString(36).slice(2);
+}
+function resetSupplierPaymentForm() {
+    var f = document.getElementById('supplierPaymentForm');
+    f.reset();
+    document.getElementById('spPaymentId').value = '';
+    document.getElementById('spRevision').value = '';
+    document.getElementById('spIdempotencyKey').value = supplierSubmissionKey();
+    document.getElementById('supplier_id').value = '';
+    document.getElementById('supplier_name').value = '';
+    document.getElementById('payment_account_id').value = '';
+    document.getElementById('supplierPaymentModalTitle').innerHTML = '<i class="bi bi-truck me-2"></i>New Supplier Payment';
+    document.getElementById('supplierPaymentSubmitBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Payment';
+}
+
+function openSupplierPaymentModal(paymentId) {
+    if (!paymentId) {
+        resetSupplierPaymentForm();
+        new bootstrap.Modal(document.getElementById('supplierPaymentModal')).show();
+        return;
+    }
+    fetch('/accounts/payments/suppliers/' + paymentId + '/data', {credentials: 'same-origin'})
+        .then(function (r) { if (!r.ok) throw new Error('Failed to load payment.'); return r.json(); })
+        .then(function (p) {
+            resetSupplierPaymentForm();
+            if (p.source_type) throw new Error('This payment is controlled by ' + p.source_type + ' #' + p.source_id + '.');
+            document.getElementById('spPaymentId').value = p.id;
+            document.getElementById('spRevision').value = p.revision || 1;
+            document.getElementById('spIdempotencyKey').value = '';
+            document.getElementById('spSupplier').value = p.supplier_name || '';
+            document.getElementById('supplier_id').value = p.supplier_id || '';
+            document.getElementById('supplier_name').value = p.supplier_name || '';
+            document.getElementById('spAmount').value = Number(p.amount).toFixed(2);
+            document.getElementById('spMethod').value = p.method || 'Cash';
+            document.getElementById('spAccount').value = p.account_label || p.account_name || '';
+            document.getElementById('payment_account_id').value = p.payment_account_id || '';
+            document.getElementById('spManualBillNo').value = p.manual_bill_no || '';
+            document.getElementById('spDate').value = p.date || '';
+            document.getElementById('spNote').value = p.note || '';
+            document.getElementById('supplierPaymentModalTitle').innerHTML = '<i class="bi bi-pencil-square me-2"></i>Edit Supplier Payment ' + (p.manual_bill_no || p.auto_bill_no || ('SP-' + p.id));
+            document.getElementById('supplierPaymentSubmitBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Payment';
+            new bootstrap.Modal(document.getElementById('supplierPaymentModal')).show();
+        })
+        .catch(function (e) { alert(e.message || 'Could not load payment.'); });
+}
+</script>
+{% endif %}
+{% endblock %}

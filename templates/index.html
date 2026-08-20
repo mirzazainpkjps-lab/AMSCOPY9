@@ -1,0 +1,170 @@
+{% extends "layout.html" %}
+{% from "_ui/page_header.html" import render as ui_header %}
+{% from "_ui/kpi_tile.html" import tile as ui_tile %}
+{% from "_ui/data_table_card.html" import card as ui_table_card %}
+
+{% block content %}
+<div class="ui-v2">
+
+  {% set _toolbar %}
+    <a href="{{ url_for('inventory.stock_summary') }}" class="btn btn-warning btn-pill fw-bold">
+      <i class="bi bi-graph-up me-1"></i> Stock Summary
+    </a>
+    <a href="/clients" class="btn btn-outline-secondary btn-pill fw-bold">
+      <i class="bi bi-people me-1"></i> Clients
+    </a>
+  {% endset %}
+  {{ ui_header('bi-speedometer2', 'System Dashboard', subtitle=today_date, toolbar=_toolbar) }}
+
+  {# === KPI tiles — every tile drills down to its detail page === #}
+  <div class="ui-kpi-grid">
+    {{ ui_tile(
+        href=url_for('inventory.stock_summary'),
+        label='Total Inventory',
+        value=total_stock|int,
+        icon='bi-box-seam',
+        colour='amber',
+        sub='Units currently in stock',
+        cta='Open stock summary'
+    ) }}
+    {{ ui_tile(
+        href='/clients',
+        label='Registered Clients',
+        value=client_count|int,
+        icon='bi-people-fill',
+        colour='indigo',
+        sub='Active customer base',
+        cta='Open clients'
+    ) }}
+    {{ ui_tile(
+        href=url_for('financial_details', type='cash'),
+        label='Daily Cash Received',
+        value='Rs. ' ~ "{:,.0f}".format(daily_cash),
+        icon='bi-cash-stack',
+        colour='green',
+        sub='Today, ' ~ today_date,
+        cta='See cash breakdown'
+    ) }}
+    {{ ui_tile(
+        href=url_for('financial_details', type='credit'),
+        label='Daily Due Amount',
+        value='Rs. ' ~ "{:,.0f}".format(daily_credit),
+        icon='bi-credit-card',
+        colour='rose',
+        sub='Credit posted today',
+        cta='See credit breakdown'
+    ) }}
+    {{ ui_tile(
+        href='/current_payables',
+        label='Total Outstanding',
+        value='Rs. ' ~ "{:,.0f}".format(total_outstanding),
+        icon='bi-exclamation-circle',
+        colour='red',
+        sub='Across all open bills',
+        cta='Review unpaid bills'
+    ) }}
+    {% if current_user.can_manage_payments or current_user.role == 'admin' %}
+    {{ ui_tile(
+        href=url_for('accounts.dashboard'),
+        label='Accounts Hub',
+        value='Open',
+        icon='bi-calculator',
+        colour='violet',
+        sub='Cash + bank + transfers',
+        cta='Go to accounts'
+    ) }}
+    {% endif %}
+      {% if current_user.can_manage_payments or current_user.role == 'admin' %}
+    {{ ui_tile(
+        href=url_for('cash_flow'),
+        label='Cash Flow',
+        value='View',
+        icon='bi-water',
+        colour='indigo',
+        sub='Receipts &amp; payments report',
+        cta='Open cash flow'
+    ) }}
+    {{ ui_tile(
+        href=url_for('cash_flow_differences'),
+        label='Cash Flow Differences',
+        value='Audit',
+        icon='bi-clipboard-check',
+        colour='amber',
+        sub='Physical cash reconciliation history',
+        cta='Review differences'
+    ) }}
+    {% endif %}
+  </div>
+
+  {# === Quick actions panel (kept as actions, not KPI) === #}
+  {% if (current_user.can_view_stock or current_user.role == 'admin')
+        or (current_user.can_view_daily or current_user.role == 'admin')
+        or (current_user.can_manage_sales or current_user.role == 'admin')
+        or (current_user.can_manage_bookings or current_user.role == 'admin')
+        or (current_user.can_manage_payments or current_user.role == 'admin') %}
+  <div class="ui-card mb-4">
+    <div class="ui-card-header">
+      <h5><i class="bi bi-lightning-charge-fill text-warning"></i> Quick Actions</h5>
+    </div>
+    <div class="ui-card-body">
+      <div class="ui-quick-grid">
+        {% if current_user.can_view_stock or current_user.role == 'admin' %}
+          <a href="{{ url_for('inventory.stock_summary') }}" class="ui-quick"><i class="bi bi-graph-up"></i> Stock Summary</a>
+        {% endif %}
+        {% if current_user.can_view_daily or current_user.role == 'admin' %}
+          <a href="{{ url_for('inventory.daily_transactions') }}" class="ui-quick"><i class="bi bi-list-check"></i> Daily Breakdown</a>
+        {% endif %}
+        {% if current_user.can_manage_sales or current_user.role == 'admin' %}
+          <a href="/direct_sales" class="ui-quick"><i class="bi bi-cart-check"></i> New Sale</a>
+        {% endif %}
+        {% if current_user.can_manage_bookings or current_user.role == 'admin' %}
+          <a href="/bookings" class="ui-quick"><i class="bi bi-bookmark-plus"></i> New Booking</a>
+        {% endif %}
+        {% if current_user.can_manage_payments or current_user.role == 'admin' %}
+          <a href="/payments" class="ui-quick"><i class="bi bi-cash-stack"></i> Payments</a>
+          <a href="{{ url_for('cash_flow_differences') }}" class="ui-quick"><i class="bi bi-clipboard-check"></i> Cash Flow Differences</a>
+        {% endif %}
+        {% if current_user.can_view_client_ledger or current_user.role == 'admin' %}
+          <a href="/clients" class="ui-quick"><i class="bi bi-journal-text"></i> Client Ledger</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# === Brand stock table — every row drills to that brand's daily breakdown === #}
+  {% set _brand_toolbar %}
+    <a href="/materials" class="btn btn-sm btn-outline-secondary fw-bold">
+      <i class="bi bi-pencil-square me-1"></i> Manage Brands
+    </a>
+  {% endset %}
+  {% call ui_table_card('Current Stock by Brand', icon='bi-tags', toolbar=_brand_toolbar) %}
+    <table class="ui-table">
+      <thead>
+        <tr>
+          <th>Brand Name</th>
+          <th class="text-center">In (Total)</th>
+          <th class="text-center">Out (Total)</th>
+          <th class="num">Current Stock</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in stats %}
+          <tr data-href="{{ url_for('inventory.daily_transactions') }}?material={{ s.name|urlencode }}"
+              title="View daily breakdown for {{ s.name }}">
+            <td><strong>{{ s.name }}</strong></td>
+            <td class="text-center num pos">+{{ s.in|int }}</td>
+            <td class="text-center num neg">−{{ s.out|int }}</td>
+            <td class="num warn">
+              {{ s.stock|int }} <small class="text-muted">{{ s.unit or 'Bags' }}</small>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="ui-empty">No brand stock yet — add a Material Brand to begin.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endcall %}
+
+</div>
+{% endblock %}

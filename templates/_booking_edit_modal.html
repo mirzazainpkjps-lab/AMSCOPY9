@@ -1,0 +1,137 @@
+<div class="modal fade" id="editBookingModal{{ booking.id }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered booking-modal-dialog">
+        <form class="modal-content border-secondary ui-helper-form" style="background: #1e293b;" action="/edit_bill/Booking/{{ booking.id }}" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Edit Booking: {{ booking.manual_bill_no or 'No Bill' }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-start">
+                <div class="mb-3 position-relative">
+                    <label class="text-white-50 small fw-bold mb-1">CLIENT (NAME OR CODE)</label>
+                    <div class="input-group">
+                        <input type="text" name="client_code" id="editBookingClientCode{{ booking.id }}" value="{{ booking.client_code or booking.client_name or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Search by name or code..." autocomplete="off" required onfocus="showCombobox('editBookingClientCode{{ booking.id }}', 'editBookingCombobox{{ booking.id }}')" oninput="filterCombobox('editBookingClientCode{{ booking.id }}', 'editBookingCombobox{{ booking.id }}', 'editBookingClientNameDisplay{{ booking.id }}')">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('editBookingClientCode{{ booking.id }}', 'editBookingCombobox{{ booking.id }}')">
+                            <i class="bi bi-chevron-down text-warning"></i>
+                        </button>
+                    </div>
+                    <div id="editBookingCombobox{{ booking.id }}" class="combobox-list shadow-lg" style="display: none;">
+                        {% for client in clients %}
+                        <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="editBookingClientCode{{ booking.id }}" data-combo-display="editBookingClientNameDisplay{{ booking.id }}">
+                            <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                            <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="editBookingClientNameDisplay{{ booking.id }}" class="text-info small mt-1 fw-bold">Name: {{ booking.client_name }}</div>
+                </div>
+                <div class="booking-item-header d-none d-md-grid mb-2 px-2 text-white-50 small fw-bold">
+                    <div class="text-center">MATERIAL</div>
+                    <div class="text-center">QTY</div>
+                    <div class="text-center">UNIT PRICE</div>
+                    <div class="text-center">ITEM TOTAL</div>
+                    <div class="text-center">REMOVE</div>
+                </div>
+                <div class="items-container-edit">
+                    {% for item in booking.items %}
+                    <div class="compact-item-row mb-3 p-2 rounded border border-secondary bg-dark">
+                        <input type="hidden" name="booking_item_id[]" value="{{ item.id }}">
+                        <div class="booking-item-grid">
+                            <div class="position-relative">
+                                <input type="hidden" name="material_id[]" class="material-id-input" value="{% for mat in materials or [] %}{% if mat.name|lower == item.material_name|lower %}{{ mat.id }}{% endif %}{% endfor %}">
+                                <input type="text" name="material_name[]" class="form-control form-control-sm bg-dark text-white border-secondary price-trigger" value="{{ item.material_name }}" placeholder="Search material..." autocomplete="off" required data-selected-material-name="{{ item.material_name }}" data-combo-suppress="1">
+                            </div>
+                            <div>
+                                <div class="input-group input-group-sm">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="changeQty(this, -1)">-</button>
+                                    <input type="number" step="any" name="qty[]" value="{{ item.qty }}" class="form-control bg-dark text-white border-secondary text-center qty-input" required>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="changeQty(this, 1)">+</button>
+                                </div>
+                            </div>
+                            <div>
+                                <input type="number" step="any" name="unit_rate[]" class="form-control form-control-sm bg-dark text-white border-secondary rate-input" value="{{ item.price_at_time }}" required>
+                            </div>
+                            <div>
+                                <input type="number" step="any" class="form-control form-control-sm bg-dark text-info border-secondary text-center line-total" value="{{ (item.qty or 0) * (item.price_at_time or 0) }}" readonly tabindex="-1">
+                            </div>
+                            <div class="text-center">
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeItemRow(this)" title="Remove item">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-warning mb-3 w-100" onclick="addItemRowEdit(this)">+ Add More Items</button>
+
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">TOTAL AMOUNT</label>
+                        <input type="number" step="any" name="amount" class="form-control bg-dark text-white border-secondary total-amount" value="{{ booking.amount }}" required readonly>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">PAID AMOUNT</label>
+                        <input type="number" step="0.01" name="paid_amount" class="form-control bg-dark text-white border-secondary" value="{{ booking.paid_amount }}">
+                    </div>
+                </div>
+                <div class="row booking-account-row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">RECEIVE METHOD</label>
+                        <select name="payment_method" class="form-select bg-dark text-white border-secondary booking-pay-method">
+                            <option value="Cash" selected>Cash</option>
+                            <option value="Bank">Bank</option>
+                        </select>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">RECEIVE INTO ACCOUNT</label>
+                        <select name="payment_account_id" class="form-select bg-dark text-white border-secondary booking-pay-account">
+                            <option value="">Keep existing / none</option>
+                            {% for account in accounts or [] %}
+                            <option value="{{ account.id }}" data-cat="{{ account.category or '' }}" {% if booking.receive_in_account_id == account.id %}selected{% endif %}>{{ account.name }}{% if account.bank_name %} ({{ account.bank_name }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-white-50">Needed only when increasing Paid Amount.</small>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">BOOKING DATE & TIME</label>
+                    <input type="datetime-local" name="date" class="form-control bg-dark text-white border-secondary" value="{{ booking.date_posted.strftime('%Y-%m-%dT%H:%M') if booking.date_posted else '' }}">
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">DISCOUNT (LOSS)</label>
+                        <input type="number" step="any" min="0" name="discount" class="form-control bg-dark text-white border-secondary" value="{{ booking.discount or 0 }}">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">DISCOUNT REASON</label>
+                        <input type="text" name="discount_reason" class="form-control bg-dark text-white border-secondary" value="{{ booking.discount_reason or '' }}" placeholder="Optional reason">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">AUTO BILL NO</label>
+                    <input type="text" class="form-control bg-dark text-white border-secondary" value="{{ booking.auto_bill_no or '' }}" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">MANUAL BILL NO</label>
+                    <input type="text" name="manual_bill_no" class="form-control bg-dark text-white border-secondary" value="{{ booking.manual_bill_no }}">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">UPDATE PHOTO</label>
+                    <input type="file" name="photo" class="form-control bg-dark text-white border-secondary" accept="image/*">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">UPDATE URL</label>
+                    <input type="url" name="photo_url" class="form-control bg-dark text-white border-secondary" value="{{ booking.photo_url or '' }}" placeholder="https://...">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">NOTES</label>
+                    <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Add booking notes...">{{ booking.note or '' }}</textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning text-dark fw-bold w-100 py-2 rounded-pill">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>

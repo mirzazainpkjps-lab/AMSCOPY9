@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="fw-bold text-warning mb-0"><i class="bi bi-clipboard2-pulse me-2"></i>System Report</h2>
+        <p class="text-white-50 small mb-0">Data integrity and consistency diagnostics.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('fix_system_issues') }}" class="btn btn-outline-warning btn-sm fw-bold"><i class="bi bi-wrench me-1"></i> Auto-Fix Issues</a>
+        <a href="{{ url_for('settings') }}" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card border-secondary bg-dark text-center py-3">
+            <div class="fs-2 fw-bold {{ 'text-danger' if report.sync_issues else 'text-success' }}">{{ report.sync_issues|length }}</div>
+            <div class="small text-white-50">Sync Issues</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-secondary bg-dark text-center py-3">
+            <div class="fs-2 fw-bold {{ 'text-danger' if report.stock_issues else 'text-success' }}">{{ report.stock_issues|length }}</div>
+            <div class="small text-white-50">Stock Discrepancies</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-secondary bg-dark text-center py-3">
+            <div class="fs-2 fw-bold text-warning">{{ report.unpaid_count }}</div>
+            <div class="small text-white-50">Unpaid Bills</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-secondary bg-dark text-center py-3">
+            <div class="fs-2 fw-bold {{ 'text-danger' if report.zero_amount_bills else 'text-success' }}">{{ report.zero_amount_bills }}</div>
+            <div class="small text-white-50">Zero-Amount Bills</div>
+        </div>
+    </div>
+</div>
+
+{% if report.sync_issues %}
+<div class="card border-danger bg-dark shadow-sm mb-3">
+    <div class="card-header bg-transparent border-danger py-2 d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+        <span class="fw-bold text-white">Sync Issues ({{ report.sync_issues|length }})</span>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-dark table-hover mb-0 small">
+            <thead><tr><th class="ps-3">Type</th><th>Description</th></tr></thead>
+            <tbody>
+            {% for issue in report.sync_issues %}
+            <tr>
+                <td class="ps-3"><span class="badge bg-danger">{{ issue.type }}</span></td>
+                <td class="text-white-50">{{ issue.desc }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-check-circle-fill"></i> No sync issues found. Bills and dispatch entries are consistent.
+</div>
+{% endif %}
+
+{% if report.stock_issues %}
+<div class="card border-warning bg-dark shadow-sm mb-3">
+    <div class="card-header bg-transparent border-warning py-2 d-flex align-items-center gap-2">
+        <i class="bi bi-box-seam text-warning"></i>
+        <span class="fw-bold text-white">Stock Discrepancies ({{ report.stock_issues|length }})</span>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-dark table-hover mb-0 small">
+            <thead><tr><th class="ps-3">Material</th><th>DB Stock</th><th>Calculated Stock</th><th>Difference</th></tr></thead>
+            <tbody>
+            {% for issue in report.stock_issues %}
+            <tr>
+                <td class="ps-3 fw-bold text-white">{{ issue.material }}</td>
+                <td>{{ issue.db_stock }}</td>
+                <td>{{ issue.calc_stock }}</td>
+                <td class="{{ 'text-danger' if issue.diff != 0 else 'text-success' }}">{{ issue.diff }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-check-circle-fill"></i> No stock discrepancies found. All material balances match.
+</div>
+{% endif %}
+{% endblock %}

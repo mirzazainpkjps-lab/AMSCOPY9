@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold text-success"><i class="bi bi-plus-circle me-2"></i>Stock Receiving</h2>
+    <p class="text-white-50">Log incoming material from suppliers into the inventory.</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-lg" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 20px;">
+            <div class="card-body p-4">
+                <form action="/add_record" method="POST">
+                    <input type="hidden" name="type" value="IN">
+                    
+                    <div class="mb-4">
+                        <label class="small fw-bold text-white-50 text-uppercase mb-2">Material Brand</label>
+                        <div class="position-relative">
+                            <input type="text" name="material" id="receivingMaterialSearch" class="form-control bg-dark text-white border-secondary py-3 fs-5" placeholder="Type brand name..." autocomplete="off" required onfocus="showCombobox('receivingMaterialSearch', 'receivingMaterialList')" oninput="filterCombobox('receivingMaterialSearch', 'receivingMaterialList', 'receivingMaterialDisplay')">
+                            <div id="receivingMaterialList" class="combobox-list shadow-lg" style="display: none;">
+                                {% for m in materials %}
+                                <div class="combobox-item" data-combo-code="{{ m.name }}" data-combo-name="{{ m.name }}" data-combo-input="receivingMaterialSearch" data-combo-display="receivingMaterialDisplay">
+                                    <span class="fw-bold text-warning">{{ m.name }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div id="receivingMaterialDisplay" class="text-info small mt-1 fw-bold"></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-white-50 text-uppercase mb-2">Quantity (Bags)</label>
+                            <input type="number" name="qty" class="form-control bg-dark text-white border-secondary py-3 fs-4 fw-bold" placeholder="0" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-white-50 text-uppercase mb-2">Bill / Invoice No.</label>
+                            <input type="text" name="bill_no" class="form-control bg-dark text-white border-secondary py-3 fs-5" placeholder="Optional">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="small fw-bold text-white-50 text-uppercase mb-2">Nimbus Number</label>
+                        <input type="text" name="nimbus_no" class="form-control bg-dark text-white border-secondary py-3 fs-5" placeholder="Optional reference">
+                    </div>
+
+                    <div class="p-3 bg-dark rounded border border-secondary mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-white-50 small fw-bold">Transaction Date:</span>
+                            <input type="date" name="date" class="form-control bg-dark text-white border-0 p-0 text-end fw-bold datepicker" style="width: auto;" value="{{ today_date }}">
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="reset" class="btn btn-outline-secondary w-50 py-3 rounded-pill fw-bold">Reset</button>
+                        <button type="submit" class="btn btn-success w-50 py-3 rounded-pill fw-bold shadow"><i class="bi bi-check2-all me-2"></i> Confirm</button>
+                    </div>
+                    <a href="/" class="btn btn-link w-100 text-white-50 text-decoration-none mt-2 small">Cancel and Return</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('current_date').innerText = new Date().toLocaleDateString('en-US', { 
+        month: 'long', day: 'numeric', year: 'numeric' 
+    });
+</script>
+{% endblock %}

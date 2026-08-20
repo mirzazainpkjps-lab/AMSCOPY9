@@ -1,0 +1,158 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold text-white mb-0">
+            {% if type == 'cash' %}
+                <span class="text-success">Cash Received</span> Details
+            {% else %}
+                <span class="text-danger">Due Amount</span> Details
+            {% endif %}
+        </h2>
+        <p class="text-white-50 mb-0 d-flex align-items-center gap-2">
+            <span>Detailed transaction breakdown</span>
+            <span class="badge bg-warning text-dark">Filtered: {{ transactions|length }}</span>
+        </p>
+    </div>
+    <a href="/" class="btn btn-outline-light rounded-pill px-4"><i class="bi bi-arrow-left me-2"></i>Back to Dashboard</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-body p-4">
+        <form method="get" class="row g-3">
+            <input type="hidden" name="type" value="{{ type }}">
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">Start Date</label>
+                <input type="date" name="start_date" class="form-control bg-dark text-white border-secondary" value="{{ start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">End Date</label>
+                <input type="date" name="end_date" class="form-control bg-dark text-white border-secondary" value="{{ end_date }}">
+            </div>
+            <div class="col-md-3 position-relative">
+                <label class="form-label text-white-50 small">Client Name/Code</label>
+                <div class="input-group">
+                    <input type="text" name="client" id="finFilterClient" class="form-control bg-dark text-white border-secondary" value="{{ client }}" placeholder="Search client..." autocomplete="off" onfocus="showCombobox('finFilterClient', 'finFilterClientList')" oninput="filterCombobox('finFilterClient', 'finFilterClientList', 'finFilterClientDisplay')">
+                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('finFilterClient', 'finFilterClientList')"><i class="bi bi-chevron-down text-warning"></i></button>
+                </div>
+                <div id="finFilterClientList" class="combobox-list shadow-lg" style="display:none;">
+                    {% for c in clients %}
+                    <div class="combobox-item" data-combo-code="{{ c.code }}" data-combo-name="{{ c.name }}" data-combo-input="finFilterClient" data-combo-display="finFilterClientDisplay">
+                        <span class="fw-bold text-warning code-span">{{ c.code }}</span>
+                        <span class="ms-2 text-white-50 small name-span">{{ c.name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="finFilterClientDisplay" class="text-info small mt-1 fw-bold"></div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-2"></i>Apply Filters</button>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">Min Amount</label>
+                <input type="number" name="min_price" class="form-control bg-dark text-white border-secondary" value="{{ min_price if min_price is not none }}" placeholder="0">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50 small">Max Amount</label>
+                <input type="number" name="max_price" class="form-control bg-dark text-white border-secondary" value="{{ max_price if max_price is not none }}" placeholder="Max">
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0 financial-details-table table-stack-cards">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="ps-4 py-3 text-white-50 fd-col-date">Date</th>
+                    <th class="py-3 text-white-50">Client</th>
+                    <th class="py-3 text-white-50">Type</th>
+                    <th class="py-3 text-white-50 fd-col-ref">Reference</th>
+                    <th class="py-3 text-end pe-4 text-white-50">Amount</th>
+                </tr>
+            </thead>
+            <tbody style="background: #1e293b;">
+                {% for t in transactions %}
+                <tr style="border-bottom: 1px solid #334155;">
+                    <td class="ps-4 py-3 fd-date-cell" data-label="Date">
+                        <div class="fd-date-main">{{ t.date.strftime('%Y-%m-%d') if t.date else '' }}</div>
+                        <div class="fd-date-sub">{{ t.date.strftime('%H:%M') if t.date and t.date.strftime is defined else '' }}</div>
+                    </td>
+                    <td class="fw-bold text-white" data-label="Client">{{ t.client }}</td>
+                    <td data-label="Type">
+                        <span class="badge bg-opacity-10 {{ 'bg-success text-success' if type == 'cash' else 'bg-warning text-warning' }} px-3 py-2 rounded-pill">
+                            {{ t.type }}
+                        </span>
+                    </td>
+                    <td class="text-white-50 fd-ref-cell" data-label="Reference">{{ t.ref }}</td>
+                    <td class="text-end pe-4 fw-bold fs-5 {{ 'text-success' if type == 'cash' else 'text-danger' }}" data-label="Amount">
+                        Rs. {{ "{:,.0f}".format(t.amount) }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-white-50 stack-no-label">No transactions found for the selected criteria.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot style="background: #0f172a;">
+                <tr>
+                    <td colspan="4" class="text-end py-3 fw-bold text-white stack-no-label">TOTAL</td>
+                    <td class="text-end pe-4 fw-bold fs-4 text-white">
+                        {% set total = transactions|sum(attribute='amount') %}
+                        Rs. {{ "{:,.0f}".format(total) }}
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<style>
+.financial-details-table {
+    table-layout: fixed;
+    width: 100%;
+}
+.financial-details-table .fd-col-date {
+    width: 96px;
+}
+.financial-details-table .fd-col-ref {
+    width: 32%;
+}
+.financial-details-table .fd-date-cell {
+    white-space: nowrap;
+    line-height: 1.1;
+}
+.financial-details-table .fd-date-main {
+    font-size: 0.78rem;
+}
+.financial-details-table .fd-date-sub {
+    font-size: 0.72rem;
+    opacity: 0.9;
+}
+.financial-details-table .fd-ref-cell {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.2;
+}
+
+/* Tablet / small desktop: let the fixed columns scroll instead of crushing. */
+@media (min-width: 768px) and (max-width: 1199.98px) {
+    .financial-details-table {
+        min-width: 720px;
+    }
+}
+
+/* Mobile: readable date text inside the stacked cards. */
+@media (max-width: 767.98px) {
+    .financial-details-table .fd-date-main {
+        font-size: 0.95rem;
+    }
+    .financial-details-table .fd-date-sub {
+        font-size: 0.82rem;
+        margin-top: 2px;
+    }
+}
+</style>
+{% endblock %}

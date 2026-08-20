@@ -1,0 +1,844 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="ledger-print-area">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+        <h2 class="mb-1 text-warning">Client Ledger: {{ client.name }}</h2>
+        <span class="badge bg-dark border border-secondary text-info">Client Code: {{ client.code or 'N/A' }}</span>
+        <div class="small mt-2 {{ 'text-danger' if (client.opening_balance or 0) > 0 else ('text-success' if (client.opening_balance or 0) < 0 else 'text-white-50') }}">
+            Opening Balance: {{ "{:,.2f}".format(client.opening_balance or 0) }}
+            {% set _obd = client.opening_balance_date or client.created_at %}
+            {% if _obd %} on {{ _obd.strftime('%Y-%m-%d') }}{% endif %}
+            {% if (client.opening_balance or 0) > 0 %}(Pending Due){% elif (client.opening_balance or 0) < 0 %}(Advance/Credit){% endif %}
+        </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap ledger-toolbar">
+        <button class="btn btn-outline-info d-print-none btn-sm" data-bs-toggle="modal" data-bs-target="#openingBalanceModal">
+            <i class="bi bi-wallet2"></i> Set Opening Balance
+        </button>
+        <form action="{{ url_for('client_toggle_active', client_id=client.id) }}" method="POST" class="d-print-none">
+            {% if client.is_active %}
+            <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Suspend this client? Deliveries will be blocked.');">
+                <i class="bi bi-pause-circle me-1"></i> Suspend Delivery
+            </button>
+            {% else %}
+            <button class="btn btn-outline-success btn-sm" onclick="return confirm('Re-activate this client? Deliveries will be allowed.');">
+                <i class="bi bi-play-circle me-1"></i> Resume Delivery
+            </button>
+            {% endif %}
+        </form>
+        <button class="btn btn-outline-warning d-print-none btn-sm" data-bs-toggle="modal" data-bs-target="#cancelBookingModal">
+            <i class="bi bi-x-octagon me-1"></i> Cancel Remaining Booking
+        </button>
+        <a href="{{ url_for('download_client_clearance', id=client.id) }}" class="btn btn-outline-success d-print-none btn-sm fw-bold">
+            <i class="bi bi-file-earmark-text me-1"></i> Clearance Statement
+        </a>
+        <a href="{{ url_for('payments_page', party='customer', client=client.code or client.name) }}" class="btn btn-outline-info d-print-none btn-sm fw-bold">
+            <i class="bi bi-cash-coin me-1"></i> Pay Remaining
+        </a>
+        <a href="{{ url_for('download_full_client_history', id=client.id) }}" class="btn btn-warning d-print-none btn-sm text-dark fw-bold">
+            <i class="bi bi-file-earmark-pdf me-1"></i> Download Full History PDF
+        </a>
+        <a href="{{ url_for('download_client_ledger', id=client.id) }}?action=print" target="_blank" class="btn btn-outline-primary d-print-none btn-sm"><i class="bi bi-printer"></i> Print</a>
+        <a href="{{ url_for('clients') }}" class="btn btn-outline-secondary btn-sm d-print-none">Back</a>
+    </div>
+</div>
+
+<div class="modal fade" id="openingBalanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form action="{{ url_for('client_opening_balance', id=client.id) }}" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold mb-0">Set Opening Balance</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="text-white-50 small fw-bold mb-1">OPENING BALANCE</label>
+                <input type="number" step="0.01" name="opening_balance" class="form-control bg-dark text-white border-secondary" value="{{ '%.2f'|format(client.opening_balance or 0) }}" required>
+                <small class="text-white-50">Use + for pending due, - for advance/credit.</small>
+                <label class="text-white-50 small fw-bold mb-1 mt-3">OPENING BALANCE DATE</label>
+                <input type="date" name="opening_balance_date" class="form-control bg-dark text-white border-secondary" value="{{ (client.opening_balance_date or client.created_at).strftime('%Y-%m-%d') if (client.opening_balance_date or client.created_at) else '' }}" required>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning text-dark fw-bold w-100">Update Opening Balance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="cancelBookingModal" tabindex="-1" aria-labelledby="cancelBookingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-secondary" style="background: #0f172a;">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-warning fw-bold" id="cancelBookingModalLabel">
+                    Cancel Remaining Booking (LIFO)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <div class="p-3 rounded border border-secondary bg-dark h-100">
+                            <div class="text-white-50 small">Current Balance</div>
+                            <div class="text-white fw-bold fs-5">{{ "{:,.2f}".format(total_balance) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded border border-secondary bg-dark h-100">
+                            <div class="text-white-50 small">Cancel Value</div>
+                            <div class="text-warning fw-bold fs-5">{{ "{:,.2f}".format(cancel_total or 0) }}</div>
+                            <div class="text-white-50 small mt-1">Total Remaining Qty: {{ "{:,.2f}".format(cancel_total_qty or 0) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded border border-secondary bg-dark h-100">
+                            <div class="text-white-50 small">Balance After Cancel</div>
+                            <div class="fw-bold fs-5 {% if cancel_new_balance < 0 %}text-success{% elif cancel_new_balance > 0 %}text-danger{% else %}text-info{% endif %}">
+                                {{ "{:,.2f}".format(cancel_new_balance or 0) }}
+                            </div>
+                            {% if cancel_company_due > 0 %}
+                            <div class="text-success small mt-1">Pay back to client: {{ "{:,.2f}".format(cancel_company_due) }}</div>
+                            {% elif cancel_client_due > 0 %}
+                            <div class="text-danger small mt-1">Client has to pay: {{ "{:,.2f}".format(cancel_client_due) }}</div>
+                            {% else %}
+                            <div class="text-info small mt-1">Settled</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if cancel_rows and cancel_rows|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0">
+                        <thead style="background: #020617;">
+                            <tr>
+                                <th class="ps-3 text-center">
+                                    <input type="checkbox" class="form-check-input" id="cancelSelectAll{{ client.id }}" checked
+                                           onclick="toggleCancelRows{{ client.id }}(this.checked)">
+                                </th>
+                                <th class="ps-3">Material</th>
+                                <th>Booking Date</th>
+                                <th>Bill #</th>
+                                <th class="text-end">Remaining Qty</th>
+                                <th class="text-end">Rate</th>
+                                <th class="text-end pe-3">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in cancel_rows %}
+                            <tr style="border-bottom: 1px solid #334155;">
+                                <td class="ps-3 text-center">
+                                    <input type="checkbox"
+                                           class="form-check-input cancel-row-check-{{ client.id }}"
+                                           data-item-id="{{ row.item_id }}"
+                                           value="{{ row.item_id }}"
+                                           checked>
+                                </td>
+                                <td class="ps-3 fw-bold text-white">{{ row.material }}</td>
+                                <td class="text-white-50">{{ row.booking_date }}</td>
+                                <td>
+                                    {% if row.bill_no %}
+                                    <span class="badge bg-dark border border-secondary text-warning">{{ row.bill_no }}</span>
+                                    {% else %}
+                                    <span class="badge bg-dark border border-secondary text-white-50">---</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end text-info fw-bold">{{ "{:,.2f}".format(row.qty_remaining or 0) }}</td>
+                                <td class="text-end text-white-50">{{ "{:,.2f}".format(row.rate or 0) }}</td>
+                                <td class="text-end pe-3 text-warning fw-bold">{{ "{:,.2f}".format(row.amount or 0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-white-50">No remaining booking items to cancel.</div>
+                {% endif %}
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <form id="cancelBookingForm{{ client.id }}" action="{{ url_for('client_booking_cancel', client_id=client.id) }}" method="POST">
+                    <input type="hidden" name="has_selection_ui" value="1">
+                    <input type="hidden" name="selected_item_ids_csv" id="selectedCancelIds{{ client.id }}" value="">
+                    <button type="submit" class="btn btn-warning text-dark fw-bold"
+                            {% if not cancel_rows or cancel_rows|length == 0 %}disabled{% endif %}
+                            onclick="return submitCancelSelection{{ client.id }}();">
+                        Confirm Cancel
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function toggleCancelRows{{ client.id }}(checked) {
+    document.querySelectorAll('.cancel-row-check-{{ client.id }}').forEach(el => { el.checked = !!checked; });
+}
+function submitCancelSelection{{ client.id }}() {
+    const checked = Array.from(document.querySelectorAll('.cancel-row-check-{{ client.id }}:checked'))
+        .map(el => (el.getAttribute('data-item-id') || '').trim())
+        .filter(Boolean);
+    if (!checked.length) {
+        alert('Select at least one material row to cancel.');
+        return false;
+    }
+    const target = document.getElementById('selectedCancelIds{{ client.id }}');
+    if (target) target.value = checked.join(',');
+    return confirm('Confirm cancellation of selected booking items? This will update booking balances.');
+}
+</script>
+
+<!-- Financial Ledger Section -->
+<div class="card border-0 shadow-sm mb-4 financial-ledger-card" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-header border-bottom border-secondary py-3 d-flex justify-content-between align-items-center" style="background: #0f172a;">
+        <h5 class="mb-0 text-success fw-bold"><i class="bi bi-cash-coin me-2"></i>Financial Transaction Ledger</h5>
+        <span class="badge bg-success text-white">{{ financial_history|length }} Transactions</span>
+    </div>
+    <div class="table-responsive ledger-table-wrap">
+        <table class="table table-dark table-hover align-middle mb-0 financial-ledger-table table-stack-cards">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50 ledger-col-date">Date</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50 ledger-col-desc">Description</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50 ledger-col-bill">Bill #</th>
+                    <th class="fw-bold py-3 text-end border-bottom border-secondary text-white-50">Due Amount</th>
+                    <th class="fw-bold py-3 text-end border-bottom border-secondary text-white-50">Paid Amount</th>
+                    <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Pending Amount</th>
+                    <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50 ledger-col-actions">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in financial_history %}
+                <tr style="border-bottom: 1px solid #334155;">
+                    {% set _dtxt = (t.date_display or t.date|string) %}
+                    <td class="ps-4 py-3 small text-white-50 ledger-date-cell" data-label="Date">
+                        <div class="ledger-date-main">{{ _dtxt[:10] }}</div>
+                        <div class="ledger-date-sub">{{ _dtxt[11:16] if _dtxt|length > 15 else '' }}</div>
+                    </td>
+                    <td class="ledger-desc-cell" data-label="Description">
+                        {% if t.is_cancel_entry %}
+                        <span class="text-info fw-bold">{{ t.description }}</span>
+                        <div class="small text-warning mt-1">
+                            <span class="badge bg-warning text-dark me-1">Audit</span>
+                            Cancellation value posted in Paid Amount
+                            {% if t.cancel_amount is not none %}
+                            | Value Rs. {{ "{:,.3f}".format(t.cancel_amount).rstrip('0').rstrip('.') }}
+                            {% endif %}
+                        </div>
+                        {% elif t.type and t.id %}
+                        <a href="{{ url_for('view_bill_detail', type=t.type, id=t.id) }}" class="text-decoration-none text-info fw-bold">
+                            {{ t.description }}
+                        </a>
+                        {% else %}
+                        <span class="text-info fw-bold">{{ t.description }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="ledger-bill-cell" data-label="Bill #">
+                        {% if t.bill_no %}
+                        <a href="{{ url_for('view_bill', bill_no=t.bill_no|replace('#', '%23')) }}" class="badge bg-dark border border-secondary text-warning text-decoration-none">{{ t.bill_no }}</a>
+                        {% else %}
+                        <span class="badge bg-dark border border-secondary text-white-50">---</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end text-danger fw-bold" data-label="Due Amount">{{ "{:,.3f}".format(t.debit).rstrip('0').rstrip('.') if t.debit > 0 else '---' }}</td>
+                    <td class="text-end text-success fw-bold" data-label="Paid Amount">{{ "{:,.3f}".format(t.credit).rstrip('0').rstrip('.') if t.credit > 0 else '---' }}</td>
+                    <td class="text-end pe-4 fw-bold text-white" data-label="Pending">{{ "{:,.3f}".format(t.balance).rstrip('0').rstrip('.') }}</td>
+                    <td class="text-end pe-4 ledger-actions-cell stack-actions-cell" data-label="Actions">
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Action
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end border-secondary shadow-sm">
+                                {% if t.is_cancel_entry and t.id %}
+                                <li>
+                                    <form action="{{ url_for('client_booking_cancel_revert', client_id=client.id, entry_id=t.id) }}" method="POST" onsubmit="return confirm('Revert this cancellation row? It will add this qty back to booking.');">
+                                        <button type="submit" class="dropdown-item text-success fw-bold">
+                                            <i class="bi bi-arrow-counterclockwise me-2"></i>Revert Cancel
+                                        </button>
+                                    </form>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                {% endif %}
+                                {% if t.type and t.id and not t.is_cancel_entry %}
+                                <li>
+                                    <a class="dropdown-item action-item-view" href="{{ url_for('view_bill_detail', type=t.type, id=t.id) }}">
+                                        <i class="bi bi-eye me-2"></i>View Detail
+                                    </a>
+                                </li>
+                                {% endif %}
+                                {% if t.bill_no %}
+                                <li>
+                                    <a class="dropdown-item action-item-download" href="{{ url_for('download_invoice', bill_no=t.bill_no|replace('#', '%23')) }}">
+                                        <i class="bi bi-download me-2"></i>Download PDF
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item action-item-print" target="_blank" href="{{ url_for('download_invoice', bill_no=t.bill_no|replace('#', '%23'), action='print') }}">
+                                        <i class="bi bi-printer me-2"></i>Print PDF
+                                    </a>
+                                </li>
+                                {% endif %}
+                                {% if t.type in ['Booking', 'Payment', 'DirectSale'] and t.id %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button type="button" class="dropdown-item text-warning" data-bs-toggle="modal" data-bs-target="#editTransactionModal{{ t.type }}{{ t.id }}">
+                                        <i class="bi bi-pencil me-2"></i>Edit Transaction
+                                    </button>
+                                </li>
+                                <li>
+                                    <form action="{{ url_for('delete_transaction', type=t.type, id=t.id) }}" method="POST" onsubmit="return confirm('Permanently delete this transaction?');">
+                                        <button type="submit" class="dropdown-item action-item-void">
+                                            <i class="bi bi-trash me-2"></i>Delete Transaction
+                                        </button>
+                                    </form>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if not financial_history %}
+        <div class="p-5 text-center text-white-50">No financial transactions found.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Material Transaction Ledger -->
+    <div class="col-lg-12">
+        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+            <div class="card-header border-bottom border-secondary py-3 d-flex justify-content-between align-items-center" style="background: #0f172a;">
+                <h5 class="mb-0 text-info fw-bold d-flex align-items-center gap-2">
+                    <span><i class="bi bi-box-seam me-2"></i>Material Transaction Ledger (Deliveries)</span>
+                    {% if unresolved_dispatches %}
+                    <span class="badge bg-warning text-dark">Unconfirmed: {{ unresolved_dispatches|length }}</span>
+                    {% endif %}
+                </h5>
+                <span class="badge bg-info text-dark">{{ material_history|length }} Records</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0 table-stack-cards">
+                    <thead style="background: #020617;">
+                        <tr>
+                            <th class="ps-3">Date</th>
+                            <th>Bill #</th>
+                            <th>Material</th>
+                            <th class="text-end">Qty Added</th>
+                            <th class="text-end">Dispatched</th>
+                            <th class="text-end pe-3">Total Remaining</th>
+                            <th class="text-end pe-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for material_name, items in material_history_grouped.items() %}
+                        <tr style="background: #0b1220; border-top: 2px solid #334155; border-bottom: 1px solid #334155;">
+                            <td class="ps-3 py-2 fw-bold text-info stack-card-heading" colspan="7">
+                                Material: {{ material_name }} <span class="text-white-50">({{ items|length }} rows)</span>
+                            </td>
+                        </tr>
+                            {% for m in items %}
+                            <tr style="border-bottom: 1px solid #334155;">
+                                <td class="ps-3 small" data-label="Date">{{ m.date }}</td>
+                                <td data-label="Bill #">
+                                    {% if m.bill_no %}
+                                    <a href="{{ url_for('view_bill', bill_no=m.bill_no|replace('#', '%23')) }}" class="badge bg-dark border border-secondary text-warning text-decoration-none">{{ m.bill_no }}</a>
+                                    {% else %}
+                                    <span class="badge bg-dark border border-secondary text-white-50">---</span>
+                                    {% endif %}
+                                    <br><small class="text-white-50">{{ m.nimbus_no or '' }}</small>
+                                </td>
+                                <td class="fw-bold" data-label="Material">
+                                    {{ m.material_display or m.material }}
+                                    {% if m.type == 'Cancel' or m.nimbus_no == 'Booking Cancel' %}
+                                    <span class="badge bg-danger ms-2">CANCELLED</span>
+                                    {% elif m.type == 'Booking' or m.nimbus_no == 'Booking' %}
+                                    <span class="badge bg-success ms-2">BOOKING ADDED</span>
+                                    {% endif %}
+                                </td>
+                                {% if m.type == 'Cancel' or m.nimbus_no == 'Booking Cancel' %}
+                                <td class="text-end text-warning fw-bold" data-label="Qty Added">booking cancelled</td>
+                                <td class="text-end text-warning fw-bold" data-label="Dispatched">{{ "{:,.3f}".format(m.qty_dispatched or 0).rstrip('0').rstrip('.') if m.qty_dispatched > 0 else '---' }}</td>
+                                <td class="text-end pe-3 fw-bold text-info" data-label="Total Remaining">{{ "{:,.3f}".format(m.balance or 0).rstrip('0').rstrip('.') }}</td>
+                                {% else %}
+                                <td class="text-end text-success fw-bold" data-label="Qty Added">{{ "{:,.3f}".format(m.qty_added or 0).rstrip('0').rstrip('.') if m.qty_added > 0 else '---' }}</td>
+                                <td class="text-end text-danger fw-bold" data-label="Dispatched">{{ "{:,.3f}".format(m.qty_dispatched or 0).rstrip('0').rstrip('.') if m.qty_dispatched > 0 else '---' }}</td>
+                                <td class="text-end pe-3 fw-bold text-info" data-label="Total Remaining">{{ "{:,.3f}".format(m.balance or 0).rstrip('0').rstrip('.') }}</td>
+                                {% endif %}
+                                <td class="text-end pe-3 stack-actions-cell" data-label="Actions">
+                                    {% if m.source_type == 'Booking' and m.source_id %}
+                                    <a href="{{ url_for('view_bill_detail', type='Booking', id=m.source_id) }}" class="btn btn-sm btn-outline-info me-1" title="View"><i class="bi bi-eye"></i></a>
+                                    <form action="{{ url_for('delete_transaction', type='Booking', id=m.source_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this booking?');">
+                                        <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                    {% elif m.source_id and (m.source_type == 'Entry' or m.type == 'Cancel' or m.nimbus_no == 'Booking Cancel') %}
+                                    {% if m.type == 'Cancel' or m.nimbus_no == 'Booking Cancel' %}
+                                    <form action="{{ url_for('client_booking_cancel_revert', client_id=client.id, entry_id=m.source_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Revert this cancellation row? It will add this qty back to booking.');">
+                                        <button class="btn btn-sm btn-success me-1" title="Revert Cancel">
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Revert Cancel
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    <form action="{{ url_for('delete_transaction', type='Entry', id=m.source_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this entry?');">
+                                        <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                    {% endif %}
+                                    {% if m.bill_no %}
+                                    <a href="{{ url_for('download_invoice', bill_no=m.bill_no|replace('#', '%23')) }}" class="btn btn-sm btn-outline-warning ms-1" title="Download"><i class="bi bi-download"></i></a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if not material_history %}
+                <div class="p-5 text-center text-white-50">No material transactions found.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Bills Section -->
+    <div class="col-lg-12">
+        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+            <div class="card-header border-bottom border-secondary py-3 d-flex justify-content-between align-items-center" style="background: #0f172a;">
+                <h5 class="mb-0 text-warning fw-bold"><i class="bi bi-clock-history me-2"></i>Bills (Pending Section)</h5>
+                <span class="badge bg-warning text-dark">{{ pending_bills|length }} Records</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0 table-stack-cards">
+                    <thead style="background: #020617;">
+                        <tr>
+                            <th class="ps-3">Bill #</th>
+                            <th class="text-end">Amount</th>
+                            <th>Status</th>
+                            <th class="pe-3">Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in pending_bills %}
+                        <tr style="border-bottom: 1px solid #334155;">
+                            <td class="ps-3 fw-bold" data-label="Bill #">
+                                {% if b.bill_no %}
+                                <a href="{{ url_for('view_bill', bill_no=b.bill_no|replace('#', '%23')) }}" class="text-warning text-decoration-none">{{ b.bill_no }}</a>
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-danger fw-bold" data-label="Amount">{{ "{:,.0f}".format(b.amount) }}</td>
+                            <td data-label="Status">
+                                {% if b.is_paid %}
+                                <span class="badge bg-success">Paid</span>
+                                {% else %}
+                                <span class="badge bg-danger">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td class="pe-3 small text-white-50" data-label="Reason" title="{{ b.reason }}">{{ b.reason[:50] }}{% if b.reason|length > 50 %}...{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if not pending_bills %}
+                <div class="p-5 text-center text-white-50">No pending bills found.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modals for Transaction Types -->
+{% for key, txn in transactions_map.items() %}
+    {% if key.startswith('Payment') %}
+    <div class="modal fade" id="editTransactionModal{{ key }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <form action="{{ url_for('edit_ledger_transaction', trans_type='Payment', trans_id=txn.id) }}" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+                <div class="modal-header border-0">
+                    <h5 class="text-warning fw-bold mb-0">Edit Payment</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Client</label>
+                            <input type="text" name="client_name" class="form-control bg-dark text-white border-secondary" value="{{ txn.client_name }}" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Amount *</label>
+                            <input type="number" step="0.01" name="amount" class="form-control bg-dark text-white border-secondary" value="{{ '%.2f'|format(txn.amount or 0) }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Method</label>
+                            <select name="method" class="form-select bg-dark text-white border-secondary">
+                                <option value="Cash" {{ 'selected' if txn.method == 'Cash' }}>Cash</option>
+                                <option value="Bank" {{ 'selected' if txn.method == 'Bank' }}>Bank</option>
+                                <option value="Cheque" {{ 'selected' if txn.method == 'Cheque' }}>Cheque</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Bill # (Ref)</label>
+                            <input type="text" name="manual_bill_no" class="form-control bg-dark text-white border-secondary" value="{{ txn.manual_bill_no or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Bank Name</label>
+                            <input type="text" name="bank_name" class="form-control bg-dark text-white border-secondary" value="{{ txn.bank_name or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Account Name</label>
+                            <input type="text" name="account_name" class="form-control bg-dark text-white border-secondary" value="{{ txn.account_name or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Account Number</label>
+                            <input type="text" name="account_no" class="form-control bg-dark text-white border-secondary" value="{{ txn.account_no or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Date</label>
+                            <input type="datetime-local" name="date_posted" class="form-control bg-dark text-white border-secondary" value="{{ (txn.date_posted.strftime('%Y-%m-%dT%H:%M') if txn.date_posted else '') }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="text-white-50 small fw-bold mb-1">Note</label>
+                            <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2">{{ txn.note or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-bold">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% elif key.startswith('Booking') %}
+    <div class="modal fade" id="editTransactionModal{{ key }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <form action="{{ url_for('edit_ledger_transaction', trans_type='Booking', trans_id=txn.id) }}" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+                <div class="modal-header border-0">
+                    <h5 class="text-warning fw-bold mb-0">Edit Booking</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Client</label>
+                            <input type="text" name="client_name" class="form-control bg-dark text-white border-secondary" value="{{ txn.client_name }}" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Manual Bill #</label>
+                            <input type="text" name="manual_bill_no" class="form-control bg-dark text-white border-secondary" value="{{ txn.manual_bill_no or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Discount</label>
+                            <input type="number" step="0.01" name="discount" class="form-control bg-dark text-white border-secondary" value="{{ '%.2f'|format(txn.discount or 0) }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Discount Reason</label>
+                            <input type="text" name="discount_reason" class="form-control bg-dark text-white border-secondary" value="{{ txn.discount_reason or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Date</label>
+                            <input type="datetime-local" name="date_posted" class="form-control bg-dark text-white border-secondary" value="{{ (txn.date_posted.strftime('%Y-%m-%dT%H:%M') if txn.date_posted else '') }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="text-white-50 small fw-bold mb-1">Note</label>
+                            <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2">{{ txn.note or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-bold">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% elif key.startswith('DirectSale') %}
+    <div class="modal fade" id="editTransactionModal{{ key }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <form action="{{ url_for('edit_ledger_transaction', trans_type='DirectSale', trans_id=txn.id) }}" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+                <div class="modal-header border-0">
+                    <h5 class="text-warning fw-bold mb-0">Edit Direct Sale</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Client</label>
+                            <input type="text" name="client_name" class="form-control bg-dark text-white border-secondary" value="{{ txn.client_name }}" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Amount *</label>
+                            <input type="number" step="0.01" name="amount" class="form-control bg-dark text-white border-secondary" value="{{ '%.2f'|format(txn.amount or 0) }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Manual Bill #</label>
+                            <input type="text" name="manual_bill_no" class="form-control bg-dark text-white border-secondary" value="{{ txn.manual_bill_no or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Category</label>
+                            <input type="text" name="category" class="form-control bg-dark text-white border-secondary" value="{{ txn.category or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Payment Method</label>
+                            <input type="text" name="payment_method" class="form-control bg-dark text-white border-secondary" value="{{ txn.payment_method or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-white-50 small fw-bold mb-1">Date</label>
+                            <input type="datetime-local" name="date_posted" class="form-control bg-dark text-white border-secondary" value="{{ (txn.date_posted.strftime('%Y-%m-%dT%H:%M') if txn.date_posted else '') }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="text-white-50 small fw-bold mb-1">Note</label>
+                            <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2">{{ txn.note or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-bold">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+{% endfor %}
+
+</div>
+<style>
+.financial-ledger-table {
+    table-layout: fixed;
+    width: 100%;
+}
+.financial-ledger-table .ledger-col-date {
+    width: 96px;
+}
+.financial-ledger-table .ledger-col-desc {
+    width: 34%;
+}
+.financial-ledger-table .ledger-col-bill {
+    width: 120px;
+}
+.financial-ledger-table .ledger-col-actions {
+    width: 96px;
+}
+.financial-ledger-table .ledger-date-cell {
+    white-space: nowrap;
+    line-height: 1.1;
+}
+.financial-ledger-table .ledger-date-main {
+    font-size: 0.78rem;
+}
+.financial-ledger-table .ledger-date-sub {
+    font-size: 0.72rem;
+    opacity: 0.9;
+}
+.financial-ledger-table .ledger-desc-cell {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.2;
+}
+.financial-ledger-table .ledger-bill-cell {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.financial-ledger-table .ledger-actions-cell {
+    white-space: nowrap;
+}
+/* The card must stay overflow:visible so the row action dropdowns can escape
+   it. Because nothing clips them, the header/table corners have to be rounded
+   by hand or they poke square out of the card's 15px radius (this is what made
+   the Financial Ledger look "off" next to the Material Ledger card). */
+.financial-ledger-card,
+.financial-ledger-card .card-header,
+.financial-ledger-card .card-body {
+    overflow: visible !important;
+}
+.financial-ledger-card > .card-header {
+    border-top-left-radius: 13px;
+    border-top-right-radius: 13px;
+}
+.financial-ledger-card > .ledger-table-wrap {
+    border-bottom-left-radius: 13px;
+    border-bottom-right-radius: 13px;
+}
+.ledger-table-wrap {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+}
+.financial-ledger-table .dropdown {
+    position: static;
+}
+.financial-ledger-table .dropdown-menu {
+    z-index: 2000;
+    background: #0f172a;
+    border-color: #475569;
+    min-width: 190px;
+}
+.financial-ledger-table .dropdown-item {
+    color: #e2e8f0;
+}
+.financial-ledger-table .dropdown-item:hover,
+.financial-ledger-table .dropdown-item:focus {
+    background: #1e293b;
+    color: #f8fafc;
+}
+.financial-ledger-table .dropdown-item i {
+    display: inline-block;
+    width: 1rem;
+    color: inherit;
+}
+.financial-ledger-table .action-item-view {
+    color: #38bdf8;
+    font-weight: 600;
+}
+.financial-ledger-table .action-item-download {
+    color: #f59e0b;
+    font-weight: 600;
+}
+.financial-ledger-table .action-item-print {
+    color: #34d399;
+    font-weight: 600;
+}
+.financial-ledger-table .action-item-void {
+    color: #f87171;
+    font-weight: 700;
+}
+.financial-ledger-table .action-item-view:hover,
+.financial-ledger-table .action-item-download:hover,
+.financial-ledger-table .action-item-print:hover,
+.financial-ledger-table .action-item-void:hover {
+    filter: brightness(1.08);
+}
+
+/* Mobile: readable, full-width ledger instead of a crushed fixed table.
+   Everything here exists to make the stacked Financial Ledger cards render
+   exactly like the Material Ledger cards below them. */
+@media (max-width: 767.98px) {
+    /* Desktop column sizing must not leak into the stacked card layout. */
+    .financial-ledger-table,
+    .financial-ledger-table .ledger-col-date,
+    .financial-ledger-table .ledger-col-desc,
+    .financial-ledger-table .ledger-col-bill,
+    .financial-ledger-table .ledger-col-actions {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto !important;
+    }
+    /* The date is a normal stacked field here, not a squeezed 96px column. */
+    .financial-ledger-table .ledger-date-cell {
+        white-space: normal !important;
+        line-height: 1.4;
+    }
+    .financial-ledger-table .ledger-date-cell .ledger-date-main {
+        font-size: 0.95rem;
+    }
+    .financial-ledger-table .ledger-date-cell .ledger-date-sub {
+        font-size: 0.82rem;
+        margin-top: 2px;
+        opacity: 0.75;
+    }
+    .financial-ledger-table td {
+        font-size: 0.95rem;
+    }
+    /* Amounts were right-aligned for the desktop table; inside a stacked card
+       they must read left-aligned under their label, like the Material Ledger. */
+    .financial-ledger-table td.text-end {
+        text-align: left !important;
+    }
+    /* Kill the desktop end-padding so every field lines up on one left edge. */
+    .financial-ledger-table td.ps-4,
+    .financial-ledger-table td.pe-4 {
+        padding-left: 0.9rem !important;
+        padding-right: 0.9rem !important;
+    }
+    /* Action dropdown: full-width tap target, menu that cannot spill off-screen. */
+    .financial-ledger-table .ledger-actions-cell .dropdown {
+        position: static;
+    }
+    .financial-ledger-table .ledger-actions-cell .dropdown-toggle {
+        min-height: 38px;
+    }
+    .financial-ledger-table .dropdown-menu {
+        max-width: calc(100vw - 32px);
+    }
+}
+
+/* Tablet / small desktop: keep the fixed financial table readable by letting
+   it scroll horizontally instead of crushing seven columns together. */
+@media (min-width: 768px) and (max-width: 1199.98px) {
+    .financial-ledger-table {
+        min-width: 780px;
+    }
+}
+
+@media print {
+    .sidebar,
+    .navbar,
+    .d-print-none,
+    .modal,
+    .modal-backdrop {
+        display: none !important;
+    }
+    .main-content {
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+    .ledger-print-area,
+    .ledger-print-area * {
+        color: #000 !important;
+        text-shadow: none !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        font-weight: 700 !important;
+    }
+    .ledger-print-area .card,
+    .ledger-print-area .modal-content {
+        background: #fff !important;
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+    }
+    .ledger-print-area .card-header,
+    .ledger-print-area .table thead,
+    .ledger-print-area .bg-dark,
+    .ledger-print-area [style*="background"] {
+        background: #fff !important;
+    }
+    .ledger-print-area .table {
+        font-size: 15px !important;
+        margin-bottom: 0.5rem !important;
+    }
+    .ledger-print-area .table th,
+    .ledger-print-area .table td {
+        border-color: #000 !important;
+        padding: 0.2rem 0.3rem !important;
+    }
+    .ledger-print-area .table-responsive {
+        overflow: visible !important;
+    }
+    .ledger-print-area .badge {
+        background: #fff !important;
+        border: 1px solid #000 !important;
+        color: #000 !important;
+    }
+    .ledger-print-area a {
+        color: #000 !important;
+        text-decoration: none !important;
+    }
+    .ledger-print-area .text-white,
+    .ledger-print-area .text-white-50,
+    .ledger-print-area .text-warning,
+    .ledger-print-area .text-danger,
+    .ledger-print-area .text-success,
+    .ledger-print-area .text-info {
+        color: #000 !important;
+    }
+    .ledger-print-area .row,
+    .ledger-print-area .card,
+    .ledger-print-area table,
+    .ledger-print-area thead,
+    .ledger-print-area tbody,
+    .ledger-print-area tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+    }
+}
+</style>
+{% endblock %}

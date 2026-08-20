@@ -1,0 +1,123 @@
+{% extends "layout.html" %}
+
+{% block title %}Reconcile Account{% endblock %}
+
+{% block content %}
+{% include 'accounts/_acc_styles.html' %}
+<style>
+.acc-page-header{ background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(56,189,248,0.18)); }
+.diff-pill{ padding:6px 12px; border-radius:999px; font-weight:700; font-size:.8rem; }
+.diff-pill.matched{ background: rgba(16,185,129,.15); color:#10b981; border:1px solid rgba(16,185,129,.35); }
+.diff-pill.loss{ background: rgba(239,68,68,.15); color:#ef4444; border:1px solid rgba(239,68,68,.35); }
+.diff-pill.excess{ background: rgba(245,158,11,.15); color:#f59e0b; border:1px solid rgba(245,158,11,.35); }
+</style>
+
+<div class="container-fluid">
+    <div class="acc-page-header">
+        <div>
+            <h2><i class="bi bi-check2-square me-2 text-success"></i>Reconcile Account</h2>
+            <div class="subtitle">{{ account.name }} — compare expected (ledger) vs actual (physical) balance.</div>
+        </div>
+        <div class="acc-toolbar">
+            <a href="{{ url_for('accounts.account_ledger', account_id=account.id) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-journal-text me-1"></i>Ledger</a>
+            <a href="{{ url_for('accounts.reconciliations') }}" class="btn btn-outline-info btn-sm"><i class="bi bi-clock-history me-1"></i>All Reconciliations</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3"><div class="card kpi-card kpi-slate"><div class="card-body"><div class="kpi-label">Previous Final</div><div class="kpi-value">Rs. {{ "%.2f"|format((recent[0].final_reconciled_balance if recent and recent[0].final_reconciled_balance is not none else (account.opening_balance or 0))) }}</div></div><i class="bi bi-skip-backward kpi-icon"></i></div></div>
+        <div class="col-md-3"><div class="card kpi-card kpi-slate"><div class="card-body"><div class="kpi-label">Stored Balance</div><div class="kpi-value">Rs. {{ "%.2f"|format(account.balance or 0) }}</div></div><i class="bi bi-database kpi-icon"></i></div></div>
+        <div class="col-md-3"><div class="card kpi-card kpi-blue"><div class="card-body"><div class="kpi-label">Expected Closing</div><div class="kpi-value">Rs. {{ "%.2f"|format(expected) }}</div></div><i class="bi bi-calculator kpi-icon"></i></div></div>
+        <div class="col-md-3"><div class="card kpi-card kpi-emerald"><div class="card-body"><div class="kpi-label">Actual − Expected</div><div class="kpi-value" id="diffPreview">Rs. 0.00</div></div><i class="bi bi-arrow-left-right kpi-icon"></i></div></div>
+    </div>
+    <div class="alert alert-info py-2 small mb-4"><strong>Carry chain:</strong> previous final reconciled balance → opening balance → period transactions → expected closing → entered actual → transparent loss/excess adjustment → final reconciled balance. Historical transactions are never rewritten.</div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="acc-section-card">
+                <div class="card-header"><h5><i class="bi bi-pencil-square me-2 text-success"></i>Reconciliation Entry</h5></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('accounts.reconcile_account', account_id=account.id) }}">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Actual / Physical Balance <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs.</span>
+                                    <input type="number" step="0.01" name="actual_balance" id="actualBalance"
+                                           class="form-control" required placeholder="Counted / bank statement balance">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Reconciliation Date</label>
+                                <input type="date" name="reconciliation_date" class="form-control" value="{{ today }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Note</label>
+                                <textarea name="note" rows="2" class="form-control" placeholder="Reason for any difference"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <div id="diffVerdict" class="diff-pill matched">Matched — no difference</div>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i>Reconcile Account</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="acc-section-card">
+                <div class="card-header"><h5><i class="bi bi-clock-history me-2 text-info"></i>Recent Reconciliations</h5></div>
+                <div class="table-responsive">
+                    <table class="table acc-table align-middle mb-0">
+                        <thead><tr><th>Date</th><th class="text-end">Expected</th><th class="text-end">Actual</th><th class="text-end">Diff</th><th>Type</th></tr></thead>
+                        <tbody>
+                        {% for r in recent %}
+                        <tr>
+                            <td class="small">{{ r.reconciliation_date.strftime('%Y-%m-%d') }}</td>
+                            <td class="text-end">{{ "%.2f"|format(r.expected_balance) }}</td>
+                            <td class="text-end">{{ "%.2f"|format(r.actual_balance) }}</td>
+                            <td class="text-end fw-bold {% if r.difference < 0 %}text-danger{% elif r.difference > 0 %}text-warning{% else %}text-success{% endif %}">{{ "%+.2f"|format(r.difference) }}</td>
+                            <td><span class="tiny-pill {% if r.difference_type == 'Matched' %}badge-soft-emerald{% elif r.difference_type == 'Loss' %}badge-soft-rose{% else %}badge-soft-amber{% endif %}">{{ r.difference_type }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="empty-state">No reconciliations yet.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var expected = {{ "%.2f"|format(expected) }};
+    var input = document.getElementById('actualBalance');
+    var preview = document.getElementById('diffPreview');
+    var verdict = document.getElementById('diffVerdict');
+    function update() {
+        var actual = parseFloat(input.value);
+        var diff = isNaN(actual) ? 0 : (actual - expected);
+        var text = 'Rs. ' + (diff >= 0 ? '' : '-') + Math.abs(diff).toFixed(2);
+        preview.textContent = text;
+        var abs = Math.abs(diff);
+        if (abs < 0.005) {
+            verdict.textContent = 'Matched — no difference';
+            verdict.className = 'diff-pill matched';
+        } else if (diff < 0) {
+            verdict.textContent = 'Loss / Shortage — actual is lower than expected by Rs. ' + abs.toFixed(2);
+            verdict.className = 'diff-pill loss';
+        } else {
+            verdict.textContent = 'Profit / Excess — actual is higher than expected by Rs. ' + abs.toFixed(2);
+            verdict.className = 'diff-pill excess';
+        }
+    }
+    input.addEventListener('input', update);
+    update();
+})();
+</script>
+{% endblock %}

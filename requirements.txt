@@ -1,0 +1,11 @@
+flask>=3.1.2
+flask-login>=0.6.3
+flask-sqlalchemy>=3.1.1
+werkzeug>=3.1.5
+sqlalchemy>=2.0.46
+gunicorn>=22.0.0
+numpy<2
+openpyxl>=3.1.5
+pandas>=2.2.0
+reportlab>=4.0.7
+pytest>=8.0.0

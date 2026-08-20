@@ -1,0 +1,260 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-warning mb-0">Import & Export</h2>
+    <a href="/" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3 text-warning"><i class="bi bi-file-earmark-arrow-up me-2"></i>Import Deliveries (u2 Sheet)</h5>
+                <p class="text-white-50 small mb-4">Auto-adds clients and materials. Verify bill no and client code.</p>
+                
+                <div id="importContainer">
+                    <div class="row g-3 align-items-end mb-3">
+                        <div class="col-md-12">
+                            <label class="small fw-bold text-white-50 mb-1">Select File</label>
+                            <input type="file" id="importFile" class="form-control bg-dark text-white border-secondary" accept=".csv, .xlsx, .xls">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-white-50 mb-1">Import Mode</label>
+                            <select id="importMode" class="form-select bg-dark text-white border-secondary" onchange="document.getElementById('importDateDiv').style.display = this.value == 'daily' ? 'block' : 'none'">
+                                <option value="append">Append to History</option>
+                                <option value="daily">Daily Sync (Overwrite)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" id="importDateDiv" style="display:none;">
+                            <label class="small fw-bold text-white-50 mb-1">Target Date</label>
+                            <input type="date" id="importDate" class="form-control bg-dark text-white border-secondary">
+                        </div>
+                        <div class="col-md-12">
+                            <button type="button" id="startImportBtn" class="btn btn-warning w-100 fw-bold text-dark shadow-sm">Process Deliveries</button>
+                        </div>
+                    </div>
+                    
+                    <form action="/import_dispatch_data" method="POST" enctype="multipart/form-data" class="mt-3">
+                        <label class="small fw-bold text-white-50 mb-1">Import Dispatch CSV (with Categories)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="file" name="file" class="form-control bg-dark text-white border-secondary" accept=".csv">
+                            <button type="submit" class="btn btn-warning fw-bold">Import CSV</button>
+                        </div>
+                    </form>
+
+                    <div id="importProgressSection" style="display: none;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span id="importStatus" class="small text-white-50 fw-bold">Reading file...</span>
+                            <span id="importCount" class="small text-warning fw-bold">0 / 0 Rows</span>
+                        </div>
+                        <div class="progress bg-dark border border-secondary" style="height: 10px; border-radius: 5px;">
+                            <div id="importProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-warning" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3 text-warning"><i class="bi bi-file-earmark-arrow-down me-2"></i>Full Database Sync (Excel)</h5>
+                <p class="text-white-50 small mb-4">Export/Import the entire database in a single multi-sheet Excel file.</p>
+                <div class="d-grid gap-2 mb-3">
+                    <a href="{{ url_for('import_export.export_excel_all') }}" class="btn btn-warning fw-bold text-dark shadow-sm">
+                        <i class="bi bi-download me-2"></i>Download Full Backup
+                    </a>
+                </div>
+                <hr class="border-secondary">
+                <form id="fullImportForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="small fw-bold text-white-50 mb-1">Select Backup File</label>
+                        <input type="file" id="fullImportFile" class="form-control bg-dark text-white border-secondary" accept=".xlsx">
+                    </div>
+                    <button type="button" id="startFullImportBtn" class="btn btn-outline-warning w-100 fw-bold shadow-sm">
+                        <i class="bi bi-upload me-2"></i>Restore from Backup
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('startFullImportBtn').addEventListener('click', async function() {
+    const file = document.getElementById('fullImportFile').files[0];
+    if (!file) { alert("Select file first"); return; }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Restoring...';
+    
+    try {
+        const response = await fetch('/import_export/import_excel_all', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert("Full database restore successful!");
+            location.reload();
+        } else {
+            alert("Restore failed: " + result.error);
+        }
+    } catch (e) {
+        alert("An error occurred");
+    } finally {
+        this.disabled = false;
+        this.innerHTML = '<i class="bi bi-upload me-2"></i>Restore from Backup';
+    }
+});
+
+document.getElementById('startImportBtn').addEventListener('click', function() {
+    const fileInput = document.getElementById('importFile');
+    const file = fileInput.files[0];
+    if (!file) {
+        alert("Please select a file first.");
+        return;
+    }
+
+    const mode = document.getElementById('importMode').value;
+    const date = document.getElementById('importDate').value;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('mode', mode);
+    if (date) formData.append('date', date);
+
+    document.getElementById('importProgressSection').style.display = 'block';
+    this.disabled = true;
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/import_data_ajax', true);
+
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            document.getElementById('startImportBtn').disabled = false;
+            try {
+                const response = JSON.parse(xhr.responseText);
+                if (response.success) {
+                    alert("Import successful: " + response.rows + " rows processed.");
+                    location.reload();
+                } else {
+                    alert("Import failed: " + response.error);
+                }
+            } catch (e) {
+                alert("An error occurred during import.");
+            }
+        }
+    };
+
+    // Note: Since real-time streaming progress requires complex backend setup,
+    // we use a simplified poll or simulated progress if the backend just returns once.
+    // However, to satisfy the user request for a progress bar that actually tells rows,
+    // we'll implement a state polling endpoint or use a dummy progress that fills up.
+    // Given Fast mode, I'll implement a simplified polling mechanism.
+    
+    let pollInterval;
+    const startPolling = () => {
+        pollInterval = setInterval(() => {
+            fetch('/import_status')
+                .then(r => r.json())
+                .then(status => {
+                    if (status.total > 0) {
+                        const percent = Math.round((status.current / status.total) * 100);
+                        document.getElementById('importProgressBar').style.width = percent + '%';
+                        document.getElementById('importCount').innerText = `${status.current} / ${status.total} Rows`;
+                        document.getElementById('importStatus').innerText = "Processing rows...";
+                    }
+                    if (status.done) clearInterval(pollInterval);
+                });
+        }, 1000);
+    };
+
+    xhr.send(formData);
+    startPolling();
+});
+</script>
+
+<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-3 text-warning"><i class="bi bi-file-earmark-arrow-down me-2"></i>Export Reports</h5>
+        <p class="text-white-50 small mb-4">Filter and download your inventory history in various formats.</p>
+        <form action="{{ url_for('import_export.export_data') }}" method="GET" class="row g-3 align-items-end">
+            <div class="col-md-2 col-6">
+                <label class="small fw-bold text-white-50">From</label>
+                <input type="date" name="start_date" class="form-control bg-dark text-white border-secondary">
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="small fw-bold text-white-50">To</label>
+                <input type="date" name="end_date" class="form-control bg-dark text-white border-secondary">
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="small fw-bold text-white-50">Client</label>
+                <div class="position-relative">
+                    <div class="input-group">
+                        <input type="text" name="client" id="exportClientFilter" class="form-control bg-dark text-white border-secondary" placeholder="Type client..." autocomplete="off" onfocus="showCombobox('exportClientFilter', 'exportClientList')" oninput="filterCombobox('exportClientFilter', 'exportClientList', 'exportClientDisplay')">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('exportClientFilter', 'exportClientList')">
+                            <i class="bi bi-chevron-down text-warning"></i>
+                        </button>
+                    </div>
+                    <div id="exportClientList" class="combobox-list shadow-lg" style="display: none;">
+                        <div class="combobox-item" data-combo-code="" data-combo-name="" data-combo-input="exportClientFilter" data-combo-display="exportClientDisplay">
+                            <span class="fw-bold text-danger">All Clients</span>
+                        </div>
+                        {% for c in clients %}
+                        <div class="combobox-item" data-combo-code="{{ c.name }}" data-combo-name="{{ c.name }}" data-combo-input="exportClientFilter" data-combo-display="exportClientDisplay">
+                            <span class="fw-bold text-warning code-span">{{ c.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="exportClientDisplay" class="text-info small mt-1 fw-bold"></div>
+                </div>
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="small fw-bold text-white-50">Material</label>
+                <div class="position-relative">
+                    <div class="input-group">
+                        <input type="text" name="material" id="exportMaterialFilter" class="form-control bg-dark text-white border-secondary" placeholder="Type material..." autocomplete="off" onfocus="showCombobox('exportMaterialFilter', 'exportMaterialList')" oninput="filterCombobox('exportMaterialFilter', 'exportMaterialList', 'exportMaterialDisplay')">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('exportMaterialFilter', 'exportMaterialList')">
+                            <i class="bi bi-chevron-down text-warning"></i>
+                        </button>
+                    </div>
+                    <div id="exportMaterialList" class="combobox-list shadow-lg" style="display: none;">
+                        <div class="combobox-item" data-combo-code="" data-combo-name="" data-combo-input="exportMaterialFilter" data-combo-display="exportMaterialDisplay">
+                            <span class="fw-bold text-danger">All Brands</span>
+                        </div>
+                        {% for m in materials %}
+                        <div class="combobox-item" data-combo-code="{{ m.name }}" data-combo-name="{{ m.name }}" data-combo-input="exportMaterialFilter" data-combo-display="exportMaterialDisplay">
+                            <span class="fw-bold text-warning code-span">{{ m.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="exportMaterialDisplay" class="text-info small mt-1 fw-bold"></div>
+                </div>
+            </div>
+            <div class="col-md-2 col-12">
+                <label class="small fw-bold text-white-50">Type</label>
+                <select name="type" class="form-select bg-dark text-white border-secondary">
+                    <option value="BOTH">Both (IN & OUT)</option>
+                    <option value="IN">IN Only (Receiving)</option>
+                    <option value="OUT">OUT Only (Dispatch)</option>
+                </select>
+            </div>
+            <div class="col-md-2 col-12">
+                <label class="small fw-bold text-white-50">Format</label>
+                <select name="format" class="form-select bg-dark text-white border-secondary">
+                    <option value="excel">Excel (.xlsx)</option>
+                    <option value="csv">CSV (.csv)</option>
+                    <option value="pdf">PDF (.pdf)</option>
+                </select>
+            </div>
+            <div class="col-12 text-end">
+                <button type="submit" class="btn btn-warning fw-bold text-dark shadow-sm px-5">Download Report</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

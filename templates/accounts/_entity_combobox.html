@@ -1,0 +1,67 @@
+{#
+  Reusable searchable selector (combobox) for Accounts pages.
+
+  Usage:
+    {% from 'accounts/_entity_combobox.html' import entity_combobox %}
+    {{ entity_combobox(
+         input_id='cpClient', value_input_id='client_code', name_input_id='client_name',
+         items=clients, code_attr='code', name_attr='name', label='Client',
+         selected_code='', selected_name='', placeholder='Search by name or code...') }}
+
+  - Renders a text input (search), an optional hidden value input (code/id) and an
+    optional hidden name input, plus the dropdown list.
+  - The hidden input IDs double as the form field names (e.g. `client_code`).
+  - Manual typing clears the hidden selection so the backend never saves a stale
+    client/supplier/account; the user must pick from the list.
+  - Keyboard/focus/click behaviour is provided by the global combobox JS in layout.html.
+#}
+{% macro entity_combobox(input_id, items, code_attr='code', name_attr='name', label='',
+                         value_input_id='', name_input_id='', selected_code='', selected_name='',
+                         placeholder='Type to search…', required=False) -%}
+<div class="position-relative">
+    {% if label %}<label class="form-label fw-semibold">{{ label }}{% if required %} <span class="text-danger">*</span>{% endif %}</label>{% endif %}
+    <div class="input-group">
+        <input type="text"
+               id="{{ input_id }}"
+               class="form-control bg-dark text-white border-secondary acc-combo-input"
+               value="{{ selected_name or selected_code or '' }}"
+               placeholder="{{ placeholder }}"
+               autocomplete="off"
+               role="combobox"
+               aria-autocomplete="list"
+               aria-haspopup="listbox"
+               aria-expanded="false"
+               aria-controls="{{ input_id }}List"
+               {% if required %}required{% endif %}
+               data-combo-list="{{ input_id }}List"
+               data-combo-display="{{ input_id }}Disp"
+               {% if value_input_id %}data-combo-value-input="{{ value_input_id }}"{% endif %}
+               {% if name_input_id %}data-combo-name-input="{{ name_input_id }}"{% endif %}
+               oninput="if(this.dataset.comboSuppress==='1'){this.dataset.comboSuppress='';return;}{% if value_input_id %}var v=document.getElementById('{{ value_input_id }}');if(v){v.value='';}{% endif %}{% if name_input_id %}var n=document.getElementById('{{ name_input_id }}');if(n){n.value='';}{% endif %}filterCombobox('{{ input_id }}','{{ input_id }}List','{{ input_id }}Disp');">
+        <button class="btn btn-outline-secondary" type="button" data-combo-toggle data-combo-list="{{ input_id }}List">
+            <i class="bi bi-chevron-down"></i>
+        </button>
+    </div>
+    <div id="{{ input_id }}List" class="combobox-list shadow-lg acc-combo-list" style="display:none;" role="listbox"
+         {% if value_input_id %}data-value-input-id="{{ value_input_id }}"{% endif %}
+         {% if name_input_id %}data-name-input-id="{{ name_input_id }}"{% endif %}>
+        {% for item in items %}
+        {% set code = item[code_attr] if item[code_attr] is not none else '' %}
+        {% set name = item[name_attr] if item[name_attr] is not none else '' %}
+        <div class="combobox-item" id="{{ input_id }}Option{{ loop.index0 }}" role="option" tabindex="-1"
+             data-combo-code="{{ code }}"
+             data-combo-name="{{ name }}"
+             data-combo-input="{{ input_id }}"
+             data-combo-display="{{ input_id }}Disp"
+             {% if value_input_id %}data-combo-value-input="{{ value_input_id }}"{% endif %}
+             {% if name_input_id %}data-combo-name-input="{{ name_input_id }}"{% endif %}>
+            <span class="fw-bold code-span">{{ code }}</span>
+            <span class="ms-2 name-span">{{ name }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    <div id="{{ input_id }}Disp" class="text-info small mt-1 fw-bold"></div>
+    {% if value_input_id %}<input type="hidden" id="{{ value_input_id }}" name="{{ value_input_id }}" value="{{ selected_code }}">{% endif %}
+    {% if name_input_id %}<input type="hidden" id="{{ name_input_id }}" name="{{ name_input_id }}" value="{{ selected_name }}">{% endif %}
+</div>
+{%- endmacro %}

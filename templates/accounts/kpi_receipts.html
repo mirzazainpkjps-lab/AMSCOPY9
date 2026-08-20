@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% from "accounts/_kpi_cards.html" import kpi_filter_bar, kpi_summary, card_grid %}
+
+{% block title %}Receipts (KPI){% endblock %}
+
+{% block content %}
+<style>
+.acc-page-header{ background: linear-gradient(135deg, rgba(6,182,212,0.18), rgba(99,102,241,0.18)); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:20px 24px; margin-bottom:24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.acc-page-header h2{ margin:0; font-weight:700; } .acc-page-header .subtitle{ color:var(--text-muted); font-size:.9rem; margin-top:4px;}
+.kpi{ border:0; border-radius:14px; color:#fff; min-height:96px; box-shadow:0 8px 20px rgba(2,6,23,.22); position:relative; overflow:hidden; }
+.kpi .card-body{ padding:14px 16px; }
+.kpi .lab{ text-transform:uppercase; font-size:.7rem; letter-spacing:.8px; font-weight:700; opacity:.92; }
+.kpi .val{ font-size:1.5rem; font-weight:800; margin-top:4px; }
+.kpi .ico{ position:absolute; right:-8px; bottom:-12px; font-size:4.2rem; opacity:.18; }
+.s-cyan{ background:linear-gradient(135deg,#06b6d4,#0e7490);} .s-violet{ background:linear-gradient(135deg,#8b5cf6,#4f46e5);}
+.led-card{ border:1px solid var(--border-color); border-radius:14px; background:var(--surface-1); overflow:hidden;}
+.filter-bar{ display:flex; gap:10px; flex-wrap:wrap; align-items:end; padding:14px 18px; border-bottom:1px solid var(--border-color); background:var(--surface-2);}
+.filter-bar .form-label{ font-size:.75rem; text-transform:uppercase; letter-spacing:.6px; font-weight:700; color:var(--text-muted); margin-bottom:4px;}
+.data-card{ border:1px solid var(--border-color); border-radius:14px; background:var(--surface-1); }
+</style>
+
+<div class="container-fluid">
+  <div class="acc-page-header">
+    <div>
+      <h2><i class="bi bi-receipt me-2 text-info"></i>Receipts (KPI Drill-Down)</h2>
+      <div class="subtitle">Paid receipts from Bookings and Direct Sales.</div>
+    </div>
+    <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+  </div>
+
+  {{ kpi_summary(total_amount=total_amount, total_count=total_count, left_label='Total Receipts', right_label='Transactions', left_color='s-cyan', right_color='s-violet', left_icon='bi-arrow-down-circle', right_icon='bi-list-ol') }}
+
+  {{ kpi_filter_bar(url_for('accounts.kpi_receipts'), date_from=date_from, date_to=date_to, search=search) }}
+
+  {{ card_grid(items, kind='receipts') }}
+</div>
+{% endblock %}

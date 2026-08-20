@@ -1,0 +1,61 @@
+{#
+  Shared Supplier Payment form — used for BOTH Create and Edit.
+  - Create: payment_id empty.
+  - Edit:   JS populates the fields from /accounts/payments/suppliers/<id>/data.
+#}
+{% from 'accounts/_entity_combobox.html' import entity_combobox %}
+<form id="supplierPaymentForm" class="modal-content border-secondary ui-helper-form" style="background: #1e293b;"
+      action="{{ url_for('accounts.supplier_payment_save') }}" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="payment_id" id="spPaymentId" value="">
+    <input type="hidden" name="revision" id="spRevision" value="">
+    <input type="hidden" name="idempotency_key" id="spIdempotencyKey" value="">
+    <input type="hidden" name="show" value="{{ show_mode }}">
+    <div class="modal-header">
+        <h5 class="modal-title text-danger" id="supplierPaymentModalTitle"><i class="bi bi-truck me-2"></i>New Supplier Payment</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+        <div class="row gy-3">
+            <div class="col-md-6">
+                {{ entity_combobox('spSupplier', supplier_options, code_attr='id', name_attr='name',
+                                   value_input_id='supplier_id', name_input_id='supplier_name',
+                                   label='Supplier', placeholder='Search by name…', required=True) }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Amount <span class="text-danger">*</span></label>
+                <input type="number" step="0.01" min="0" name="amount" id="spAmount"
+                       class="form-control bg-dark text-white border-secondary" required placeholder="0.00">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Method <span class="text-danger">*</span></label>
+                <select name="method" id="spMethod" class="form-select bg-dark text-white border-secondary">
+                    {% for m in ['Cash','Bank','Check','Card','Online'] %}
+                    <option value="{{ m }}" {% if m == 'Cash' %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                {{ entity_combobox('spAccount', account_options, code_attr='id', name_attr='label',
+                                   value_input_id='payment_account_id',
+                                   label='Pay From Account', placeholder='Search by account, bank, or number…', required=True) }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Bill / Voucher Reference</label>
+                <input type="text" name="manual_bill_no" id="spManualBillNo"
+                       class="form-control bg-dark text-white border-secondary" placeholder="e.g. PV-1234">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Transaction Date</label>
+                <input type="date" name="date" id="spDate" class="form-control bg-dark text-white border-secondary">
+            </div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">Note</label>
+                <textarea name="note" id="spNote" rows="2" class="form-control bg-dark text-white border-secondary"></textarea>
+            </div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-danger" id="supplierPaymentSubmitBtn"><i class="bi bi-check-lg me-1"></i>Save Payment</button>
+    </div>
+</form>

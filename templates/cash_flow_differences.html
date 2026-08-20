@@ -1,0 +1,159 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="ui-v2">
+  {% from "_ui/page_header.html" import render as ui_header %}
+  {{ ui_header('bi-clipboard-check', 'Cash Flow Reconciliations', subtitle='Physical cash reconciliation history and audit trail') }}
+
+  {# Summary stats #}
+  <div class="ui-kpi-grid mb-4">
+    <div class="ui-tile" style="border-left:4px solid #6366f1;">
+      <div class="ui-tile-label">Total Reconciliations</div>
+      <div class="ui-tile-value">{{ total_count }}</div>
+      <div class="ui-tile-sub">All-time</div>
+    </div>
+    <div class="ui-tile" style="border-left:4px solid #16a34a;">
+      <div class="ui-tile-label">New Workflow</div>
+      <div class="ui-tile-value">{{ new_workflow_count }}</div>
+      <div class="ui-tile-sub">Physical cash available records</div>
+    </div>
+    <div class="ui-tile" style="border-left:4px solid #f59e0b;">
+      <div class="ui-tile-label">Legacy Records</div>
+      <div class="ui-tile-value">{{ legacy_count }}</div>
+      <div class="ui-tile-sub">Old difference-entry workflow</div>
+    </div>
+    <div class="ui-tile" style="border-left:4px solid #8b5cf6;">
+      <div class="ui-tile-label">Total Changes</div>
+      <div class="ui-tile-value">{{ total_audit_events }}</div>
+      <div class="ui-tile-sub">Creates, edits, deletes tracked</div>
+    </div>
+  </div>
+
+  {# Filter and search bar #}
+  <div class="ui-card mb-4">
+    <div class="ui-card-body">
+      <form method="GET" action="{{ url_for('cash_flow_differences') }}" class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="ui-label">Date From</label>
+          <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
+        </div>
+        <div class="col-auto">
+          <label class="ui-label">Date To</label>
+          <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
+        </div>
+        <div class="col-auto">
+          <label class="ui-label">Workflow</label>
+          <select name="workflow_filter" class="form-select form-select-sm">
+            <option value="all" {% if workflow_filter=='all' %}selected{% endif %}>All</option>
+            <option value="new" {% if workflow_filter=='new' %}selected{% endif %}>New (Physical Cash)</option>
+            <option value="legacy" {% if workflow_filter=='legacy' %}selected{% endif %}>Legacy (Differences)</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-warning btn-sm fw-bold">
+            <i class="bi bi-funnel me-1"></i> Filter
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# Main reconciliation table #}
+  <div class="ui-card mb-4">
+    <div class="ui-card-header">
+      <h5><i class="bi bi-table me-2"></i> Reconciliation Records</h5>
+    </div>
+    <div class="table-responsive">
+      <table class="ui-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th class="text-end">Opening Balance</th>
+            <th class="text-end">Cash In</th>
+            <th class="text-end">Cash Out</th>
+            <th class="text-end">Calculated Closing</th>
+            <th class="text-end">Physical Cash</th>
+            <th class="text-end">Difference</th>
+            <th>Reason</th>
+            <th>Created By</th>
+            <th>Edits</th>
+            <th>Last Updated</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rec in reconciliations %}
+          <tr>
+            <td><strong>{{ rec.adjustment_date }}</strong></td>
+            <td class="text-end">Rs. {{ "{:,.0f}".format(rec.display_opening_balance or 0) }}</td>
+            <td class="text-end">Rs. {{ "{:,.0f}".format(rec.display_cash_in or 0) }}</td>
+            <td class="text-end">Rs. {{ "{:,.0f}".format(rec.display_cash_out or 0) }}</td>
+            <td class="text-end">Rs. {{ "{:,.0f}".format(rec.display_calculated_closing or 0) }}</td>
+            <td class="text-end" style="font-weight:bold;">
+              {% if rec.physical_cash_available is not none %}
+              Rs. {{ "{:,.0f}".format(rec.physical_cash_available) }}
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td class="text-end" style="font-weight:bold;color:{{ '#dc2626' if (rec.difference or 0) < 0 else '#16a34a' if (rec.difference or 0) > 0 else '#6b7280' }};">
+              {% if rec.difference is not none %}
+              Rs. {{ "{:,.0f}".format(rec.difference) }}
+              {% elif rec.amount is not none %}
+              Rs. {{ "{:,.0f}".format(rec.amount) }} (legacy)
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td><small>{{ rec.reason or rec.note or "—" }}</small></td>
+            <td><small>{{ rec.created_by or "—" }}</small></td>
+            <td>
+              {% if rec.edit_count and rec.edit_count > 1 %}
+              <span class="badge bg-info">{{ rec.edit_count }}</span>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td><small>{{ rec.updated_at.strftime('%Y-%m-%d %H:%M') if rec.updated_at else "-" }}</small></td>
+            <td>
+              <a href="{{ url_for('cash_flow_reconciliation_detail', rec_id=rec.id) }}" 
+                 class="btn btn-sm btn-outline-primary" title="View audit trail">
+                <i class="bi bi-info-circle"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="12" class="ui-empty">No reconciliation records found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# Pagination #}
+  {% if pages > 1 %}
+  <nav aria-label="Page navigation" class="mb-4">
+    <ul class="pagination justify-content-center">
+      {% if page > 1 %}
+      <li class="page-item">
+        <a class="page-link" href="{{ url_for('cash_flow_differences', page=page-1) }}">Previous</a>
+      </li>
+      {% endif %}
+      {% for p in range(1, pages + 1) %}
+      <li class="page-item {% if p == page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('cash_flow_differences', page=p) }}">{{ p }}</a>
+      </li>
+      {% endfor %}
+      {% if page < pages %}
+      <li class="page-item">
+        <a class="page-link" href="{{ url_for('cash_flow_differences', page=page+1) }}">Next</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+</div>
+{% endblock %}

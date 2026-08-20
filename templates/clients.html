@@ -1,0 +1,347 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0">Client Ledger</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <form class="d-flex gap-2" method="GET" action="{{ url_for('clients') }}">
+            <select name="category" class="form-select form-select-sm bg-dark text-white border-secondary" style="width: auto;">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <div class="position-relative">
+                <div class="input-group">
+                    <input class="form-control form-control-sm bg-dark text-white border-secondary" type="search" name="search" id="clientLedgerSearch" placeholder="Search Client/Code..." autocomplete="off" value="{{ search or '' }}" onfocus="showCombobox('clientLedgerSearch', 'clientLedgerCombobox')" oninput="filterCombobox('clientLedgerSearch', 'clientLedgerCombobox', 'clientLedgerNameDisplay')">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="toggleCombobox('clientLedgerSearch', 'clientLedgerCombobox')">
+                        <i class="bi bi-chevron-down text-warning"></i>
+                    </button>
+                </div>
+                <div id="clientLedgerCombobox" class="combobox-list shadow-lg" style="display: none;">
+                    {% for client in all_clients %}
+                    <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="clientLedgerSearch" data-combo-display="clientLedgerNameDisplay">
+                        <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                        <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="clientLedgerNameDisplay" class="text-info small mt-1 fw-bold"></div>
+            </div>
+            <button class="btn btn-outline-warning btn-sm" type="submit">Search</button>
+        </form>
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        <a href="/export_clients" class="btn btn-outline-success btn-sm fw-bold"><i class="bi bi-file-earmark-excel"></i> Export</a>
+        <form action="{{ url_for('activate_all_clients') }}" method="POST" class="d-inline" onsubmit="return confirm('Activate all suspended clients?')">
+            <button type="submit" class="btn btn-outline-success btn-sm fw-bold">
+                <i class="bi bi-play-circle me-1"></i> Activate All Suspended
+            </button>
+        </form>
+        <button class="btn btn-warning btn-sm text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#cModal">+ New Client</button>
+    </div>
+</div>
+<script>
+async function generateClientAutoCode() {
+    const codeEl = document.getElementById('addClientCode');
+    const hintEl = document.getElementById('addClientCodeHint');
+    const btnEl = document.getElementById('addClientAutoCodeBtn');
+    if (!codeEl || !hintEl || !btnEl) return;
+
+    btnEl.disabled = true;
+    const oldLabel = btnEl.innerHTML;
+    btnEl.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Checking...';
+    hintEl.textContent = '';
+
+    try {
+        const res = await fetch('/api/client_next_code');
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.code) {
+            hintEl.textContent = 'Unable to generate code right now.';
+            hintEl.className = 'small mt-2 text-danger';
+            return;
+        }
+        codeEl.value = data.code;
+        hintEl.textContent = `Generated client code: ${data.code}`;
+        hintEl.className = 'small mt-2 text-info';
+    } catch (err) {
+        hintEl.textContent = 'Auto-code request failed. Please try again.';
+        hintEl.className = 'small mt-2 text-danger';
+    } finally {
+        btnEl.disabled = false;
+        btnEl.innerHTML = oldLabel;
+    }
+}
+
+function _removePageRow(buttonEl) {
+    const row = buttonEl.closest('.page-row');
+    if (row) row.remove();
+}
+
+function _createPageRowHtml(value) {
+    const safeVal = (value || '').replace(/"/g, '\u0026quot;');
+    return `
+        <div class="input-group mb-2 page-row">
+            <input type="text" name="page_entry" class="form-control bg-dark text-white border-secondary" placeholder="Type page detail (e.g. BOOK 2 PAGE 117 CEMENT)" value="${safeVal}">
+            <button type="button" class="btn btn-outline-danger" onclick="_removePageRow(this)">Remove</button>
+        </div>
+    `;
+}
+
+function addPageInput(containerId, value = '') {
+    const wrap = document.getElementById(containerId);
+    if (!wrap) return;
+    wrap.insertAdjacentHTML('beforeend', _createPageRowHtml(value));
+}
+</script>
+
+<!-- Active Clients Section -->
+<div class="mb-5">
+    <h4 class="text-info fw-bold mb-3 d-flex align-items-center gap-2">
+        <span><i class="bi bi-person-check me-2"></i>Active Clients</span>
+        <span class="badge bg-info text-dark">Filtered: {{ active_pagination.total }}</span>
+    </h4>
+    <div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead style="background: #0f172a;">
+                    <tr>
+                        <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50">Client Name</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Code</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Pages</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50 text-end">Opening Balance</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Bills</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Deliveries</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Phone</th>
+                        <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
+                    </tr>
+                </thead>
+                <tbody style="background: #1e293b;">
+                    {% for c in active_pagination.items %}
+                    <tr style="border-bottom: 1px solid #334155; background: #1e293b;">
+                        <td class="ps-4 py-3">
+                            <a href="/ledger/{{ c.id }}" class="text-decoration-none fw-bold text-info fs-5 d-block">{{ c.name }}</a>
+                            <span class="badge {% if c.category == 'General' %}bg-primary{% elif c.category == 'Walking-Customer' %}bg-success{% elif c.category == 'Open Khata' %}bg-warning text-dark{% else %}bg-secondary{% endif %} small" style="font-size: 0.65rem;">{{ c.category }}</span>
+                        </td>
+                        <td><span class="badge bg-dark border border-secondary text-warning">{{ c.code or '---' }}</span></td>
+                        <td><span class="small text-white-50">{{ c.page_notes or c.steel_page or c.cement_page or c.financial_page or '-' }}</span></td>
+                        <td class="text-end fw-bold {{ 'text-danger' if (c.opening_balance or 0) > 0 else ('text-success' if (c.opening_balance or 0) < 0 else 'text-white-50') }}">
+                            {{ "{:,.2f}".format(c.opening_balance or 0) }}
+                        </td>
+                        <td class="text-info fw-bold">{{ c.total_bills }}</td>
+                        <td class="text-warning fw-bold">{{ c.total_deliveries }}</td>
+                        <td class="text-white-50">{{ c.phone or '---' }}</td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-outline-info btn-sm border-2 rounded-pill shadow-sm me-1" data-client-modal-url="{{ url_for('client_modals', client_id=c.id) }}" data-client-modal="transfer" title="Transfer Data">
+                                <i class="bi bi-arrow-right-circle"></i>
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" data-client-modal-url="{{ url_for('client_modals', client_id=c.id) }}" data-client-modal="edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form action="/delete_client/{{ c.id }}" method="POST" class="d-inline" onsubmit="return confirm('Suspend client {{ c.name }}?')">
+                                <button type="submit" class="btn btn-outline-danger btn-sm border-2 rounded-pill shadow-sm">
+                                    <i class="bi bi-pause-circle"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if active_pagination.pages > 1 %}
+        <div class="card-footer bg-transparent border-0 py-3">
+            <nav>
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if active_pagination.has_prev %}
+                    <li class="page-item"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('clients', page_active=active_pagination.prev_num, page_inactive=inactive_pagination.page, search=search, category=category) }}">Previous</a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ active_pagination.page }}</span></li>
+                    {% if active_pagination.has_next %}
+                    <li class="page-item"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('clients', page_active=active_pagination.next_num, page_inactive=inactive_pagination.page, search=search, category=category) }}">Next</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Inactive Clients Section -->
+<div class="mb-5">
+    <h4 class="text-secondary fw-bold mb-3 d-flex align-items-center gap-2">
+        <span><i class="bi bi-person-x me-2"></i>Inactive Clients</span>
+        <span class="badge bg-secondary text-white">Filtered: {{ inactive_pagination.total }}</span>
+    </h4>
+    <div class="card border-0 shadow-sm" style="background: #0f172a; border: 2px solid #334155 !important; border-radius: 15px; overflow: hidden; opacity: 0.8;">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead style="background: #020617;">
+                    <tr>
+                        <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50">Client Name</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Code</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Pages</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50 text-end">Opening Balance</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Bills</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Deliveries</th>
+                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Phone</th>
+                        <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in inactive_pagination.items %}
+                    <tr style="border-bottom: 1px solid #1e293b;">
+                        <td class="ps-4 py-3">
+                            <span class="fw-bold text-secondary fs-5 d-block text-decoration-line-through">{{ c.name }}</span>
+                        </td>
+                        <td><span class="badge bg-dark border border-secondary text-secondary">{{ c.code or '---' }}</span></td>
+                        <td><span class="small text-white-50">{{ c.page_notes or c.steel_page or c.cement_page or c.financial_page or '-' }}</span></td>
+                        <td class="text-end fw-bold {{ 'text-danger' if (c.opening_balance or 0) > 0 else ('text-success' if (c.opening_balance or 0) < 0 else 'text-white-50') }}">
+                            {{ "{:,.2f}".format(c.opening_balance or 0) }}
+                        </td>
+                        <td>
+                            <div class="small">
+                                <span class="text-secondary d-block">Bills: <strong>{{ c.total_bills }}</strong></span>
+                                <span class="text-secondary d-block">Deliveries: <strong>{{ c.total_deliveries }}</strong></span>
+                            </div>
+                        </td>
+                        <td class="text-white-50">{{ c.phone or '---' }}</td>
+                        <td class="text-end pe-4">
+                            {% if c.transferred_to_id %}
+                            <form action="/reclaim_client/{{ c.id }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-outline-success btn-sm border-2 rounded-pill shadow-sm me-1" title="Reclaim Data" onclick="return confirm('Reclaim data for {{ c.name }}?')">
+                                    <i class="bi bi-arrow-left-circle"></i> Reclaim
+                                </button>
+                            </form>
+                            {% endif %}
+                            <form action="{{ url_for('client_toggle_active', client_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Activate client {{ c.name }}?')">
+                                <button type="submit" class="btn btn-outline-success btn-sm border-2 rounded-pill shadow-sm">
+                                    <i class="bi bi-play-circle"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if inactive_pagination.pages > 1 %}
+        <div class="card-footer bg-transparent border-0 py-3">
+            <nav>
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if inactive_pagination.has_prev %}
+                    <li class="page-item"><a class="page-link bg-dark border-secondary text-secondary" href="{{ url_for('clients', page_active=active_pagination.page, page_inactive=inactive_pagination.prev_num, search=search, category=category) }}">Previous</a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link bg-secondary border-secondary text-white">{{ inactive_pagination.page }}</span></li>
+                    {% if inactive_pagination.has_next %}
+                    <li class="page-item"><a class="page-link bg-dark border-secondary text-secondary" href="{{ url_for('clients', page_active=active_pagination.page, page_inactive=inactive_pagination.next_num, search=search, category=category) }}">Next</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div id="lazyClientModalHost"></div>
+
+<div class="modal fade" id="cModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="/add_client" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Register New Client</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">NAME</label>
+                    <input type="text" name="name" class="form-control bg-dark text-white border-secondary" required>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">CATEGORY</label>
+                    <input type="text" name="category" value="General" list="categoryList" class="form-control bg-dark text-white border-secondary" placeholder="Type or select category">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">CODE <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input type="text" id="addClientCode" name="code" class="form-control bg-dark text-white border-secondary" placeholder="Leave blank for auto code">
+                        <button type="button" id="addClientAutoCodeBtn" class="btn btn-outline-info" onclick="generateClientAutoCode()">
+                            <i class="bi bi-magic me-1"></i> Auto
+                        </button>
+                    </div>
+                    <small id="addClientCodeHint" class="text-white-50">Optional. If blank, code will auto-generate on save.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">PAGES</label>
+                    <div id="addPagesList">
+                        <div class="input-group mb-2 page-row">
+                            <input type="text" name="page_entry" class="form-control bg-dark text-white border-secondary" placeholder="Type page detail (e.g. BOOK 2 PAGE 117 CEMENT)">
+                            <button type="button" class="btn btn-outline-danger" onclick="_removePageRow(this)">Remove</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="addPageInput('addPagesList')">Add Page</button>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">PHONE</label>
+                    <input type="text" name="phone" class="form-control bg-dark text-white border-secondary">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">CLIENT LOCATION (GOOGLE MAPS URL)</label>
+                    <input type="url" name="location_url" class="form-control bg-dark text-white border-secondary" placeholder="https://maps.google.com/...">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">ADDRESS</label>
+                    <input type="text" name="address" class="form-control bg-dark text-white border-secondary">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">OPENING BALANCE</label>
+                    <input type="number" step="0.01" name="opening_balance" value="0" class="form-control bg-dark text-white border-secondary">
+                    <small class="text-white-50">Use + for pending due, - for advance/credit.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">OPENING BALANCE DATE</label>
+                    <input type="date" name="opening_balance_date" value="" class="form-control bg-dark text-white border-secondary">
+                </div>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2">
+                <button type="reset" class="btn btn-outline-secondary flex-grow-1 py-2 rounded-pill fw-bold">Reset</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold flex-grow-1 py-2 rounded-pill">Create Client</button>
+            </div>
+        </form>
+    </div>
+</div>
+<datalist id="categoryList">
+    <option value="General"></option>
+    <option value="Open Khata"></option>
+    <option value="Walking-Customer"></option>
+    <option value="Misc"></option>
+    {% for cat in categories %}
+    <option value="{{ cat }}"></option>
+    {% endfor %}
+</datalist>
+<script>
+function loadClientModal(url, mode) {
+    const isTransfer = mode === 'transfer';
+    AMSLazyModal.load({
+        hostId: 'lazyClientModalHost',
+        url: url,
+        selector: `[id^="${isTransfer ? 'transferCModal' : 'editCModal'}"]`,
+        label: isTransfer ? 'Loading transfer form…' : 'Loading client form…',
+        onReady: function (modalEl) {
+            // Show global loading overlay on save for lazy-loaded forms
+            const editForm = modalEl.querySelector('form');
+            if (editForm) {
+                editForm.addEventListener('submit', function () {
+                    if (typeof window.showLoading === 'function') window.showLoading();
+                });
+            }
+        },
+    });
+}
+
+document.addEventListener('click', function(event) {
+    const button = event.target.closest('[data-client-modal-url]');
+    if (!button) return;
+    event.preventDefault();
+    loadClientModal(button.dataset.clientModalUrl, button.dataset.clientModal);
+});
+</script>
+{% endblock %}

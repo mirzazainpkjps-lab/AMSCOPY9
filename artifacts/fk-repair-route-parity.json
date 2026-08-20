@@ -1,0 +1,63 @@
+{
+  "all_routes_identical": true,
+  "generated_at_utc": "2026-08-16T09:18:45.963333+00:00",
+  "method": "Authenticated isolated-copy rendering; only per-session CSRF token normalized",
+  "routes": {
+    "/": {
+      "after_sha256": "fc762a7ad574aee83bfbd5eded91129c614e5ab7bdf8d50260f3dc8f3e99e3c6",
+      "before_sha256": "fc762a7ad574aee83bfbd5eded91129c614e5ab7bdf8d50260f3dc8f3e99e3c6",
+      "identical": true,
+      "normalized_bytes": 117020,
+      "status_after": 200,
+      "status_before": 200
+    },
+    "/accounts/": {
+      "after_sha256": "33689ed326a8d53db63adf81a85eec567e854a8d253f21486b6d1fc629f198e5",
+      "before_sha256": "33689ed326a8d53db63adf81a85eec567e854a8d253f21486b6d1fc629f198e5",
+      "identical": true,
+      "normalized_bytes": 535864,
+      "status_after": 200,
+      "status_before": 200
+    },
+    "/bookings": {
+      "after_sha256": "6a0bd828e502514a3202ed199c2fde59039a56eace1a9f6dd2812d257f701ced",
+      "before_sha256": "6a0bd828e502514a3202ed199c2fde59039a56eace1a9f6dd2812d257f701ced",
+      "identical": true,
+      "normalized_bytes": 421099,
+      "status_after": 200,
+      "status_before": 200
+    },
+    "/direct_sales": {
+      "after_sha256": "4f8e9a956a8a54533cc65c232c3f32e08ef531ee0191535798a4b3eb67060fb7",
+      "before_sha256": "4f8e9a956a8a54533cc65c232c3f32e08ef531ee0191535798a4b3eb67060fb7",
+      "identical": true,
+      "normalized_bytes": 866899,
+      "status_after": 200,
+      "status_before": 200
+    },
+    "/inventory/stock_summary": {
+      "after_sha256": "542d1df6ea018de8a68016e1788133008c23019ae892c2e863b6baa488d3c7e6",
+      "before_sha256": "542d1df6ea018de8a68016e1788133008c23019ae892c2e863b6baa488d3c7e6",
+      "identical": true,
+      "normalized_bytes": 134349,
+      "status_after": 200,
+      "status_before": 200
+    },
+    "/pending_bills": {
+      "after_sha256": "de649b0b6478a684a873b4f9ab0569546f888e030725deda83af671e789dd3fa",
+      "before_sha256": "de649b0b6478a684a873b4f9ab0569546f888e030725deda83af671e789dd3fa",
+      "identical": true,
+      "normalized_bytes": 429904,
+      "status_after": 200,
+      "status_before": 200
+    },
+    "/profit_reports?start_date=2020-01-01&end_date=2030-12-31": {
+      "after_sha256": "4cb20225d85a68644b40a247ceb71985490544b1cc23d8b3f455fb980f471637",
+      "before_sha256": "4cb20225d85a68644b40a247ceb71985490544b1cc23d8b3f455fb980f471637",
+      "identical": true,
+      "normalized_bytes": 267120,
+      "status_after": 200,
+      "status_before": 200
+    }
+  }
+}

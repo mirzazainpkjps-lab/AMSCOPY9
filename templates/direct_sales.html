@@ -1,0 +1,2995 @@
+{% extends "layout.html" %}
+{% from "_ui/page_header.html" import render as ui_header %}
+{% block content %}
+<style>
+/* === Direct Sales — full-page sale sheet ===
+   Uses theme-aware CSS variables from ui.css for both dark and light mode. */
+
+/* ----- Shell + scroll behaviour ----- */
+.sale-form { background: var(--ui-surface, #0b1220); }
+.sale-form .modal-body { overflow-x: hidden; padding: 1.25rem 1.5rem; }
+#addSaleModal .modal-header,
+#addSaleModal .modal-footer,
+[id^="editSaleModal"] .modal-header,
+[id^="editSaleModal"] .modal-footer {
+    position: sticky;
+    z-index: 6;
+    background: var(--ui-surface-2, #0b1220);
+}
+#addSaleModal .modal-header,
+[id^="editSaleModal"] .modal-header { top: 0; border-bottom: 1px solid var(--ui-border, #1f2a44); }
+#addSaleModal .modal-footer,
+[id^="editSaleModal"] .modal-footer { bottom: 0; border-top: 1px solid var(--ui-border, #1f2a44); }
+
+.sale-form .section-title {
+    color: var(--ui-text, #f8fafc);
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--ui-border, #1f2a44);
+}
+
+/* ----- Line-item header + grid ----- */
+.sale-form .sale-item-header {
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ui-text-muted, #94a3b8);
+}
+.sale-form .sale-item-header,
+.sale-form .sale-item-grid {
+    display: grid;
+    grid-template-columns: minmax(120px, 1.6fr) minmax(100px, 1.4fr) minmax(120px, 1.6fr) minmax(120px, 1.2fr) minmax(100px, 1.3fr) minmax(90px, 1.2fr) auto;
+    column-gap: 10px;
+    row-gap: 8px;
+    align-items: stretch;
+}
+/* Cell captions */
+.sale-form .sale-item-grid > *:nth-child(1)::before { content: "Material"; }
+.sale-form .sale-item-grid > *:nth-child(2)::before { content: "GRN"; }
+.sale-form .sale-item-grid > *:nth-child(3)::before { content: "Alternate"; }
+.sale-form .sale-item-grid > *:nth-child(4)::before { content: "Qty"; }
+.sale-form .sale-item-grid > *:nth-child(5)::before { content: "Unit Price"; }
+.sale-form .sale-item-grid > *:nth-child(6)::before { content: "Item Total"; }
+.sale-form .sale-item-grid > *:nth-child(7)::before { content: "Remove"; }
+.sale-form .sale-item-grid > *::before {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ui-text-muted, #94a3b8);
+    margin-bottom: 3px;
+}
+
+/* Each cell becomes a flex column */
+.sale-form .sale-item-grid > * {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    min-width: 0;
+}
+.sale-form .sale-item-grid .text-info.small {
+    display: block;
+    min-height: 1rem;
+    font-size: 0.72rem;
+    line-height: 1.15;
+    margin-top: 3px !important;
+    word-break: break-word;
+}
+
+.sale-form .compact-item-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-color: var(--ui-border-strong, #3b465c) !important;
+    background: var(--ui-surface-2, #111a2d) !important;
+}
+
+.sale-form #sale-items-container,
+.sale-form .items-container-edit {
+    max-height: calc(100vh - 540px);
+    min-height: 180px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* ----- Delivery persons + Sale date row ----- */
+.sale-form .delivery-date-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    width: 100%;
+}
+.sale-form .delivery-date-row .delivery-section {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.sale-form .delivery-row-labels,
+.sale-form .delivery-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    align-items: stretch;
+}
+.sale-form .delivery-row-labels {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--ui-text-soft, #cbd5f5);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.sale-form .delivery-cell { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+.sale-form .delivery-cell.shrink { flex: 0 0 56px; }
+.sale-form .delivery-person-rows {
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.sale-form .delivery-date-spacer {
+    height: 1.05rem;
+    margin-bottom: 4px;
+}
+
+/* Sale date shell */
+.sale-form .sale-date-shell {
+    background: var(--ui-surface-2, #0b1325);
+    border-radius: var(--ui-radius, 0.375rem);
+    overflow: hidden;
+}
+.sale-form .sale-date-shell .input-group-text,
+.sale-form .sale-date-shell .btn {
+    background: transparent;
+    border: 0;
+    color: var(--ui-text-soft, #cbd5f5);
+}
+.sale-form .sale-date-shell .sale-date-icon { color: var(--ui-accent, #22d3ee); }
+.sale-form .sale-date-shell .form-control {
+    background: var(--ui-surface-3, #1f2937) !important;
+    color: var(--ui-text, #ffffff) !important;
+    border: 0;
+    box-shadow: none !important;
+    font-weight: 600;
+}
+.sale-form .flatpickr-input {
+    background: var(--ui-surface-3, #1f2937) !important;
+    color: var(--ui-text, #ffffff) !important;
+}
+.sale-form .sale-date-hint {
+    color: var(--ui-info, #93c5fd);
+    font-size: 0.72rem;
+    margin-top: 4px;
+}
+
+/* Side panel containers */
+.sale-form .side-panel { display: flex; flex-direction: column; gap: 14px; }
+
+.air-datepicker, .flatpickr-calendar {
+    z-index: 2000;
+}
+
+/* ----- Responsive collapse ----- */
+@media (max-width: 1199.98px) {
+    .sale-form .sale-item-header,
+    .sale-form .sale-item-grid {
+        grid-template-columns: minmax(120px, 1.3fr) minmax(100px, 1.1fr) minmax(120px, 1.3fr) minmax(120px, 1fr) minmax(100px, 1.1fr) minmax(90px, 1fr) auto;
+    }
+}
+@media (max-width: 991.98px) {
+    .sale-form .delivery-date-row { flex-direction: column; }
+    .sale-form .sale-item-header,
+    .sale-form .sale-item-grid {
+        grid-template-columns: 1.2fr 1fr 1.2fr 120px 1.2fr 1fr auto;
+    }
+}
+@media (max-width: 575.98px) {
+    .sales-filter-form { row-gap: 0.4rem !important; }
+    .sale-form .sale-item-header { display: none; }
+    .sale-form .sale-item-grid {
+        grid-template-columns: 1fr;
+        row-gap: 0.55rem;
+    }
+    .sale-form .sale-item-grid > *::before { display: block; }
+    .sale-form .modal-body { padding: 0.65rem !important; }
+    .sale-form .section-title { margin-bottom: 0.35rem; font-size: 0.82rem; }
+    .sale-form .compact-item-row {
+        gap: 0.35rem;
+        padding: 0.45rem !important;
+        margin-bottom: 0.45rem !important;
+    }
+    .sale-form .delivery-row-labels { font-size: 0.62rem; margin-bottom: 0.3rem; }
+    .sale-form .delivery-row { gap: 0.35rem; }
+    .sale-form .modal-footer {
+        gap: 0.4rem !important;
+        padding: 0.55rem 0.6rem !important;
+    }
+}
+
+/* Theme-aware form controls inside sale modals */
+.sale-form .form-control,
+.sale-form .form-select {
+    background: var(--ui-surface-2, #1a2332) !important;
+    border-color: var(--ui-border-strong, #3b465c) !important;
+    color: var(--ui-text, #fff) !important;
+}
+.sale-form .form-control:focus,
+.sale-form .form-select:focus {
+    border-color: var(--ui-accent, #fbbf24) !important;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.15) !important;
+}
+.sale-form .form-control::placeholder {
+    color: var(--ui-text-muted, #64748b) !important;
+}
+.sale-form label:not(.form-check-label) {
+    color: var(--ui-text-muted, #94a3b8) !important;
+}
+</style>
+
+{% set _ds_toolbar %}
+    <a href="/" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Back</a>
+    <a href="/mixed_transactions" class="btn btn-outline-info btn-sm fw-bold"><i class="bi bi-shuffle me-1"></i> Mixed Report</a>
+    <button type="button" class="btn btn-warning btn-sm text-dark fw-bold" data-open-sale-modal="Billed">
+        <i class="bi bi-plus-lg"></i> Add Sale
+    </button>
+{% endset %}
+{{ ui_header('bi-cart-check', 'Sales', subtitle='Direct sales — billed and unbilled', toolbar=_ds_toolbar) }}
+
+<div class="ds-mode-tabs mb-3">
+    <a href="{{ url_for('direct_sales_page', show='active') }}" class="btn btn-sm {% if show_mode == 'active' %}btn-warning text-dark{% else %}btn-outline-warning{% endif %} fw-bold">Active</a>
+    <a href="{{ url_for('direct_sales_page', show='all') }}" class="btn btn-sm {% if show_mode == 'all' %}btn-info text-dark{% else %}btn-outline-info{% endif %} fw-bold">All</a>
+</div>
+
+<div class="ui-card ds-filter-card mb-3">
+    <div class="ui-card-body">
+        <button class="btn btn-outline-secondary btn-sm w-100 mb-2 d-md-none fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#dsFilterCollapse" aria-expanded="false" aria-controls="dsFilterCollapse">
+            <i class="bi bi-funnel me-1"></i> Filter Options
+        </button>
+        <div class="collapse d-md-block" id="dsFilterCollapse">
+        <form method="GET" action="{{ url_for('direct_sales_page') }}" class="row g-2 form-grid-top ui-helper-form sales-filter-form">
+            <input type="hidden" name="show" value="{{ show_mode }}">
+            <input type="hidden" name="page" value="1">
+            <div class="col-lg-2 col-md-4 col-sm-6 position-relative">
+                <label class="ui-label">Client</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="client" id="dsFilterClient" class="form-control" value="{{ (filters.client if filters else '') or '' }}" placeholder="Search client..." autocomplete="off" onfocus="showCombobox('dsFilterClient', 'dsFilterClientList')" oninput="filterCombobox('dsFilterClient', 'dsFilterClientList', 'dsFilterClientDisplay')">
+                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('dsFilterClient', 'dsFilterClientList')"><i class="bi bi-chevron-down text-warning"></i></button>
+                </div>
+                <div id="dsFilterClientList" class="combobox-list shadow-lg" style="display:none;">
+                    {% for client in clients %}
+                    <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="dsFilterClient" data-combo-display="dsFilterClientDisplay">
+                        <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                        <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="dsFilterClientDisplay" class="text-info small mt-1 fw-bold"></div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="ui-label">Bill No</label>
+                <input type="text" name="bill_no" class="form-control form-control-sm" value="{{ (filters.bill_no if filters else '') or '' }}" placeholder="Manual/Auto/Invoice">
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="ui-label">Billed State</label>
+                <select name="bill_state" class="form-select form-select-sm">
+                    <option value="all" {% if (filters.bill_state if filters else 'all') == 'all' %}selected{% endif %}>All</option>
+                    <option value="billed" {% if (filters.bill_state if filters else '') == 'billed' %}selected{% endif %}>Billed</option>
+                    <option value="unbilled" {% if (filters.bill_state if filters else '') == 'unbilled' %}selected{% endif %}>Unbilled</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="ui-label">Category</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {% if (filters.category if filters else '') == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6 position-relative">
+                <label class="ui-label">Material</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="material" id="dsFilterMat" class="form-control" value="{{ (filters.material if filters else '') or '' }}" placeholder="Search material..." autocomplete="off" onfocus="showCombobox('dsFilterMat', 'dsFilterMatList')" oninput="filterCombobox('dsFilterMat', 'dsFilterMatList', 'dsFilterMatDisplay')">
+                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('dsFilterMat', 'dsFilterMatList')"><i class="bi bi-chevron-down text-warning"></i></button>
+                </div>
+                <div id="dsFilterMatList" class="combobox-list shadow-lg" style="display:none;">
+                    {% for mat in materials %}
+                    <div class="combobox-item" data-combo-code="{{ mat.name }}" data-combo-name="{{ mat.name }}" data-combo-input="dsFilterMat" data-combo-display="dsFilterMatDisplay">
+                        <span class="fw-bold text-warning code-span">{{ mat.name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="dsFilterMatDisplay" class="text-info small mt-1 fw-bold"></div>
+            </div>
+            <div class="col-lg-1 col-md-3 col-sm-6">
+                <label class="ui-label">Rows</label>
+                <select name="per_page" class="form-select form-select-sm">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-12 d-flex gap-2 align-items-end">
+                <button type="submit" class="btn btn-warning btn-sm text-dark fw-bold flex-grow-1">Apply</button>
+                <a href="{{ url_for('direct_sales_page', show=show_mode, per_page=per_page) }}" class="btn btn-outline-light btn-sm fw-bold">Reset</a>
+            </div>
+        </form>
+        </div>
+    </div>
+</div>
+
+<div class="ds-add-grid mb-4">
+    <button type="button" class="ds-add-tile ds-add-tile--billed" data-open-sale-modal="Billed">
+        <div class="ds-add-label"><i class="bi bi-receipt me-2"></i>Billed Sales (Due / Booking)</div>
+        <div class="ds-add-value">{{ stats.billed }}</div>
+        <span class="ds-add-cta ds-add-cta--billed">Click to Add</span>
+    </button>
+    <button type="button" class="ds-add-tile ds-add-tile--unbilled" data-open-sale-modal="Unbilled">
+        <div class="ds-add-label"><i class="bi bi-cash-coin me-2"></i>Unbilled Sales (Cash)</div>
+        <div class="ds-add-value">{{ stats.unbilled }}</div>
+        <span class="ds-add-cta ds-add-cta--unbilled">Click to Add</span>
+    </button>
+</div>
+
+<div class="ui-card ds-table-card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 ds-sales-table">
+            <thead>
+                <tr>
+                    <th class="text-center">Bill No.</th>
+                    <th class="text-center">System Ref</th>
+                    <th class="text-center">Status</th>
+                    <th>Client</th>
+                    <th>Date &amp; Time</th>
+                    <th>Material</th>
+                    <th class="text-end">Qty</th>
+                    <th class="text-end">Total Amount</th>
+                    <th class="text-end">Driver Rent</th>
+                    <th>Notes</th>
+                    <th class="text-end pe-4">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales %}
+                <tr {% if sale.is_void %}class="ds-row-void"{% endif %}>
+                    <td class="text-center" data-label="Bill No.">
+                        {% set shown_refs = [] %}
+                        {% if sale.manual_bill_no and sale.manual_bill_no not in shown_refs %}
+                        <a href="{{ url_for('view_bill', bill_no=sale.manual_bill_no|replace('#', '%23'), src='direct_sale', src_id=sale.id, client_name=sale.client_name) }}" class="badge bg-dark border border-secondary text-warning text-decoration-none me-1">{{ sale.manual_bill_no }}</a>
+                        {% set _ = shown_refs.append(sale.manual_bill_no) %}
+                        {% endif %}
+                        {% if sale.invoice and sale.invoice.invoice_no and sale.invoice.invoice_no not in shown_refs %}
+                        <a href="{{ url_for('view_bill', bill_no=sale.invoice.invoice_no|replace('#', '%23'), src='direct_sale', src_id=sale.id, client_name=sale.client_name) }}" class="badge bg-dark border border-secondary text-info text-decoration-none me-1">{{ sale.invoice.invoice_no }}</a>
+                        {% set _ = shown_refs.append(sale.invoice.invoice_no) %}
+                        {% endif %}
+                        {% if not shown_refs %}
+                        <span class="badge bg-secondary text-white border border-secondary border-opacity-25">CASH-SALE</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center" data-label="System Ref">
+                        {% if sale.auto_bill_no %}
+                        <a href="{{ url_for('view_bill', bill_no=sale.auto_bill_no|replace('#', '%23'), src='direct_sale', src_id=sale.id, client_name=sale.client_name) }}" class="badge bg-dark border border-secondary text-info text-decoration-none">{{ sale.auto_bill_no }}</a>
+                        {% else %}
+                        <span class="text-white-50">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center" data-label="Status">
+                        {% if sale.is_void %}
+                            <span class="badge bg-danger">DELETED</span>
+                        {% else %}
+                            {% if sale.category == 'Open Khata' %}
+                            <span class="badge bg-warning text-dark border border-warning border-opacity-50">OPEN KHATA</span>
+                            {% elif sale.category == 'Cash' and not sale.manual_bill_no and not sale.invoice_id %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25">UNBILLED</span>
+                            {% else %}
+                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25">BILLED</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td data-label="Client">
+                        {{ sale.client_name }}
+                        {% if sale.category == 'Open Khata' %}
+                        <span class="badge bg-warning text-dark ms-1">Open Khata</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Date &amp; Time">
+                        <span class="d-block">{{ sale.date_posted.strftime('%Y-%m-%d') if sale.date_posted else '-' }}</span>
+                        <small class="text-white-50">{{ sale.date_posted.strftime('%I:%M %p') if sale.date_posted else '' }}</small>
+                    </td>
+                    <td data-label="Material">
+                        {% if sale.items %}
+                            {% for it in sale.items %}
+                            <div class="small">{{ it.product_name }}{% if it.alternate_material %} <span class="text-white-50">/ {{ it.alternate_material }}</span>{% endif %}</div>
+                            {% endfor %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold" data-label="Qty">
+                        {% if sale.items %}
+                            {% for it in sale.items %}
+                            <div>{{ it.qty }}</div>
+                            {% endfor %}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold text-danger" data-label="Total Amount">{{ currency_symbol }}{{ "%.2f"|format(sale.amount) }}</td>
+                    {% set sale_rent_total = delivery_rent_totals_by_sale.get(sale.id, 0) %}
+                    <td class="text-end fw-bold text-warning" data-label="Driver Rent">{{ currency_symbol }}{{ "%.2f"|format((sale_rent_total or 0)) }}</td>
+                    <td data-label="Notes">
+                        {% if sale.note %}
+                        <span class="ds-note" title="{{ sale.note }}">{{ sale.note }}</span>
+                        {% else %}
+                        <span class="text-white-50">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4" data-label="Actions">
+                        {% set sale_bill_ref = (sale.invoice.invoice_no if sale.invoice else (sale.manual_bill_no or sale.auto_bill_no or ('DS-' ~ sale.id))) %}
+                        {% if not sale.is_void %}
+                        {% if sale.invoice %}
+                        <a href="{{ url_for('view_bill', bill_no=sale.invoice.invoice_no|replace('#', '%23'), src='direct_sale', src_id=sale.id, client_name=sale.client_name) }}" class="btn btn-outline-info btn-sm border-2 rounded-pill shadow-sm me-1" title="View Invoice"><i class="bi bi-receipt"></i></a>
+                        {% elif sale.manual_bill_no %}
+                        <a href="{{ url_for('view_bill', bill_no=sale.manual_bill_no|replace('#', '%23'), src='direct_sale', src_id=sale.id, client_name=sale.client_name) }}" class="btn btn-outline-info btn-sm border-2 rounded-pill shadow-sm me-1" title="View"><i class="bi bi-eye"></i></a>
+                        {% elif sale.auto_bill_no %}
+                        <a href="{{ url_for('view_bill', bill_no=sale.auto_bill_no|replace('#', '%23'), src='direct_sale', src_id=sale.id, client_name=sale.client_name) }}" class="btn btn-outline-secondary btn-sm border-2 rounded-pill shadow-sm me-1" title="View Auto Bill"><i class="bi bi-cash"></i></a>
+                        {% else %}
+                        <button class="btn btn-outline-secondary btn-sm border-2 rounded-pill shadow-sm me-1" title="Cash Sale"><i class="bi bi-cash"></i></button>
+                        {% endif %}
+                        <a href="{{ url_for('download_invoice', bill_no=sale_bill_ref|replace('#', '%23'), src='direct_sale', src_id=sale.id, client_name=sale.client_name) }}" class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" title="Download PDF"><i class="bi bi-download"></i></a>
+                        <a href="{{ url_for('download_invoice', bill_no=sale_bill_ref|replace('#', '%23'), action='print', src='direct_sale', src_id=sale.id, client_name=sale.client_name) }}" target="_blank" class="btn btn-outline-success btn-sm border-2 rounded-pill shadow-sm me-1" title="Print PDF"><i class="bi bi-printer"></i></a>
+                        {% if sale.photo_path %}
+                        <a href="{{ url_for('uploaded_file', filename=sale.photo_path) }}" target="_blank" class="btn btn-outline-light btn-sm border-2 rounded-pill shadow-sm me-1" title="View Photo (p)"><i class="bi bi-file-image"></i></a>
+                        {% endif %}
+                        {% if sale.photo_url %}
+                        <a href="{{ sale.photo_url }}" target="_blank" class="btn btn-outline-light btn-sm border-2 rounded-pill shadow-sm me-1" title="View URL (u)"><i class="bi bi-link-45deg"></i></a>
+                        {% endif %}
+                        <button type="button" class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" data-edit-sale-url="{{ url_for('direct_sale_edit_modal', sale_id=sale.id) }}" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        {% if current_user.role == 'admin' %}
+                        <form action="{{ url_for('delete_transaction', type='DirectSale', id=sale.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this sale? Stock will be reversed.')">
+                            <button type="submit" class="btn btn-outline-danger btn-sm border-2 rounded-pill shadow-sm">Delete</button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="11" class="text-center py-4 text-white-50">No sales found for selected filters.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% if pagination and pagination.pages > 1 %}
+<nav aria-label="Sales pagination" class="d-flex justify-content-center mt-3 mb-4">
+    <ul class="pagination pagination-sm mb-0">
+        {% if pagination.has_prev %}
+        <li class="page-item">
+            <a class="page-link bg-dark border-secondary text-warning"
+               href="{{ url_for('direct_sales_page', page=pagination.prev_num, per_page=per_page, show=show_mode, client=(filters.client if filters else ''), bill_no=(filters.bill_no if filters else ''), bill_state=(filters.bill_state if filters else ''), category=(filters.category if filters else ''), material=(filters.material if filters else '')) }}">Previous</a>
+        </li>
+        {% endif %}
+        <li class="page-item active">
+            <span class="page-link bg-warning border-warning text-dark">{{ pagination.page }} / {{ pagination.pages }}</span>
+        </li>
+        {% if pagination.has_next %}
+        <li class="page-item">
+            <a class="page-link bg-dark border-secondary text-warning"
+               href="{{ url_for('direct_sales_page', page=pagination.next_num, per_page=per_page, show=show_mode, client=(filters.client if filters else ''), bill_no=(filters.bill_no if filters else ''), bill_state=(filters.bill_state if filters else ''), category=(filters.category if filters else ''), material=(filters.material if filters else '')) }}">Next</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<!-- ===================== ADD SALE MODAL (full-page) ===================== -->
+<div class="modal fade" id="addSaleModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen">
+        <form class="modal-content sale-form ui-helper-form ds-sale-sheet" action="/add_direct_sale" method="POST" enctype="multipart/form-data">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold mb-0" id="addSaleModalLabel">New Direct Sale</h5>
+                <div class="ms-auto d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-outline-info btn-sm fw-bold" onclick="openHoldDraftsModal()" title="Hold Bills">
+                        <i class="bi bi-window"></i>
+                        <span class="badge bg-dark text-info border border-info ms-1">{{ (hold_drafts|length) if hold_drafts is defined else 0 }}</span>
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm fw-bold" onclick="submitHoldSale()">
+                        <i class="bi bi-plus-lg"></i> Hold
+                    </button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <!-- Left side panel: client + booking + financial summary -->
+                    <div class="col-lg-3 col-md-4 border-end border-secondary pe-md-3 side-panel">
+                        <div id="categorySelectDiv">
+                            <label class="text-white-50 small fw-bold mb-1">1. Select Sale Type</label>
+                            <select name="category" id="saleCategory" class="form-select bg-dark text-white border-secondary w-sale-type">
+                                <option value="Booking Delivery">Booked Sale</option>
+                                <option value="Mixed Transaction">Booked + Due</option>
+                                <option value="Credit Customer">Due Sale</option>
+                                <option value="Open Khata">Open Khata</option>
+                                <option value="Cash">Cash Sale</option>
+                            </select>
+                        </div>
+                        <div class="position-relative">
+                            <label class="text-white-50 small fw-bold mb-1">2. Select Client</label>
+                            <div class="input-group" id="clientSearchGroup">
+                                <input type="text" name="client_code" id="addSaleClientCode" class="form-control bg-dark text-white border-secondary w-client" placeholder="Search by name or code..." autocomplete="off" required data-combo-list="addSaleCombobox" data-combo-display="addSaleClientNameDisplay" value="{{ client_name_prefill or '' }}">
+                                <button class="btn btn-outline-secondary" type="button" data-combo-toggle data-combo-list="addSaleCombobox" data-combo-input="addSaleClientCode">
+                                    <i class="bi bi-chevron-down text-warning"></i>
+                                </button>
+                            </div>
+                            <input type="hidden" name="client_name" id="addSaleClientNameHidden" value="{{ client_name_prefill or '' }}">
+                            <div id="addSaleCombobox" class="combobox-list shadow-lg" style="display: none;" data-display-id="addSaleClientNameDisplay" data-name-input-id="addSaleClientNameHidden" data-after="onSaleClientPicked">
+                                {% for client in clients %}
+                                <div class="combobox-item" data-client-code="{{ client.code }}" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="addSaleClientCode" data-combo-display="addSaleClientNameDisplay" data-combo-name-input="addSaleClientNameHidden">
+                                    <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                                    <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div id="addSaleClientNameDisplay" class="text-info small mt-1 fw-bold"></div>
+                        </div>
+                        <div class="position-relative" id="manualClientNameGroup" style="display:none;">
+                            <label class="text-white-50 small fw-bold mb-1">Customer Name (Manual)</label>
+                            <div class="input-group">
+                                <input type="text" name="manual_client_name" id="manualClientName" class="form-control bg-dark text-white border-secondary" placeholder="Search by name..." autocomplete="off" onfocus="showCombobox('manualClientName', 'addSaleManualClientList')" oninput="filterCombobox('manualClientName', 'addSaleManualClientList', 'addSaleManualClientDisplay')">
+                                <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('manualClientName', 'addSaleManualClientList')">
+                                    <i class="bi bi-chevron-down text-warning"></i>
+                                </button>
+                            </div>
+                            <div id="addSaleManualClientList" class="combobox-list shadow-lg" style="display: none;">
+                                {% for client in clients %}
+                                <div class="combobox-item" data-combo-code="{{ client.name }}" data-combo-name="{{ client.name }}" data-combo-input="manualClientName" data-combo-display="addSaleManualClientDisplay">
+                                    <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                                    <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div id="addSaleManualClientDisplay" class="text-info small mt-1 fw-bold"></div>
+                        </div>
+                        <div id="bookingStatusContainer" class="p-3 rounded border" style="min-height: 220px; overflow-y: auto; background: var(--ui-surface-2); border-color: var(--ui-border-strong);">
+                            <p class="text-white-50 text-center mt-5">Select a client to see booked items</p>
+                        </div>
+                        <div id="clientFinancialContainer" class="p-3 rounded border" style="min-height: 110px; background: var(--ui-surface-2); border-color: var(--ui-border-strong);">
+                            <p class="text-white-50 text-center mt-3 mb-0">Select a client to see running balance</p>
+                        </div>
+                    </div>
+
+                    <!-- Right side: sale details -->
+                    <div class="col-lg-9 col-md-8 ps-md-3">
+                        <div class="section-title">3. Sale Details</div>
+                        <input type="hidden" name="has_bill" id="addSaleHasBillHidden" value="1">
+                        <input type="hidden" name="create_invoice" id="addSaleCreateInvoiceHidden" value="1">
+                        <input type="hidden" name="track_as_cash" id="addSaleTrackAsCashHidden" value="0">
+                        <input type="hidden" name="draft_id" id="addSaleDraftId" value="">
+                        <input type="hidden" name="idempotency_key" id="addSaleIdempotencyKey" value="">
+
+                        <div class="delivery-date-row mb-3">
+                            <div class="delivery-section">
+                                <label class="text-white-50 small fw-bold mb-1">Delivery Persons</label>
+                                <div class="delivery-row-labels">
+                                    <div class="delivery-cell">Delivery Person</div>
+                                    <div class="delivery-cell text-center">Bags Delivered</div>
+                                    <div class="delivery-cell text-center">Rent</div>
+                                    <div class="delivery-cell shrink text-center">Remove</div>
+                                </div>
+                                <div class="delivery-person-rows">
+                                    <div class="delivery-person-row delivery-row">
+                                        <div class="delivery-cell">
+                                            <select name="delivery_person_id[]" class="form-select bg-dark text-white border-secondary delivery-person-select" required>
+                                                <option value="">Select person</option>
+                                                {% for dp in delivery_persons %}
+                                                <option value="{{ dp.id }}">{{ dp.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="delivery-cell">
+                                            <input type="number" step="any" name="delivery_bags[]" class="form-control bg-dark text-white border-secondary text-center delivery-bags-input" value="">
+                                        </div>
+                                        <div class="delivery-cell">
+                                            <input type="number" step="0.01" name="delivery_rent_amount[]" class="form-control bg-dark text-white border-secondary text-center delivery-rent-input" value="">
+                                        </div>
+                                        <div class="delivery-cell shrink text-center">
+                                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeDeliveryPersonRow(this)">X</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-warning w-100 mt-2" onclick="addDeliveryPersonRow(this)">+ Add Delivery Person</button>
+                            </div>
+                            <div class="delivery-section">
+                                <label class="text-white-50 small fw-bold mb-1">Sale Date</label>
+                                <div class="delivery-date-spacer"></div>
+                                <div class="input-group sale-date-shell">
+                                    <span class="input-group-text"><i class="bi bi-calendar-event sale-date-icon"></i></span>
+                                    <input type="text" name="sale_date" id="addSaleDate" class="form-control text-white air-date-time" placeholder="YYYY-MM-DD HH:MM" readonly>
+                                    <button class="btn sale-date-btn" type="button" aria-label="Open calendar"><i class="bi bi-calendar-week"></i></button>
+                                </div>
+                                <div id="addSaleDateHint" class="sale-date-hint">--</div>
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-2" id="manualClientToggleDiv" style="display:none;">
+                            <input class="form-check-input" type="checkbox" id="manualClientCheck">
+                            <label class="form-check-label text-white-50 small" for="manualClientCheck">Unregistered / Manual Client Name</label>
+                        </div>
+                        <div class="d-flex justify-content-end mb-1">
+                            <div class="form-check form-check-sm">
+                                <input class="form-check-input" type="checkbox" id="toggleIgnoreBookingAdd">
+                                <label class="form-check-label text-white-50 small" for="toggleIgnoreBookingAdd">Show ignore booking per item</label>
+                            </div>
+                        </div>
+                        <div class="sale-item-header d-none d-md-grid mb-2 px-2 text-white-50">
+                            <div class="text-center">Material</div>
+                            <div class="text-center">GRN</div>
+                            <div class="text-center">Alternate</div>
+                            <div class="text-center">Qty</div>
+                            <div class="text-center">Unit Price</div>
+                            <div class="text-center">Item Total</div>
+                            <div class="text-center">Remove</div>
+                        </div>
+                        <div id="sale-items-container">
+                            <div class="compact-item-row mb-2 p-2 rounded border border-secondary bg-dark">
+                                <div class="sale-item-grid">
+                                    <div class="position-relative">
+                                        <div class="input-group input-group-sm">
+                                            <input type="hidden" name="material_id[]" id="addSaleMaterialId0" class="material-id-input" value="">
+                                            <input type="text" name="product_name[]" id="addSaleMaterialSearch0" class="form-control bg-dark text-white border-secondary price-trigger w-material" placeholder="Search material..." autocomplete="off" required data-combo-list="addSaleMaterialList0" data-combo-display="addSaleMaterialDisplay0" data-material-id-input="addSaleMaterialId0">
+                                            <button class="btn btn-outline-secondary material-toggle-btn" type="button" data-combo-toggle data-combo-list="addSaleMaterialList0" data-combo-input="addSaleMaterialSearch0">
+                                                <i class="bi bi-chevron-down text-warning"></i>
+                                            </button>
+                                        </div>
+                                        <div id="addSaleMaterialList0" class="combobox-list shadow-lg" style="display: none;">
+                                            {% for mat in materials %}
+                                            <div class="combobox-item" data-value="{{ mat.name }}" data-material-id="{{ mat.id }}" data-combo-code="{{ mat.name }}" data-combo-name="{{ mat.name }}" data-combo-input="addSaleMaterialSearch0" data-combo-display="addSaleMaterialDisplay0" data-combo-after="onSaleMaterialPicked">
+                                                <span class="fw-bold text-warning code-span">{{ mat.name }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div id="addSaleMaterialDisplay0" class="text-info small mt-1 fw-bold"></div>
+                                    </div>
+                                    <div class="position-relative">
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" name="grn_item_id[]" id="addSaleGRNSearch0" class="form-control bg-dark text-white border-secondary grn-input w-grn" placeholder="GRN (optional)" autocomplete="off" data-combo-list="addSaleGRNList0" data-combo-display="addSaleGRNDisplay0">
+                                            <button class="btn btn-outline-secondary grn-toggle-btn" type="button" data-combo-toggle data-combo-list="addSaleGRNList0" data-combo-input="addSaleGRNSearch0">
+                                                <i class="bi bi-chevron-down text-warning"></i>
+                                            </button>
+                                        </div>
+                                        <div id="addSaleGRNList0" class="combobox-list shadow-lg" style="display: none;">
+                                            {% for grn in grns %}
+                                            {% for item in grn.items if not item.is_void %}
+                                            <div class="combobox-item" data-value="{{ item.id }}" data-material="{{ item.mat_name }}" data-combo-code="{{ item.id }}" data-combo-name="{{ grn.manual_bill_no or grn.auto_bill_no }} - {{ item.mat_name }} ({{ item.qty }} @ Rs.{{ item.price_at_time }})" data-combo-input="addSaleGRNSearch0" data-combo-display="addSaleGRNDisplay0">
+                                                <span class="fw-bold text-warning code-span">{{ grn.manual_bill_no or grn.auto_bill_no }}</span>
+                                                <span class="ms-2 text-white-50 small">{{ item.mat_name }} ({{ item.qty }} @ Rs.{{ item.price_at_time }})</span>
+                                            </div>
+                                            {% endfor %}
+                                            {% endfor %}
+                                        </div>
+                                        <div id="addSaleGRNDisplay0" class="text-info small mt-1 fw-bold"></div>
+                                    </div>
+                                    <div class="position-relative">
+                                        <div class="input-group input-group-sm">
+                                            <input type="hidden" name="alternate_material_id[]" id="addSaleAltMaterialId0" class="alt-material-id-input" value="">
+                                            <input type="text" name="alternate_material[]" id="addSaleAltMaterialSearch0" class="form-control bg-dark text-white border-secondary alt-material-input w-alt-material" placeholder="Alternate (optional)" autocomplete="off" data-combo-list="addSaleAltMaterialList0" data-combo-display="addSaleAltMaterialDisplay0" data-material-id-input="addSaleAltMaterialId0">
+                                            <button class="btn btn-outline-secondary alt-material-toggle-btn" type="button" data-combo-toggle data-combo-list="addSaleAltMaterialList0" data-combo-input="addSaleAltMaterialSearch0">
+                                                <i class="bi bi-chevron-down text-warning"></i>
+                                            </button>
+                                        </div>
+                                        <div id="addSaleAltMaterialList0" class="combobox-list alt-material-list shadow-lg" style="display: none;">
+                                            {% for mat in materials %}
+                                            <div class="combobox-item" data-value="{{ mat.name }}" data-material-id="{{ mat.id }}" data-combo-code="{{ mat.name }}" data-combo-name="{{ mat.name }}" data-combo-input="addSaleAltMaterialSearch0" data-combo-display="addSaleAltMaterialDisplay0">
+                                                <span class="fw-bold text-warning code-span">{{ mat.name }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div id="addSaleAltMaterialDisplay0" class="text-info small mt-1 fw-bold alt-material-display"></div>
+                                    </div>
+                                    <div>
+                                        <div class="input-group input-group-sm">
+                                            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="changeSaleQty(this, -1)">-</button>
+                                            <input type="number" step="any" name="qty[]" value="1" class="form-control bg-dark text-white border-secondary text-center qty-input w-qty" style="font-size: 1.05rem; font-weight: 700; padding: 0.475rem 0.5rem;" required>
+                                            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="changeSaleQty(this, 1)">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="rate-cell position-relative">
+                                        <input type="number" step="any" name="unit_rate[]" class="form-control form-control-sm bg-dark text-white border-secondary rate-input w-rate" placeholder="Rate (not needed if booked)">
+                                        <div class="reserved-rate-badge text-warning small fw-bold" style="display:none;">Reserved</div>
+                                        <div class="ignore-booking-inline">
+                                            <input type="hidden" name="ignore_booking_item[]" value="0" class="ignore-booking-hidden">
+                                            <input class="form-check-input ignore-booking-item" type="checkbox">
+                                            <span class="text-white-50 small">Ignore</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <input type="number" step="any" class="form-control form-control-sm bg-dark text-info border-secondary text-center line-total" placeholder="Item Total" readonly tabindex="-1">
+                                    </div>
+                                    <div class="text-center">
+                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeSaleItemRow(this)" title="Remove item">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="item-status-badge mt-1"></div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-warning mb-3 w-100" onclick="addSaleItemRow()">+ Add More Items</button>
+
+                        <div class="row g-3">
+                            <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">RENT CHARGED TO CLIENT (TOTAL)</label>
+                                    <input type="number" step="0.01" class="form-control bg-dark text-white border-secondary rent-charged-total" value="0" readonly>
+                                </div>
+                               <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">DELIVERY PERSON RENT (ACTUAL)</label>
+                                    <input type="number" step="0.01" name="delivery_rent" class="form-control bg-dark text-white border-secondary delivery-rent-total" value="0" readonly>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">RENT DIFFERENCE (PROFIT/LOSS)</label>
+                                    <input type="number" step="0.01" class="form-control bg-dark text-white border-secondary rent-diff-total" value="0" readonly>
+                                    <small class="rent-diff-hint text-white-50">No difference</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">AUTO BILL NO</label>
+                                    <input type="text" class="form-control bg-dark text-white border-secondary w-bill" value="Not assigned until saved" readonly>
+                                    <small class="text-white-50">Drafts do not reserve bill numbers.</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">MANUAL BILL NO</label>
+                                    <input type="text" id="addSaleManualBill" name="manual_bill_no" class="form-control bg-dark text-white border-secondary w-bill">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">BILL PHOTO</label>
+                                    <input type="file" name="photo" class="form-control bg-dark text-white border-secondary w-photo" accept="image/*">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">PHOTO URL</label>
+                                    <input type="url" name="photo_url" class="form-control bg-dark text-white border-secondary w-photo" placeholder="https://...">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="text-white-50 small fw-bold mb-1">NOTES</label>
+                            <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Add sale notes..."></textarea>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-sm-4">
+                                <div class="mb-3" id="saleTotalGroup">
+                                    <label class="text-white-50 small fw-bold mb-1">TOTAL AMOUNT</label>
+                                    <input type="number" step="0.01" name="amount" id="saleTotal" class="form-control bg-dark text-white border-secondary total-amount" required>
+                                    <small class="text-white-50 x-small" id="amountHelp">Adjust this amount for mixed booking/credit bills.</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="mb-3" id="saleDiscountGroup">
+                                    <label class="text-white-50 small fw-bold mb-1">DISCOUNT</label>
+                                    <input type="number" step="any" name="discount" class="form-control bg-dark text-white border-secondary" value="0">
+                                    <input type="text" name="discount_reason" class="form-control bg-dark text-white border-secondary mt-1 form-control-sm" placeholder="Reason (optional)">
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="mb-3" id="salePaidGroup">
+                                    <label class="text-white-50 small fw-bold mb-1">PAID NOW</label>
+                                    <input type="number" step="0.01" name="paid_amount" class="form-control bg-dark text-white border-secondary" value="0">
+                                    <small class="text-white-50 x-small d-block mt-1">For Cash Sale, this auto-fills as Total − Discount.</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3" id="paymentMethodSection" style="display: none;">
+                            <div class="col-sm-6">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">PAYMENT METHOD</label>
+                                    <select name="payment_method" class="form-select bg-dark text-white border-secondary">
+                                        <option value="Cash">Cash</option>
+                                        <option value="Bank">Bank Transfer</option>
+                                        <option value="Check">Check</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-sm-6" id="salePaymentAccountSection" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="text-white-50 small fw-bold mb-1">SELECT ACCOUNT</label>
+                                    <select name="payment_account_id" class="form-select bg-dark text-white border-secondary">
+                                        <option value="">Select account...</option>
+                                        {% for account in accounts %}
+                                            {% if account.category in ['cash', 'bank'] %}
+                                            <option value="{{ account.id }}" data-category="{{ account.category }}">{{ account.name }}{% if account.category == 'bank' %} ({{ account.bank_name or 'Bank' }}){% endif %}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <div class="small text-muted mt-1" id="salePaymentAccountHint">Bank/branch details are taken from the selected account.</div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="bank_name" value="">
+                            <input type="hidden" name="account_name" value="">
+                            <input type="hidden" name="account_no" value="">
+                        </div>
+                        {% if not settings or not settings.allow_global_negative_stock %}
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="allow_negative_stock" id="allowNegativeStock">
+                            <label class="form-check-label text-danger" for="allowNegativeStock">Allow Negative Stock (Override Limit)</label>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-danger py-2 small mt-3">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Global setting for <strong>Negative Stock Override</strong> is active.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-grow-1 py-2 rounded-pill fw-bold" onclick="resetAddSaleForm()">Reset</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold flex-grow-1 py-2 rounded-pill">Save Sale</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===================== HOLD DRAFTS MODAL ===================== -->
+<div class="modal fade" id="holdDraftsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header" style="border-color: var(--ui-border);">
+                <h5 class="text-warning fw-bold mb-0"><i class="bi bi-window me-2"></i>Hold Bills</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% if hold_drafts %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="text-white-50">
+                            <tr>
+                                <th>Held</th>
+                                <th>Client</th>
+                                <th>Items</th>
+                                <th>Qty</th>
+                                <th>Amount</th>
+                                <th>By</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in hold_drafts %}
+                            <tr>
+                                <td class="text-white-50">{{ d.updated_at.strftime('%Y-%m-%d %I:%M %p') if d.updated_at else '-' }}</td>
+                                <td class="text-white">{{ d.manual_client_name or d.client_name or d.client_code or '-' }}</td>
+                                <td class="text-white-50">{{ d.item_count or 0 }}</td>
+                                <td class="text-white-50">{{ "{:,.2f}".format(d.total_qty or 0) }}</td>
+                                <td class="text-info fw-bold">{{ "{:,.2f}".format(d.total_amount or 0) }}</td>
+                                <td class="text-white-50">{{ d.created_by or '-' }}</td>
+                                <td class="text-end">
+                                    <form method="post" action="{{ url_for('resume_direct_sale_draft', draft_id=d.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Resume</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('delete_direct_sale_draft', draft_id=d.id) }}" class="d-inline" onsubmit="return confirm('Delete this draft?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-white-50 text-center py-4">No held bills yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit forms are fetched only when requested to keep list responses bounded. -->
+<div id="lazyEditSaleModalHost"></div>
+
+<!-- Hidden template used by addDeliveryPersonRow() -->
+<template id="deliveryPersonRowTemplate">
+    <div class="delivery-person-row delivery-row">
+        <div class="delivery-cell">
+            <select name="delivery_person_id[]" class="form-select bg-dark text-white border-secondary delivery-person-select" required>
+                <option value="">Select person</option>
+                {% for dp in delivery_persons %}
+                <option value="{{ dp.id }}">{{ dp.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="delivery-cell">
+            <input type="number" step="any" name="delivery_bags[]" class="form-control bg-dark text-white border-secondary text-center delivery-bags-input" value="">
+        </div>
+        <div class="delivery-cell">
+            <input type="number" step="0.01" name="delivery_rent_amount[]" class="form-control bg-dark text-white border-secondary text-center delivery-rent-input" value="">
+        </div>
+        <div class="delivery-cell shrink text-center">
+            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeDeliveryPersonRow(this)">X</button>
+        </div>
+    </div>
+</template>
+
+<style>
+/* Compact line-item visual treatment */
+.compact-item-row {
+    padding: 0.5rem 0.6rem !important;
+    border-radius: var(--ui-radius, 10px) !important;
+}
+.compact-item-row [id^="addSaleMaterialDisplay"],
+.compact-item-row [id^="editSaleMaterialDisplay"] {
+    min-height: 1rem;
+    line-height: 1rem;
+    margin-top: 2px !important;
+}
+.compact-item-row .item-status-badge {
+    min-height: 14px;
+    display: flex;
+    align-items: center;
+    margin-top: 1px !important;
+}
+.compact-item-row .rate-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+}
+.compact-item-row .rate-cell .rate-input { min-width: 0; text-align: center; flex: 1; }
+.compact-item-row .ignore-booking-inline {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-accent, #f59e0b);
+    border-radius: var(--ui-radius, 0.375rem);
+    background: var(--ui-accent, #facc15);
+    white-space: nowrap;
+}
+.sale-form.show-ignore-booking .ignore-booking-inline { display: inline-flex; }
+.compact-item-row .ignore-booking-inline .form-check-input { margin-top: 0; }
+.compact-item-row .ignore-booking-inline .text-white-50 {
+    color: #111827 !important;
+    font-weight: 700;
+}
+.sale-form input[type=number]::-webkit-outer-spin-button,
+.sale-form input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.sale-form input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.compact-item-row .remove-btn {
+    top: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+    margin-top: 0 !important;
+    background: var(--ui-surface-3, #1f2937);
+    border-radius: 999px;
+    padding: 0 2px;
+}
+.rate-cell.reserved-only .rate-input { display: block; opacity: 0.7; }
+.rate-cell.reserved-only { flex-wrap: wrap; height: auto; }
+.rate-cell .reserved-rate-badge {
+    width: 100%;
+    text-align: center;
+    border: 1px dashed var(--ui-border-strong, #475569);
+    border-radius: var(--ui-radius, 0.375rem);
+    background: color-mix(in srgb, var(--ui-surface-3, #0f172a) 75%, transparent);
+    font-size: 0.72rem;
+    padding: 4px 6px;
+}
+</style>
+<script>
+let saleMaterialRowCounter = 0;
+const bookedEligibleClientCodes = new Set({{ (booked_client_codes or [])|tojson }});
+const knownClientCodes = new Set({{ (clients | map(attribute='code') | list)|tojson }});
+const knownClientNames = new Set({{ (clients | map(attribute='name') | list)|tojson }});
+const knownMaterialNames = new Set({{ (materials | map(attribute='name') | list)|tojson }});
+const knownMaterialCodes = new Set({{ (materials | map(attribute='code') | list)|tojson }});
+window.AMS_KNOWN_MATERIAL_NAMES = new Set([
+    ...Array.from(knownMaterialNames),
+    ...Array.from(knownMaterialNames).map((n) => String(n || '').toLowerCase()),
+    ...Array.from(knownMaterialCodes),
+    ...Array.from(knownMaterialCodes).map((n) => String(n || '').toLowerCase()),
+]);
+const saleFormDraft = {{ (sale_form_draft if sale_form_draft is defined else None)|tojson }};
+const resumeMode = {{ (resume_mode if resume_mode is defined else '')|tojson }};
+const holdSaleEndpoint = {{ url_for('hold_direct_sale')|tojson }};
+let currentSaleLaunchMode = 'Billed';
+const AIR_DATE_LOCALE_EN = {
+    days: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    daysShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    daysMin: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+    months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    monthsShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    today: 'Today',
+    clear: 'Clear',
+    dateFormat: 'yyyy-MM-dd',
+    timeFormat: 'HH:mm',
+    firstDay: 0
+};
+
+function wireComboField(input, button, list, display, inputId, listId, displayId, afterFn) {
+    if (!input || !list) return;
+    input.id = inputId;
+    input.setAttribute('data-combo-list', listId);
+    if (displayId) input.setAttribute('data-combo-display', displayId);
+    input.removeAttribute('onfocus');
+    input.removeAttribute('oninput');
+    if (button) {
+        button.setAttribute('data-combo-toggle', '1');
+        button.setAttribute('data-combo-list', listId);
+        button.setAttribute('data-combo-input', inputId);
+        button.removeAttribute('onclick');
+    }
+    list.id = listId;
+    list.style.display = 'none';
+    list.dataset.anchorInput = inputId;
+    if (displayId) list.dataset.displayId = displayId;
+    if (afterFn) list.dataset.after = afterFn;
+    list.querySelectorAll('.combobox-item').forEach(item => {
+        const value = item.getAttribute('data-combo-code') || item.getAttribute('data-value') || item.innerText.trim();
+        const name = item.getAttribute('data-combo-name') || value;
+        item.setAttribute('data-combo-code', value);
+        item.setAttribute('data-combo-name', name);
+        item.setAttribute('data-combo-input', inputId);
+        if (displayId) item.setAttribute('data-combo-display', displayId);
+        if (afterFn) item.setAttribute('data-combo-after', afterFn);
+        item.removeAttribute('onclick');
+    });
+    if (display) {
+        display.id = displayId;
+        display.innerText = '';
+    }
+}
+
+function prepareSaleMaterialComboboxRow(row, idx) {
+    const input = row.querySelector('.price-trigger');
+    const button = row.querySelector('.material-toggle-btn');
+    const list = row.querySelector('.combobox-list');
+    const display = row.querySelector('[id*="MaterialDisplay"]');
+    if (!input || !list || !display) return;
+
+    wireComboField(input, button, list, display,
+        `addSaleMaterialSearch${idx}`, `addSaleMaterialList${idx}`, `addSaleMaterialDisplay${idx}`,
+        'onSaleMaterialPicked');
+    input.value = '';
+    const matIdInput = row.querySelector('.material-id-input, input[name="material_id[]"]');
+    if (matIdInput) {
+        matIdInput.id = `addSaleMaterialId${idx}`;
+        matIdInput.value = '';
+        input.setAttribute('data-material-id-input', matIdInput.id);
+    }
+    if (typeof window.clearSelectedMaterialId === 'function') window.clearSelectedMaterialId(input);
+
+    const altInput = row.querySelector('.alt-material-input');
+    const altList = row.querySelector('.alt-material-list');
+    const altDisplay = row.querySelector('.alt-material-display');
+    if (altInput && altList && altDisplay) {
+        wireComboField(altInput, row.querySelector('.alt-material-toggle-btn'), altList, altDisplay,
+            `addSaleAltMaterialSearch${idx}`, `addSaleAltMaterialList${idx}`, `addSaleAltMaterialDisplay${idx}`);
+        altInput.value = '';
+        const altIdInput = row.querySelector('.alt-material-id-input, input[name="alternate_material_id[]"]');
+        if (altIdInput) {
+            altIdInput.id = `addSaleAltMaterialId${idx}`;
+            altIdInput.value = '';
+            altInput.setAttribute('data-material-id-input', altIdInput.id);
+        }
+        if (typeof window.clearSelectedMaterialId === 'function') window.clearSelectedMaterialId(altInput);
+    }
+
+    const grnInput = row.querySelector('.grn-input');
+    const grnList = row.querySelector('[id*="GRNList"]');
+    const grnDisplay = row.querySelector('[id*="GRNDisplay"]');
+    if (grnInput && grnList && grnDisplay) {
+        wireComboField(grnInput, row.querySelector('.grn-toggle-btn'), grnList, grnDisplay,
+            `addSaleGRNSearch${idx}`, `addSaleGRNList${idx}`, `addSaleGRNDisplay${idx}`);
+        grnInput.value = '';
+        if (grnInput.dataset.grnFilterBound !== '1') {
+            grnInput.dataset.grnFilterBound = '1';
+            grnInput.addEventListener('focus', function () { filterSaleGrnItems(row); });
+        }
+    }
+}
+
+function onSaleMaterialPicked(code, name, inputId) {
+    const input = inputId ? document.getElementById(inputId) : null;
+    if (!input) return;
+    const row = input.closest('.compact-item-row');
+    if (row) {
+        row.dataset.saleMaterial = name || code || '';
+        const grnInput = row.querySelector('.grn-input');
+        const grnDisplay = row.querySelector('[id*="GRNDisplay"]');
+        if (grnInput) grnInput.value = '';
+        if (grnDisplay) grnDisplay.innerText = '';
+        filterSaleGrnItems(row);
+        checkItemBookingStatus(row);
+    }
+}
+window.onSaleMaterialPicked = onSaleMaterialPicked;
+
+function filterSaleGrnItems(row) {
+    if (!row) return;
+    const selectedMaterial = (row.dataset.saleMaterial || '').trim().toLowerCase();
+    const grnList = row.querySelector('[id*="GRNList"]');
+    if (!grnList) return;
+    grnList.querySelectorAll('.combobox-item').forEach(item => {
+        const itemMaterial = (item.dataset.material || '').trim().toLowerCase();
+        const matches = !selectedMaterial || itemMaterial === selectedMaterial;
+        item.style.display = matches ? '' : 'none';
+    });
+}
+
+function selectSaleMaterial(inputId, listId, value, displayId) {
+    selectComboboxItem(inputId, listId, value, value, displayId);
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const row = input.closest('.compact-item-row');
+    if (row) {
+        row.dataset.saleMaterial = value;
+        const grnInput = row.querySelector('.grn-input');
+        const grnDisplay = row.querySelector('[id*="GRNDisplay"]');
+        if (grnInput) grnInput.value = '';
+        if (grnDisplay) grnDisplay.innerText = '';
+        filterSaleGrnItems(row);
+    }
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    if (row) checkItemBookingStatus(row);
+}
+
+function selectGRNItem(inputId, listId, value, displayText, displayId) {
+    selectComboboxItem(inputId, listId, value, displayText, displayId);
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function populateEditGRNDisplays(form) {
+    form.querySelectorAll('.grn-input').forEach(input => {
+        const grnItemId = input.value.trim();
+        if (!grnItemId) return;
+        
+        const displayId = input.id.replace('Search', 'Display');
+        const displayEl = document.getElementById(displayId);
+        if (!displayEl) return;
+        
+        // Find the corresponding GRN item in the combobox list
+        const listId = input.id.replace('Search', 'List');
+        const listEl = document.getElementById(listId);
+        if (!listEl) return;
+        
+        const itemEl = listEl.querySelector(`.combobox-item[data-value="${grnItemId}"]`);
+        if (itemEl) {
+            const displayText = itemEl.innerText.trim();
+            displayEl.innerText = displayText;
+        }
+    });
+}
+
+function formatPrecisionInput(value, maxDecimals = 8) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0';
+    return n.toFixed(maxDecimals).replace(/\.?0+$/, '');
+}
+
+function changeSaleQty(btn, delta) {
+    const input = btn.parentElement.querySelector('input');
+    let val = parseFloat(input.value) || 0;
+    val = Math.max(0, val + delta);
+    input.value = formatPrecisionInput(val);
+    updateSalePrice(btn.closest('form'));
+}
+
+function addSaleItemRow() {
+    const container = document.getElementById('sale-items-container');
+    const firstRow = container.querySelector('.compact-item-row');
+    let newRow = null;
+    if (firstRow) {
+        newRow = firstRow.cloneNode(true);
+    } else if (window.saleRowTemplate) {
+        newRow = window.saleRowTemplate.cloneNode(true);
+    }
+    if (!newRow) return;
+    newRow.querySelectorAll('input').forEach(i => {
+        if(i.classList.contains('qty-input')) { i.value = '1'; }
+        else { i.value = ''; }
+    });
+    newRow.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    newRow.querySelectorAll('.ignore-booking-hidden').forEach(h => { h.value = '0'; });
+    newRow.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
+    saleMaterialRowCounter += 1;
+    prepareSaleMaterialComboboxRow(newRow, saleMaterialRowCounter);
+    container.appendChild(newRow);
+    attachSaleListeners(newRow);
+    syncSaleRowToggleButton(newRow);
+    updateSalePrice(container.closest('form'));
+}
+
+function addSaleItemRowEdit(btn) {
+    const container = btn.previousElementSibling;
+    const firstRow = container ? container.querySelector('.compact-item-row') : null;
+    if (!container || !firstRow) return;
+    const newRow = firstRow.cloneNode(true);
+    
+    newRow.querySelectorAll('input').forEach(i => {
+        if(i.classList.contains('qty-input')) { i.value = '1'; }
+        else { i.value = ''; }
+    });
+    newRow.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    newRow.querySelectorAll('.ignore-booking-hidden').forEach(h => { h.value = '0'; });
+    newRow.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
+    saleMaterialRowCounter += 1;
+    prepareSaleMaterialComboboxRow(newRow, saleMaterialRowCounter);
+    container.appendChild(newRow);
+    attachSaleListeners(newRow);
+    syncSaleRowToggleButton(newRow);
+    updateSalePrice(container.closest('form'));
+}
+
+function removeSaleItemRow(btn) {
+    const row = btn.closest('.compact-item-row');
+    if (!row) return;
+    const container = row.parentElement;
+    const rows = container ? container.querySelectorAll('.compact-item-row') : [];
+    if (rows.length <= 1) {
+        row.querySelectorAll('input').forEach(i => {
+            if (i.classList.contains('qty-input')) { i.value = '1'; }
+            else if (i.classList.contains('ignore-booking-hidden')) { i.value = '0'; }
+            else { i.value = ''; }
+        });
+        row.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+        const materialDisplay = row.querySelector('[id*="MaterialDisplay"]');
+        if (materialDisplay) materialDisplay.innerText = '';
+        const altDisplay = row.querySelector('.alt-material-display');
+        if (altDisplay) altDisplay.innerText = '';
+        updateSalePrice(row.closest('form'));
+        return;
+    }
+    row.remove();
+    updateSalePrice(container.closest('form'));
+}
+
+// Global to store booking info
+let currentClientBookings = {};
+let currentClientBookingRates = {};
+// In-flight coalescing for the two side-panel lookups. Picking a client fires
+// both the combobox `after` hook and the input `change` listener; without this
+// the same /api/client_booking_status and /api/client_financial_summary calls
+// were issued twice (and the old 30s timer multiplied them further).
+let bookingStatusInflight = {};
+let financialSummaryInflight = {};
+const currencySymbol = "{{ currency_symbol|default('') }}";
+function formatDateTimeLocal(d) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function placeCursorAtEnd(input) {
+    if (!input) return;
+    try {
+        const len = (input.value || '').length;
+        input.setSelectionRange(len, len);
+    } catch (_err) {
+        // Some input types (e.g., datetime-local) may not support selection ranges.
+    }
+}
+function bindNoAutoSelect(input) {
+    if (!input || input.dataset.noAutoSelectBound === '1') return;
+    input.dataset.noAutoSelectBound = '1';
+    input.addEventListener('focus', () => {
+        setTimeout(() => placeCursorAtEnd(input), 0);
+    });
+    input.addEventListener('mouseup', (e) => {
+        if (document.activeElement === input) {
+            e.preventDefault();
+            placeCursorAtEnd(input);
+        }
+    });
+}
+function bindManualInputBehavior(scope) {
+    const root = scope || document;
+    root.querySelectorAll('input:not([type="file"]):not([type="checkbox"])').forEach(bindNoAutoSelect);
+}
+function bindEditFormClientMode(form) {
+    if (!form || form.dataset.editClientModeBound === '1') return;
+    form.dataset.editClientModeBound = '1';
+    const category = form.querySelector('.edit-sale-category');
+    const manualToggle = form.querySelector('.edit-manual-client-check');
+    const manualToggleWrap = form.querySelector('[id^="editManualClientToggleDiv"]');
+    const searchWrap = form.querySelector('.edit-client-search-wrap');
+    const manualWrap = form.querySelector('.edit-manual-client-wrap');
+    const codeInput = form.querySelector('input[name="client_code"]');
+    const manualInput = form.querySelector('.edit-manual-client-input');
+    if (!category || !manualToggle || !searchWrap || !manualWrap || !codeInput || !manualInput) return;
+
+    const applyMode = () => {
+        const isCash = category.value === 'Cash';
+        const isOpenKhata = category.value === 'Open Khata';
+        if (manualToggleWrap) manualToggleWrap.style.display = isCash ? 'block' : 'none';
+        if (!isCash && manualToggle.checked) manualToggle.checked = false;
+        const useManual = isOpenKhata || (isCash && manualToggle.checked);
+
+        searchWrap.style.display = useManual ? 'none' : 'block';
+        manualWrap.style.display = useManual ? 'block' : 'none';
+        codeInput.required = !useManual;
+        manualInput.required = !!isOpenKhata;
+
+        // Refresh the Payment Account selector visibility when the sale type
+        // changes on the edit form (so Cash Sale always exposes the account picker).
+        if (typeof updateSalePaymentSection === 'function') {
+            updateSalePaymentSection(form);
+        }
+    };
+
+    const refreshEditBookingContext = () => {
+        const selectedClient = (codeInput.value || '').trim();
+        if (!selectedClient) return;
+        const bookingId = form.dataset.bookingContainer || 'bookingStatusContainer';
+        const financialId = form.dataset.financialContainer || 'clientFinancialContainer';
+        updateBookingStatus(selectedClient, bookingId, financialId).finally(() => {
+            form.querySelectorAll('.compact-item-row').forEach(row => checkItemBookingStatus(row));
+            updateSalePrice(form);
+        });
+    };
+
+    category.addEventListener('change', applyMode);
+    manualToggle.addEventListener('change', applyMode);
+    codeInput.addEventListener('change', refreshEditBookingContext);
+    codeInput.addEventListener('blur', refreshEditBookingContext);
+    applyMode();
+}
+function syncSaleRowToggleButton(row) {
+    if (!row) return;
+    const btn = row.querySelector('.toggle-row-btn');
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    const collapsed = row.classList.contains('row-collapsed');
+    if (icon) icon.className = collapsed ? 'bi bi-plus-lg' : 'bi bi-dash-lg';
+    btn.title = collapsed ? 'Expand' : 'Collapse';
+}
+function collapseExpandedSaleRows(exceptRow = null) {
+    document.querySelectorAll('.compact-item-row').forEach(row => {
+        if (exceptRow && row === exceptRow) return;
+        if (!row.classList.contains('row-collapsed')) {
+            row.classList.add('row-collapsed');
+            syncSaleRowToggleButton(row);
+        }
+    });
+}
+function toggleSaleRowDetails(btn) {
+    const row = btn.closest('.compact-item-row');
+    if (!row) return;
+    const willExpand = row.classList.contains('row-collapsed');
+    if (willExpand) collapseExpandedSaleRows(row);
+    row.classList.toggle('row-collapsed');
+    syncSaleRowToggleButton(row);
+}
+function formatDateAmPmFromLocalValue(v) {
+    if (!v) return '--';
+    const parts = v.split('T');
+    const splitParts = parts.length > 1 ? parts : v.split(' ');
+    const [datePart, timePart] = splitParts;
+    if (!datePart || !timePart) return '--';
+    const [y, m, d] = datePart.split('-').map(Number);
+    const [hh, mm] = timePart.split(':').map(Number);
+    if (!y || !m || !d || Number.isNaN(hh) || Number.isNaN(mm)) return '--';
+    const dt = new Date(y, m - 1, d, hh, mm, 0);
+    const dateText = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeText = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateText} ${timeText}`;
+}
+function updateSaleDateHint(dateInput, hintEl) {
+    if (!dateInput || !hintEl) return;
+    hintEl.textContent = formatDateAmPmFromLocalValue(dateInput.value);
+}
+function _toNativeDateTimeValue(v) {
+    if (!v) return '';
+    if (v.includes('T')) return v;
+    const parts = v.split(' ');
+    if (parts.length < 2) return v;
+    return `${parts[0]}T${parts[1]}`;
+}
+function fallbackNativeDateTimeInputs() {
+    document.querySelectorAll('.air-date-time').forEach(input => {
+        input.type = 'datetime-local';
+        input.readOnly = false;
+        input.value = _toNativeDateTimeValue(input.value);
+    });
+}
+function ensureAddSaleDateDefault() {
+    const dateInput = document.getElementById('addSaleDate');
+    const hint = document.getElementById('addSaleDateHint');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = formatDateTimeLocal(new Date());
+    }
+    updateSaleDateHint(dateInput, hint);
+}
+function initSaleDatePickers() {
+    if (typeof flatpickr === 'undefined') {
+        fallbackNativeDateTimeInputs();
+        return;
+    }
+    const baseOptions = {
+        enableTime: true,
+        dateFormat: 'Y-m-d H:i',
+        time_24hr: true,
+        allowInput: true,
+    };
+    const addInput = document.getElementById('addSaleDate');
+    if (addInput && !addInput.dataset.adp) {
+        addInput.dataset.adp = '1';
+        addInput.removeAttribute('readonly');
+        const instance = flatpickr(addInput, {
+            ...baseOptions,
+            onChange: (_dates, dateStr) => {
+                addInput.value = dateStr || addInput.value;
+                updateSaleDateHint(addInput, document.getElementById('addSaleDateHint'));
+            },
+            onClose: () => updateSaleDateHint(addInput, document.getElementById('addSaleDateHint')),
+        });
+        const shell = addInput.closest('.sale-date-shell');
+        const btn = shell ? shell.querySelector('.sale-date-btn') : null;
+        if (btn) btn.addEventListener('click', () => instance.open());
+    }
+    document.querySelectorAll('.edit-sale-date').forEach(input => {
+        if (input.dataset.adp) return;
+        input.dataset.adp = '1';
+        input.removeAttribute('readonly');
+        const scope = input.closest('.col-md-6') || input.closest('.mb-3');
+        const hint = scope ? scope.querySelector('.edit-sale-date-hint') : null;
+        const instance = flatpickr(input, {
+            ...baseOptions,
+            onChange: (_dates, dateStr) => {
+                input.value = dateStr || input.value;
+                updateSaleDateHint(input, hint);
+            },
+            onClose: () => updateSaleDateHint(input, hint),
+        });
+        const shell = input.closest('.sale-date-shell');
+        const btn = shell ? shell.querySelector('.sale-date-btn') : null;
+        if (btn) btn.addEventListener('click', () => instance.open());
+    });
+}
+function materialKey(v) {
+    return (v || '').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+function isRentMaterial(v) {
+    const txt = (v || '').toString().trim().toLowerCase().replace(/[-_]+/g, ' ');
+    return txt.includes('rent');
+}
+function toNum(v) {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+}
+
+function updateClientFinancialSummary(clientCode, containerId = 'clientFinancialContainer') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!clientCode) {
+        container.innerHTML = '<p class="text-white-50 text-center mt-3 mb-0">Select a client to see running balance</p>';
+        delete financialSummaryInflight[containerId];
+        return;
+    }
+
+    // Collapse duplicate concurrent requests for the same client + container.
+    const key = containerId + '::' + (clientCode || '').trim();
+    if (financialSummaryInflight[key]) return;
+    financialSummaryInflight[key] = true;
+
+    const tab = (window.__AMS_TAB_ID || 'tab-unknown');
+    const src = encodeURIComponent('summary/' + containerId + '/' + tab);
+    console.debug('[AMS-POLL] client_financial_summary source=' + containerId + ' client=' + clientCode + ' tab=' + tab);
+
+    fetch(`/api/client_financial_summary/${encodeURIComponent(clientCode)}?src=${src}`, { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => {
+            if (!data || !data.found) {
+                container.innerHTML = '<p class="text-white-50 text-center mt-3 mb-0">Client not found</p>';
+                return;
+            }
+
+            const balance = Number(data.balance || 0);
+            const debitTotal = Number(data.debit_total || 0);
+            const cashReceivedTotal = Number(data.cash_received_total || 0);
+            const waiveOffTotal = Number(data.waive_off_total || 0);
+            const label = balance > 0 ? 'DUE' : (balance < 0 ? 'ADVANCE' : 'SETTLED');
+            const badgeClass = balance > 0 ? 'bg-danger' : (balance < 0 ? 'bg-success' : 'bg-secondary');
+            const balanceClass = balance > 0 ? 'text-danger' : (balance < 0 ? 'text-success' : 'text-white');
+            const fmt = (val) => `${currencySymbol}${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+            container.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-warning small fw-bold">RUNNING PENDING</span>
+                    <span class="badge ${badgeClass}">${label}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-white-50 small">Total Due</span>
+                    <span class="text-danger fw-bold">${fmt(debitTotal)}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-white-50 small">Total Paid</span>
+                    <span class="text-success fw-bold">${fmt(cashReceivedTotal)}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-white-50 small">Waive-Off (Loss)</span>
+                    <span class="text-warning fw-bold">${fmt(waiveOffTotal)}</span>
+                </div>
+                <div class="d-flex justify-content-between mt-2 pt-2 border-top border-secondary">
+                    <span class="text-white-50 small">Net Pending</span>
+                    <span class="fw-bold ${balanceClass}">${balance < 0 ? '-' : ''}${fmt(balance)}</span>
+                </div>
+            `;
+        })
+        .catch(err => {
+            console.error('Error fetching financial summary:', err);
+            container.innerHTML = '<p class="text-danger text-center mt-3 mb-0">Error loading balance</p>';
+        })
+        .finally(() => {
+            delete financialSummaryInflight[key];
+        });
+}
+
+function rememberBookingRow(item) {
+    const key = materialKey(item.material);
+    if (!key) return;
+    if (item.balance > 0) currentClientBookings[key] = item.balance;
+    currentClientBookingRates[key] = toNum(item.unit_price);
+}
+
+function onSaleClientPicked(code) {
+    updateBookingStatus(code || '');
+}
+window.onSaleClientPicked = onSaleClientPicked;
+
+function updateBookingStatus(clientCode, bookingContainerId = 'bookingStatusContainer', financialContainerId = 'clientFinancialContainer') {
+    const container = document.getElementById(bookingContainerId);
+
+    // Collapse duplicate concurrent requests for the same client + container
+    // (the combobox `after` hook and the input `change` listener both fire).
+    const bkey = bookingContainerId + '::' + (clientCode || '').trim();
+    if (clientCode && bookingStatusInflight[bkey]) {
+        return bookingStatusInflight[bkey];
+    }
+
+    currentClientBookings = {}; // Reset
+    currentClientBookingRates = {}; // Reset
+    updateClientFinancialSummary(clientCode, financialContainerId);
+
+    if (!clientCode) {
+        const display = document.getElementById('addSaleClientNameDisplay');
+        const hiddenName = document.getElementById('addSaleClientNameHidden');
+        if (display) display.innerText = '';
+        if (hiddenName) hiddenName.value = '';
+        if (container) {
+            container.innerHTML = '<p class="text-white-50 text-center mt-5">Select a client to see booked items</p>';
+        }
+        return Promise.resolve([]);
+    }
+
+    const tab = (window.__AMS_TAB_ID || 'tab-unknown');
+    const bsrc = encodeURIComponent('booking/' + bookingContainerId + '/' + tab);
+    console.debug('[AMS-POLL] client_booking_status source=' + bookingContainerId + ' client=' + clientCode + ' tab=' + tab);
+
+    const promise = fetch(`/api/client_booking_status/${encodeURIComponent(clientCode)}?src=${bsrc}`, { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => {
+            if (!container) {
+                data.forEach(rememberBookingRow);
+                return data;
+            }
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p class="text-white-50 text-center mt-5">No bookings found for this client</p>';
+                return data;
+            }
+            
+            // Store for row logic
+            data.forEach(item => {
+                const key = materialKey(item.material);
+                if (!key) return;
+                if (item.balance > 0) currentClientBookings[key] = item.balance;
+                currentClientBookingRates[key] = toNum(item.unit_price);
+                // Alias by known material code so picking code or name both match booking
+                knownMaterialNames.forEach((nm) => {
+                    if (materialKey(nm) === key && item.balance > 0) currentClientBookings[materialKey(nm)] = item.balance;
+                });
+                knownMaterialCodes.forEach((cd) => {
+                    if (item.balance > 0 && (materialKey(cd) === key || String(cd).toLowerCase() === String(item.material || '').toLowerCase())) {
+                        currentClientBookings[materialKey(cd)] = item.balance;
+                        currentClientBookingRates[materialKey(cd)] = toNum(item.unit_price);
+                    }
+                });
+            });
+
+            // Auto-detect client type: Booking Reserved
+            const categorySelect = document.getElementById('saleCategory');
+            const hasBookings = Object.keys(currentClientBookings).length > 0;
+            
+            if (hasBookings && categorySelect) {
+                // Keep booked flow as default unless user has explicitly chosen another mode.
+                if (!categorySelect.value) {
+                    categorySelect.value = 'Booking Delivery';
+                    categorySelect.dispatchEvent(new Event('change'));
+                }
+            }
+
+            let html = '<label class="text-warning small fw-bold mb-2">CLIENT BOOKING STATUS</label>';
+            data.forEach(item => {
+                const colorClass = item.balance > 0 ? 'text-success' : 'text-danger';
+                const unitPrice = Number(item.unit_price || 0);
+                const priceLabel = unitPrice > 0
+                    ? `${currencySymbol}${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+                    : '--';
+                html += `
+                <div class="mb-2 p-2 rounded bg-secondary bg-opacity-25 border border-secondary">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-white small fw-bold">${item.material}</span>
+                        <span class="${colorClass} small fw-bold">${item.balance} Left</span>
+                    </div>
+                    <div class="progress mt-1" style="height: 4px;">
+                        <div class="progress-bar bg-warning" style="width: ${item.booked > 0 ? (item.delivered / item.booked * 100) : 0}%"></div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-white-50" style="font-size: 0.7rem;">Booked: ${item.booked}</span>
+                        <span class="text-white-50" style="font-size: 0.7rem;">Delivered: ${item.delivered}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-white-50" style="font-size: 0.7rem;">Returned: ${item.returned || 0}</span>
+                        <span class="text-white-50" style="font-size: 0.7rem;">Unit Price</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-white-50" style="font-size: 0.7rem;">Remaining</span>
+                        <span class="text-white-50" style="font-size: 0.7rem;">${item.balance}</span>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
+            
+            // Re-check only the rows that belong to the same form as this
+            // container (add form vs edit modal) so one sale's booking status
+            // never rewrites another form's line badges / rate locks.
+            const scopeForm = container ? container.closest('form') : null;
+            const scopeRows = scopeForm
+                ? scopeForm.querySelectorAll('.compact-item-row')
+                : document.querySelectorAll('.compact-item-row');
+            scopeRows.forEach(row => checkItemBookingStatus(row));
+            return data;
+        })
+        .catch(err => {
+            console.error('Error fetching booking status:', err);
+            if (container) {
+                container.innerHTML = '<p class="text-danger text-center mt-5">Error loading status</p>';
+            }
+            return [];
+        })
+        .finally(() => {
+            delete bookingStatusInflight[bkey];
+        });
+
+    bookingStatusInflight[bkey] = promise;
+    return promise;
+}
+
+function refreshDirectSaleClientWidgets() {
+    const codeInput = document.getElementById('addSaleClientCode');
+    const code = (codeInput && codeInput.value ? codeInput.value : '').trim();
+    if (!code) return;
+    // Only refresh for a fully-known client. Never issue a booking-status
+    // request for a partially typed search string (e.g. "paf") or unknown text.
+    const known = (typeof knownClientCodes !== 'undefined' && knownClientCodes.has(code)) ||
+                  (typeof knownClientNames !== 'undefined' && knownClientNames.has(code));
+    if (!known) return;
+    updateBookingStatus(code);
+}
+
+document.addEventListener('pware:financial-refresh', function() {
+    refreshDirectSaleClientWidgets();
+});
+
+// Category Change Logic
+const saleCategory = document.getElementById('saleCategory');
+const manualClientCheck = document.getElementById('manualClientCheck');
+const manualToggleDiv = document.getElementById('manualClientToggleDiv');
+
+function updateClientInputVisibility() {
+    const manualGroup = document.getElementById('manualClientNameGroup');
+    const searchGroup = document.getElementById('clientSearchGroup');
+    const clientCodeInput = document.getElementById('addSaleClientCode');
+    const manualNameInput = document.getElementById('manualClientName');
+
+    const isCash = saleCategory.value === 'Cash';
+    const isMixed = saleCategory.value === 'Mixed Transaction';
+    const isCredit = saleCategory.value === 'Credit Customer';
+    const isOpenKhata = saleCategory.value === 'Open Khata';
+    const isManualChecked = manualClientCheck.checked;
+
+    // Re-evaluate rows for booking status — only in the add form this control
+    // belongs to (never the edit modals rendered on the same page).
+    const addFormOnly = document.querySelector('#addSaleModal form');
+    (addFormOnly ? addFormOnly.querySelectorAll('.compact-item-row') : document.querySelectorAll('.compact-item-row')).forEach(row => checkItemBookingStatus(row));
+    
+    // Show manual toggle only for cash mode.
+    manualToggleDiv.style.display = isCash ? 'block' : 'none';
+    if (!isCash && manualClientCheck.checked) {
+        manualClientCheck.checked = false;
+    }
+
+    if (isOpenKhata || (isCash && isManualChecked)) {
+        manualGroup.style.display = 'block';
+        searchGroup.style.display = 'none';
+        clientCodeInput.removeAttribute('required');
+        if (manualNameInput) {
+            if (isOpenKhata) manualNameInput.setAttribute('required', 'required');
+            else manualNameInput.removeAttribute('required');
+        }
+    } else {
+        manualGroup.style.display = 'none';
+        searchGroup.style.display = 'flex';
+        clientCodeInput.setAttribute('required', 'required');
+        if (manualNameInput) manualNameInput.removeAttribute('required');
+    }
+    
+    setAddSaleAutoOptions();
+    filterAddSaleClientsByCategory();
+
+    const form = document.querySelector('#addSaleModal form');
+    if (form) {
+        applyIgnoreBookingUI(form);
+        updateSalePrice(form);
+    }
+}
+
+if (saleCategory) saleCategory.addEventListener('change', updateClientInputVisibility);
+if (manualClientCheck) manualClientCheck.addEventListener('change', updateClientInputVisibility);
+const addSaleClientCodeEl = document.getElementById('addSaleClientCode');
+if (addSaleClientCodeEl) {
+    addSaleClientCodeEl.addEventListener('change', function () {
+        updateBookingStatus(this.value);
+    });
+    addSaleClientCodeEl.addEventListener('input', function () {
+        if (typeof filterAddSaleClientsByCategory === 'function') filterAddSaleClientsByCategory();
+    });
+}
+
+function setAddSaleAutoOptions() {
+    const categorySelect = document.getElementById('saleCategory');
+    const isCash = categorySelect && categorySelect.value === 'Cash';
+    const isOpenKhata = categorySelect && categorySelect.value === 'Open Khata';
+    const isBooked = categorySelect && categorySelect.value === 'Booking Delivery';
+    const isUnbilledMode = currentSaleLaunchMode === 'Unbilled';
+
+    const hasBillHidden = document.getElementById('addSaleHasBillHidden');
+    const createInvoiceHidden = document.getElementById('addSaleCreateInvoiceHidden');
+    const trackAsCashHidden = document.getElementById('addSaleTrackAsCashHidden');
+    const manualBillInput = document.getElementById('addSaleManualBill');
+    const manualBillGroup = manualBillInput ? manualBillInput.closest('.mb-3') : null;
+
+    if (hasBillHidden) hasBillHidden.value = (isCash && isUnbilledMode) ? '0' : '1';
+    if (createInvoiceHidden) createInvoiceHidden.value = (isCash || isOpenKhata || isBooked) ? '0' : '1';
+    if (trackAsCashHidden) trackAsCashHidden.value = isCash ? '1' : '0';
+
+    if (manualBillInput) {
+        // Keep bill input visible/editable for Billed Cash Sale.
+        if (isCash && isUnbilledMode) {
+            if (!manualBillInput.readOnly) manualBillInput.value = '';
+            manualBillInput.readOnly = true;
+            manualBillInput.classList.add('text-muted');
+            if (manualBillGroup) manualBillGroup.style.display = 'none';
+        } else {
+            manualBillInput.readOnly = false;
+            manualBillInput.classList.remove('text-muted');
+            if (manualBillGroup) manualBillGroup.style.display = 'block';
+        }
+    }
+}
+
+function filterAddSaleClientsByCategory() {
+    const categorySelect = document.getElementById('saleCategory');
+    const list = document.getElementById('addSaleCombobox');
+    const input = document.getElementById('addSaleClientCode');
+    const display = document.getElementById('addSaleClientNameDisplay');
+    const hiddenName = document.getElementById('addSaleClientNameHidden');
+    if (!categorySelect || !list) return;
+
+    const mode = categorySelect.value;
+    const bookedOnly = (mode === 'Booking Delivery' || mode === 'Mixed Transaction');
+    const filterText = (input && input.value ? input.value : '').toLowerCase();
+    list.querySelectorAll('.combobox-item').forEach(item => {
+        const code = (item.getAttribute('data-client-code') || '').trim();
+        const isBookedClient = bookedEligibleClientCodes.has(code);
+        const allowed = bookedOnly ? isBookedClient : true;
+        if (!allowed) {
+            item.dataset.bookedFilterHidden = '1';
+            item.style.display = 'none';
+            return;
+        }
+        item.dataset.bookedFilterHidden = '0';
+        const text = (item.innerText || '').toLowerCase();
+        const matches = !filterText || text.includes(filterText);
+        item.style.display = matches ? '' : 'none';
+    });
+
+    if (bookedOnly && input && input.value) {
+        const raw = input.value.trim();
+        const isKnownCode = knownClientCodes.has(raw);
+        const selectedBooked = bookedEligibleClientCodes.has(raw);
+        const invalid = isKnownCode && !selectedBooked;
+        if (!invalid) return;
+        input.value = '';
+        if (display) display.innerText = '';
+        if (hiddenName) hiddenName.value = '';
+        const bookingContainer = document.getElementById('bookingStatusContainer');
+        if (bookingContainer) {
+            bookingContainer.innerHTML = '<p class="text-white-50 text-center mt-5">Only clients with booking balance are allowed for this sale type.</p>';
+        }
+    }
+}
+
+function checkItemBookingStatus(row) {
+    const materialInput = row.querySelector('.price-trigger');
+    const rateInput = row.querySelector('.rate-input');
+    const qtyInputEl = row.querySelector('.qty-input');
+    const statusBadge = row.querySelector('.item-status-badge');
+    const rateCell = row.querySelector('.rate-cell');
+    const reservedBadge = row.querySelector('.reserved-rate-badge');
+    const ignoreHidden = row.querySelector('.ignore-booking-hidden');
+    
+    // Find category input in the same form
+    const form = row.closest('form');
+    if (!materialInput || !rateInput || !qtyInputEl) return;  // safety guard
+    const ignoreBooking = !!(row.querySelector('.ignore-booking-item') && row.querySelector('.ignore-booking-item').checked);
+    
+    const material = materialInput.value;
+    const matKey = materialKey(material);
+    const isRent = isRentMaterial(material);
+    const bookingRate = toNum(currentClientBookingRates[matKey]);
+    // Check if material is booked for this client
+    const balance = toNum(currentClientBookings[matKey]);
+    const currentQty = toNum(qtyInputEl.value);
+
+    if (ignoreHidden) ignoreHidden.value = ignoreBooking ? '1' : '0';
+    if (ignoreBooking) {
+        if (rateInput.readOnly) rateInput.readOnly = false;
+        rateInput.disabled = false;
+        rateInput.classList.remove('text-muted', 'bg-secondary', 'bg-opacity-10');
+        if (rateCell) rateCell.classList.remove('reserved-only');
+        if (reservedBadge) reservedBadge.style.display = 'none';
+        rateInput.title = "Enter price for non-booked item";
+        if (statusBadge) {
+            statusBadge.innerHTML = `<span class="badge bg-info text-dark" style="font-size: 0.65rem;">IGNORE BOOKING | Dispatch: ${formatPrecisionInput(currentQty)}</span>`;
+        }
+        updateSalePrice(form);
+        return;
+    }
+    
+    if (balance > 0) {
+        if (currentQty <= balance) {
+            // Fully covered by booking — keep booked unit price visible, do not ask for a new rate
+            if (bookingRate > 0) rateInput.value = formatPrecisionInput(bookingRate);
+            rateInput.readOnly = true;
+            rateInput.disabled = false;
+            rateInput.removeAttribute('required');
+            rateInput.classList.add('text-muted', 'bg-secondary', 'bg-opacity-10');
+            if (rateCell) rateCell.classList.add('reserved-only');
+            if (reservedBadge) {
+                const rateTxt = bookingRate > 0
+                    ? `Booked @ ${currencySymbol}${formatPrecisionInput(bookingRate)} — no new rate`
+                    : 'Booked — rate already reserved';
+                reservedBadge.textContent = rateTxt;
+                reservedBadge.style.display = 'block';
+            }
+            if (statusBadge) {
+                const remaining = Math.max(0, balance - currentQty);
+                statusBadge.innerHTML = `
+                    <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">
+                        <i class="bi bi-bookmark-check me-1"></i>
+                        BOOKED | Bal: ${formatPrecisionInput(balance)} | Dispatch: ${formatPrecisionInput(currentQty)} | Remaining: ${formatPrecisionInput(remaining)}
+                    </span>`;
+            }
+        } else {
+            // Mixed (Partially booked, part sale)
+            // Enable price editing for the excess portion
+            if (rateInput.readOnly) rateInput.readOnly = false;
+            rateInput.disabled = false;
+            rateInput.classList.remove('text-muted', 'bg-secondary', 'bg-opacity-10');
+            if (rateCell) rateCell.classList.remove('reserved-only');
+            if (reservedBadge) reservedBadge.style.display = 'none';
+            rateInput.title = "Enter price for the " + formatPrecisionInput(currentQty - balance) + " non-booked items (Excess)";
+            if (statusBadge) {
+                const excess = Math.max(0, currentQty - balance);
+                statusBadge.innerHTML = `
+                    <span class="badge bg-info text-dark" style="font-size: 0.65rem;">
+                        MIXED | Bal: ${formatPrecisionInput(balance)} | Dispatch: ${formatPrecisionInput(currentQty)} | Remaining: 0 | Excess: ${formatPrecisionInput(excess)}
+                    </span>`;
+            }
+        }
+    } else {
+        // Not booked -> Non-Booked Material
+        if (rateInput.readOnly) {
+            rateInput.readOnly = false;
+        }
+        rateInput.disabled = false;
+        rateInput.classList.remove('text-muted', 'bg-secondary', 'bg-opacity-10');
+        if (rateCell) rateCell.classList.remove('reserved-only');
+        if (reservedBadge) reservedBadge.style.display = 'none';
+        rateInput.title = "Enter price for non-booked item";
+        if (statusBadge) {
+            statusBadge.innerHTML = `<span class="badge bg-info text-dark" style="font-size: 0.65rem;">NON-BOOKED | Dispatch: ${formatPrecisionInput(currentQty)}</span>`;
+        }
+    }
+    updateSalePrice(form);
+}
+
+function attachSaleListeners(row) {
+    const materialInput = row.querySelector('.price-trigger');
+    const rateInput = row.querySelector('.rate-input');
+    const qtyInput = row.querySelector('.qty-input');
+    const ignoreItem = row.querySelector('.ignore-booking-item');
+    const ignoreHidden = row.querySelector('.ignore-booking-hidden');
+    syncSaleRowToggleButton(row);
+    
+    if (materialInput) {
+        materialInput.addEventListener('input', () => checkItemBookingStatus(row));
+        materialInput.addEventListener('change', () => checkItemBookingStatus(row));
+    }
+    if (ignoreItem) {
+        ignoreItem.addEventListener('change', () => {
+            checkItemBookingStatus(row);
+        });
+        if (ignoreHidden) {
+            ignoreHidden.value = ignoreItem.checked ? '1' : '0';
+        }
+    }
+
+    // Null-safe: only attach if both inputs exist
+    [rateInput, qtyInput].forEach(el => {
+        if (el) el.addEventListener('input', () => updateSalePrice(row.closest('form')));
+    });
+    if (qtyInput) qtyInput.addEventListener('input', () => checkItemBookingStatus(row));
+    bindManualInputBehavior(row);
+}
+
+function applyIgnoreBookingUI(form) {
+    if (!form) return;
+    const toggle = form.querySelector('[id^="toggleIgnoreBooking"]');
+    const showIgnore = !!(toggle && toggle.checked);
+
+    form.classList.toggle('show-ignore-booking', !!showIgnore);
+
+    form.querySelectorAll('.compact-item-row').forEach(row => {
+        const checkbox = row.querySelector('.ignore-booking-item');
+        const hidden = row.querySelector('.ignore-booking-hidden');
+        if (checkbox) checkbox.dataset.forceIgnore = '0';
+        if (hidden && checkbox) hidden.value = checkbox.checked ? '1' : '0';
+    });
+}
+
+function updateSalePrice(form, source) {
+    if (!form) return;
+    let total = 0;
+    let hasChargeable = false;
+    // Clone balance map to track usage across rows (in case multiple rows use same material)
+    let tempBalances = {...currentClientBookings};
+    let rentChargedToClient = 0;
+
+    form.querySelectorAll('.compact-item-row').forEach(row => {
+        const rateInput = row.querySelector('.rate-input');
+        const qtyInput = row.querySelector('.qty-input');
+        const materialInput = row.querySelector('.price-trigger');
+
+        if (!rateInput || !qtyInput) return;  // skip rows without price inputs (safety guard)
+        const price = toNum(rateInput.value);
+        const qty = toNum(qtyInput.value);
+        const material = materialInput ? materialInput.value : '';
+        const matKey = materialKey(material);
+        const isRent = isRentMaterial(material);
+
+        const ignoreRow = !!(row.querySelector('.ignore-booking-item') && row.querySelector('.ignore-booking-item').checked);
+        let balance = ignoreRow ? 0 : toNum(tempBalances[matKey]);
+        let chargeableQty = qty;
+        let coveredQty = 0;
+
+        if (balance > 0) {
+            if (qty <= balance) {
+                chargeableQty = 0; // Fully covered by booking
+                tempBalances[matKey] -= qty;
+                coveredQty = qty;
+            } else {
+                chargeableQty = qty - balance; // Only charge for excess
+                coveredQty = balance;
+                tempBalances[matKey] = 0;
+            }
+        }
+
+        if (isRent) {
+            const bookingRate = toNum(currentClientBookingRates[matKey]);
+            const bookedPart = coveredQty * bookingRate;
+            const salePart = chargeableQty * price;
+            rentChargedToClient += bookedPart + salePart;
+        }
+
+        if (chargeableQty > 0) hasChargeable = true;
+        const lineTotal = price * chargeableQty;
+        total += lineTotal;
+        const itemTotalEl = row.querySelector('.item-total-value');
+        if (itemTotalEl) {
+            itemTotalEl.textContent = `${currencySymbol}${formatPrecisionInput(lineTotal)}`;
+        }
+        const lineTotalInput = row.querySelector('.line-total');
+        if (lineTotalInput) {
+            lineTotalInput.value = formatPrecisionInput(lineTotal);
+        }
+        const summaryMaterial = row.querySelector('.summary-material');
+        const summaryQty = row.querySelector('.summary-qty');
+        const summaryRate = row.querySelector('.summary-rate');
+        if (summaryMaterial) summaryMaterial.textContent = material || 'Select material...';
+        if (summaryQty) summaryQty.textContent = formatPrecisionInput(qty);
+        if (summaryRate) summaryRate.textContent = formatPrecisionInput(price);
+    });
+
+    const deliveryRentInput = form.querySelector('input[name="delivery_rent"]');
+    const deliveryRent = toNum(deliveryRentInput ? deliveryRentInput.value : 0);
+    const rentDiff = rentChargedToClient - deliveryRent;
+    const rentChargedInput = form.querySelector('.rent-charged-total');
+    const rentDiffInput = form.querySelector('.rent-diff-total');
+    const rentDiffHint = form.querySelector('.rent-diff-hint');
+    if (rentChargedInput) rentChargedInput.value = rentChargedToClient.toFixed(2);
+    if (rentDiffInput) rentDiffInput.value = rentDiff.toFixed(2);
+    if (rentDiffHint) {
+        rentDiffHint.classList.remove('text-success', 'text-danger', 'text-white-50');
+        if (rentDiff > 0.009) {
+            rentDiffHint.classList.add('text-success');
+            rentDiffHint.textContent = `Profit ${currencySymbol}${rentDiff.toFixed(2)}`;
+        } else if (rentDiff < -0.009) {
+            rentDiffHint.classList.add('text-danger');
+            rentDiffHint.textContent = `Loss ${currencySymbol}${Math.abs(rentDiff).toFixed(2)}`;
+        } else {
+            rentDiffHint.classList.add('text-white-50');
+            rentDiffHint.textContent = 'No difference';
+        }
+    }
+    
+    const totalInput = form.querySelector('.total-amount');
+    // Only auto-update total if it's readonly (Unbilled) or if user hasn't manually edited it (hard to track, so we just update it)
+    // Actually for Billed mode, we want to allow override. But usually it sums up.
+    // Let's update it, but user can change it after.
+    totalInput.value = formatPrecisionInput(total);
+    
+    // Auto-fill paid amount if Cash Sale
+    // Determine category from the specific form (Edit modals have their own select)
+    const catSelect = form.querySelector('select[name="category"]');
+    const cat = catSelect ? catSelect.value : (document.getElementById('saleCategory') ? document.getElementById('saleCategory').value : '');
+    
+    const paidInput = form.querySelector('input[name="paid_amount"]');
+    const discountInput = form.querySelector('input[name="discount"]');
+    const totalGroup = document.getElementById('saleTotalGroup');
+    const paidGroup = document.getElementById('salePaidGroup');
+
+    const hidePricing = (cat === 'Booking Delivery') || (!hasChargeable);
+    if (totalGroup) totalGroup.style.display = 'block';
+    if (paidGroup) paidGroup.style.display = 'block';
+    const amountHelp = form.querySelector('#amountHelp') || document.getElementById('amountHelp');
+    if (amountHelp) amountHelp.style.display = 'block';
+
+    if (hidePricing) {
+        totalInput.value = '0';
+        if (paidInput) {
+            paidInput.value = '0';
+            paidInput.readOnly = true;
+        }
+        return;
+    }
+
+    if (paidInput) {
+        if (cat === 'Cash') {
+            // Cash Sale: Paid = Total − Discount. User only edits Discount.
+            // If Discount is 0, the full Total is treated as cash received.
+            let discountVal = parseFloat(discountInput ? discountInput.value : 0) || 0;
+            if (discountVal < 0) discountVal = 0;
+            if (discountVal > total) {
+                discountVal = total;
+                if (discountInput) discountInput.value = formatPrecisionInput(discountVal);
+            }
+            const paidVal = Math.max(0, total - discountVal);
+            paidInput.value = formatPrecisionInput(paidVal);
+            paidInput.readOnly = true;
+            paidInput.classList.add('bg-secondary');
+            paidInput.title = 'Auto-calculated: Total − Discount';
+        } else {
+            paidInput.readOnly = false;
+            paidInput.classList.remove('bg-secondary');
+            paidInput.title = '';
+        }
+    }
+
+    updateSalePaymentSection(form);
+}
+
+function updateSalePaymentSection(form) {
+    if (!form) return;
+    const paidInput = form.querySelector('input[name="paid_amount"]');
+    const paymentSection = form.querySelector('#paymentMethodSection');
+    if (!paymentSection) return;
+    const paidVal = parseFloat(paidInput ? paidInput.value : 0) || 0;
+    const catSelect = form.querySelector('select[name="category"]');
+    const catVal = catSelect ? (catSelect.value || '') : '';
+    const isCashSale = catVal === 'Cash';
+    const isDueLikeSale = ['Credit Customer', 'Mixed Transaction'].includes(catVal);
+    const show = paidVal > 0.009 || isCashSale || isDueLikeSale;
+    paymentSection.style.display = show ? 'block' : 'none';
+
+    const methodSelect = paymentSection.querySelector('select[name="payment_method"]');
+    if (!methodSelect) return;
+    updateSalePaymentMethod(methodSelect);
+}
+
+function updateSalePaymentMethod(select) {
+    const form = select ? select.closest('form') : null;
+    if (!form) return;
+    const paidInput = form.querySelector('input[name="paid_amount"]');
+    const paidVal = parseFloat(paidInput ? paidInput.value : 0) || 0;
+    const catSelect = form.querySelector('select[name="category"]');
+    const catVal = catSelect ? (catSelect.value || '') : '';
+    const isCashSale = catVal === 'Cash';
+    const isDueLikeSale = ['Credit Customer', 'Mixed Transaction'].includes(catVal);
+    const shouldShow = paidVal > 0.009 || isCashSale || isDueLikeSale;
+    const shouldRequire = paidVal > 0.009 || isCashSale;
+
+    const accountSection = form.querySelector('#salePaymentAccountSection');
+    const accountSelect = accountSection ? accountSection.querySelector('select[name="payment_account_id"]') : null;
+
+    const isBankLike = ['Bank', 'Bank Transfer', 'Check', 'Cheque'].includes(select.value);
+    const expectedCategory = isBankLike ? 'bank' : 'cash';
+
+    if (accountSection) accountSection.style.display = shouldShow ? 'block' : 'none';
+    if (accountSelect) {
+        accountSelect.required = shouldRequire;
+        accountSelect.querySelectorAll('option').forEach(opt => {
+            const cat = (opt.getAttribute('data-category') || '').toLowerCase();
+            if (!opt.value) {
+                opt.hidden = false;
+                return;
+            }
+            opt.hidden = (cat && cat !== expectedCategory);
+        });
+        const selectedOpt = accountSelect.selectedOptions && accountSelect.selectedOptions[0];
+        if (selectedOpt && selectedOpt.hidden) accountSelect.value = '';
+    }
+}
+
+function syncDeliveryRentTotal(form) {
+    if (!form) return;
+    let total = 0;
+    form.querySelectorAll('.delivery-rent-input').forEach(input => {
+        total += toNum(input.value);
+    });
+    const totalInput = form.querySelector('input[name="delivery_rent"]');
+    if (totalInput) totalInput.value = formatPrecisionInput(total);
+}
+
+function addDeliveryPersonRow(btn) {
+    const form = btn.closest('form');
+    if (!form) return;
+    const tbody = form.querySelector('.delivery-person-rows');
+    const template = document.getElementById('deliveryPersonRowTemplate');
+    if (!tbody || !template) return;
+    const row = template.content.firstElementChild.cloneNode(true);
+    tbody.appendChild(row);
+    syncDeliveryRentTotal(form);
+    updateSalePrice(form, 'delivery_rent');
+}
+
+function removeDeliveryPersonRow(btn) {
+    const row = btn.closest('.delivery-person-row');
+    const form = btn.closest('form');
+    if (!row || !form) return;
+    const tbody = row.parentElement;
+    const rows = tbody ? Array.from(tbody.querySelectorAll('.delivery-person-row')) : [];
+    if (rows.length <= 1) {
+        row.querySelectorAll('input').forEach(input => input.value = '');
+        row.querySelectorAll('select').forEach(select => select.value = '');
+    } else {
+        row.remove();
+    }
+    syncDeliveryRentTotal(form);
+    updateSalePrice(form, 'delivery_rent');
+}
+
+function setDeliveryPersonRows(form, rows) {
+    if (!form) return;
+    const tbody = form.querySelector('.delivery-person-rows');
+    const template = document.getElementById('deliveryPersonRowTemplate');
+    if (!tbody || !template) return;
+    tbody.innerHTML = '';
+    const payload = (Array.isArray(rows) && rows.length) ? rows : [{}];
+    payload.forEach((rowData) => {
+        const row = template.content.firstElementChild.cloneNode(true);
+        const select = row.querySelector('select[name="delivery_person_id[]"]');
+        const bagsInput = row.querySelector('input[name="delivery_bags[]"]');
+        const rentInput = row.querySelector('input[name="delivery_rent_amount[]"]');
+        if (select && rowData.delivery_person_id) select.value = rowData.delivery_person_id;
+        if (bagsInput && rowData.bags_delivered !== undefined) bagsInput.value = rowData.bags_delivered;
+        if (rentInput && rowData.rent_amount !== undefined) rentInput.value = rowData.rent_amount;
+        tbody.appendChild(row);
+    });
+    syncDeliveryRentTotal(form);
+}
+
+function openAddSaleModal(mode) {
+    if (typeof hideLoading === 'function') hideLoading();
+    const modalEl = document.getElementById('addSaleModal');
+    if (!modalEl) {
+        alert('Sale form is missing. Refresh the Sales page.');
+        return;
+    }
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+        alert('Page scripts did not finish loading. Refresh Sales and try again.');
+        return;
+    }
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalEl);
+    }
+    
+    currentSaleLaunchMode = mode || 'Billed';
+    resetAddSaleForm();
+    ensureAddSaleDateDefault();
+    initSaleDatePickers();
+    
+    const catSelect = document.getElementById('saleCategory');
+    const modalTitle = document.getElementById('addSaleModalLabel');
+    const catDiv = document.getElementById('categorySelectDiv');
+    const paidInput = document.querySelector('#addSaleModal input[name="paid_amount"]');
+
+    if (catSelect) {
+        if (mode === 'Unbilled') {
+            catSelect.value = 'Cash';
+            modalTitle.innerText = "New Unbilled Sale (Cash)";
+            if (paidInput) paidInput.readOnly = true;
+            if (catDiv) catDiv.style.display = 'none';
+        } else {
+            // Billed
+            catSelect.value = 'Booking Delivery'; // Default for billed
+            modalTitle.innerText = "New Billed Sale";
+            if (paidInput) paidInput.readOnly = false;
+            if (catDiv) catDiv.style.display = 'block';
+        }
+        catSelect.dispatchEvent(new Event('change'));
+    }
+    
+    updateClientInputVisibility(mode);
+    
+    modal.show();
+}
+window.openAddSaleModal = openAddSaleModal;
+
+document.addEventListener('click', function (e) {
+    const launch = e.target.closest('[data-open-sale-modal]');
+    if (!launch) return;
+    e.preventDefault();
+    if (typeof hideLoading === 'function') hideLoading();
+    openAddSaleModal(launch.getAttribute('data-open-sale-modal') || 'Billed');
+});
+
+function openHoldDraftsModal() {
+    const modalEl = document.getElementById('holdDraftsModal');
+    if (!modalEl) return;
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalEl);
+    }
+    modal.show();
+}
+
+function submitHoldSale() {
+    const form = document.querySelector('#addSaleModal form');
+    if (!form) return;
+    form.dataset.skipValidation = '1';
+    form.action = holdSaleEndpoint;
+    form.submit();
+}
+
+function attachFormListeners(form) {
+    // Use custom validation dialog instead of browser-native bubbles so users get one clear checklist.
+    form.setAttribute('novalidate', 'novalidate');
+    const paidInput = form.querySelector('input[name="paid_amount"]');
+    const discountInput = form.querySelector('input[name="discount"]');
+    const catSelect = form.querySelector('select[name="category"]');
+    if (paidInput) paidInput.addEventListener('input', () => updateSalePrice(form, 'paid'));
+    if (discountInput) discountInput.addEventListener('input', () => updateSalePrice(form, 'discount'));
+    if (catSelect) catSelect.addEventListener('change', () => {
+        applyIgnoreBookingUI(form);
+        updateSalePrice(form, 'category');
+    });
+    form.querySelectorAll('input[type="number"]').forEach(input => {
+        if (input.dataset.noWheelBound === '1') return;
+        input.dataset.noWheelBound = '1';
+        input.addEventListener('wheel', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+    });
+    if (!form.dataset.deliveryAllocBound) {
+        form.dataset.deliveryAllocBound = '1';
+        form.addEventListener('input', function (e) {
+            if (e.target && e.target.classList.contains('delivery-rent-input')) {
+                syncDeliveryRentTotal(form);
+                updateSalePrice(form, 'delivery_rent');
+            }
+        });
+    }
+    syncDeliveryRentTotal(form);
+    if (!form.dataset.salePrecheckBound) {
+        form.dataset.salePrecheckBound = '1';
+        // Register in the CAPTURE phase.  The global page loader also listens
+        // for `submit` (bubble phase) and latches `__formSubmitting=true` on
+        // the first event it sees.  Running first lets us `preventDefault()`
+        // the initial submit before that latch is set, so the follow-up
+        // `requestSubmit()` is not swallowed and the sale form no longer
+        // freezes on "Saving…".
+        //
+        // Submit flow (two passes):
+        //   1st pass (real Save click): preventDefault, lock the Save button,
+        //      refresh booking status + financial summary, validate once.
+        //      If valid -> set data-final-submit and requestSubmit() again.
+        //   2nd pass (programmatic): data-final-submit is set -> clear it and
+        //      let the native POST through; layout.html takes over with the
+        //      "Saving…" progress and its global double-submit latch.
+        // The in-flight lock (data-submitting) must ONLY guard the 1st pass,
+        // otherwise the follow-up requestSubmit() gets swallowed and clicking
+        // Save appears to do nothing at all (no navigation, no data saved).
+        const setSubmitting = (on) => {
+            form.dataset.submitting = on ? '1' : '';
+            form.querySelectorAll('button[type="submit"]').forEach((b) => { b.disabled = !!on; });
+        };
+        form.addEventListener('submit', function (e) {
+            if (form.dataset.skipValidation === '1') {
+                // Hold-draft flow: bypass the precheck entirely.
+                form.dataset.skipValidation = '';
+                return;
+            }
+            if (form.dataset.finalSubmit === '1') {
+                // Second, programmatic submit — the precheck already passed.
+                // Allow the native POST through; layout.html's global submit
+                // latch is the final guard against double submission.
+                form.dataset.finalSubmit = '';
+                return;
+            }
+            // First submit: block the native POST, run the async precheck,
+            // then re-submit programmatically.
+            e.preventDefault();
+            if (form.dataset.submitting === '1') {
+                return; // precheck already in flight — ignore repeat clicks
+            }
+            setSubmitting(true);  // lock immediately: disable Save, block re-entry
+            const codeEl = form.querySelector('input[name="client_code"]');
+            const code = (codeEl && codeEl.value ? codeEl.value : '').trim();
+            const bookingId = form.dataset.bookingContainer || 'bookingStatusContainer';
+            const financialId = form.dataset.financialContainer || 'clientFinancialContainer';
+            const proceed = () => {
+                try {
+                    form.querySelectorAll('.compact-item-row').forEach((row) => checkItemBookingStatus(row));
+                    if (!validateSaleFormBeforeSubmit(form)) {
+                        setSubmitting(false);  // validation failed — release the lock
+                        return;
+                    }
+                    form.dataset.finalSubmit = '1';
+                    setSubmitting(false);  // unlock so the final pass can submit
+                    // Show global loading overlay for lazy-loaded forms that don't
+                    // have the layout.html submit handler attached to them.
+                    if (typeof window.showLoading === 'function') window.showLoading();
+                    form.requestSubmit();
+                } catch (err) {
+                    console.error('Sale precheck failed:', err);
+                    setSubmitting(false);  // never leave the sheet locked
+                }
+            };
+            if (code) {
+                try {
+                    updateBookingStatus(code, bookingId, financialId).finally(proceed);
+                } catch (err) {
+                    proceed();  // a sync throw in booking refresh must not block saving
+                }
+            } else {
+                proceed();
+            }
+        }, { capture: true });
+    }
+}
+
+function validateSaleFormBeforeSubmit(form) {
+    const issues = [];
+    const categoryEl = form.querySelector('select[name="category"]');
+    const category = categoryEl ? (categoryEl.value || '').trim() : '';
+    const isOpenKhata = category === 'Open Khata';
+    const isCash = category === 'Cash';
+    const isCreditStyle = ['Credit Customer', 'Mixed Transaction', 'Open Khata'].includes(category);
+
+    const deliveryRows = Array.from(form.querySelectorAll('.delivery-person-row'));
+    let deliveryRowCount = 0;
+    let totalDeliveryBags = 0;
+    deliveryRows.forEach((row, idx) => {
+        const personId = (row.querySelector('[name="delivery_person_id[]"]')?.value || '').trim();
+        const bags = toNum(row.querySelector('[name="delivery_bags[]"]')?.value || 0);
+        const rent = toNum(row.querySelector('[name="delivery_rent_amount[]"]')?.value || 0);
+        const hasPayload = !!personId || bags > 0 || rent > 0;
+        if (!hasPayload) return;
+        if (!personId) issues.push(`Delivery row ${idx + 1}: Select a delivery person.`);
+        if (bags < 0) issues.push(`Delivery row ${idx + 1}: Bags cannot be negative.`);
+        if (rent < 0) issues.push(`Delivery row ${idx + 1}: Rent cannot be negative.`);
+        if (personId) deliveryRowCount += 1;
+        totalDeliveryBags += bags;
+    });
+    if (deliveryRowCount === 0) {
+        issues.push('Add at least one delivery person.');
+    }
+
+    const manualClientName = (form.querySelector('[name="manual_client_name"]')?.value || '').trim();
+    const clientCode = (form.querySelector('[name="client_code"]')?.value || '').trim();
+    const clientName = (form.querySelector('[name="client_name"]')?.value || '').trim();
+    const usingManualClient = isOpenKhata || (!!manualClientName && isCash);
+    if (isOpenKhata && !manualClientName) {
+        issues.push('Open Khata requires manual customer name.');
+    }
+    if (!usingManualClient && !clientCode && !clientName) {
+        issues.push('Select a client (or enter manual customer name for allowed sale type).');
+    }
+    if (!usingManualClient) {
+        const token = (clientCode || clientName || '').trim();
+        const knownClient = knownClientCodes.has(token) || knownClientNames.has(token);
+        if (!knownClient) {
+            issues.push('Select a valid registered client from the client list (partial text is not allowed).');
+        }
+    }
+
+    const billNo = (form.querySelector('[name="manual_bill_no"]')?.value || '').trim();
+    // A billed sale is acceptable with either a manual bill number or an
+    // auto-generated invoice.  The backend `add_direct_sale` accepts both, so
+    // the form must not block a valid Due / Booked+Due save when an invoice
+    // will be generated automatically.
+    const createInvoiceEl = form.querySelector('[name="create_invoice"]');
+    const willHaveBill = billNo || (createInvoiceEl && (createInvoiceEl.value || '').trim() === '1');
+    if (isCreditStyle && !willHaveBill) {
+        issues.push('Manual Bill No is required for this sale type.');
+    }
+
+    const rows = Array.from(form.querySelectorAll('.compact-item-row'));
+    let validRows = 0;
+    let totalMaterialQty = 0;
+    let tempBalances = { ...currentClientBookings };
+    rows.forEach((row, idx) => {
+        const product = (row.querySelector('[name="product_name[]"]')?.value || '').trim();
+        const qtyRaw = (row.querySelector('[name="qty[]"]')?.value || '').trim();
+        const rateRaw = (row.querySelector('[name="unit_rate[]"]')?.value || '').trim();
+        const qty = parseFloat(qtyRaw || '0');
+        const rate = parseFloat(rateRaw || '0');
+
+        // Ignore fully empty row
+        if (!product && !qtyRaw && !rateRaw) return;
+
+        if (!product) {
+            issues.push(`Row ${idx + 1}: Material is required.`);
+            return;
+        }
+        // Allow existing sale materials even if deactivated/renamed — check by ID hidden input too
+        const matIdInput = row.querySelector('.material-id-input');
+        const matIdVal = (matIdInput && matIdInput.value) ? matIdInput.value.trim() : '';
+        const isKnownByName = knownMaterialNames.has(product) || knownMaterialNames.has(product.toLowerCase()) || knownMaterialCodes.has(product) || knownMaterialCodes.has(product.toLowerCase());
+        if (!isKnownByName && !matIdVal) {
+            issues.push(`Row ${idx + 1}: Select a valid material from list.`);
+            return;
+        }
+        if (!(qty > 0)) {
+            issues.push(`Row ${idx + 1}: Qty must be greater than 0.`);
+            return;
+        }
+        validRows += 1;
+        totalMaterialQty += qty;
+        const alt = (row.querySelector('[name="alternate_material[]"]')?.value || '').trim();
+        const altMatIdInput = row.querySelector('.alt-material-id-input');
+        const altMatId = (altMatIdInput && altMatIdInput.value) ? altMatIdInput.value.trim() : '';
+        if (alt && !altMatId && !(knownMaterialNames.has(alt) || knownMaterialNames.has(alt.toLowerCase()) || knownMaterialCodes.has(alt) || knownMaterialCodes.has(alt.toLowerCase()))) {
+            issues.push(`Row ${idx + 1}: Select a valid alternate material from list.`);
+        }
+
+        const ignoreBooking = !!(row.querySelector('.ignore-booking-item') && row.querySelector('.ignore-booking-item').checked);
+        const matKey = materialKey(product);
+        let bal = ignoreBooking ? 0 : toNum(tempBalances[matKey]);
+        let covered = 0;
+        if (bal > 0) {
+            covered = Math.min(qty, bal);
+            tempBalances[matKey] = bal - covered;
+        }
+        const chargeableQty = Math.max(0, qty - covered);
+        // Booked qty is already priced on the booking — only leftover (sale) qty needs a rate
+        if (chargeableQty > 0 && !(rate > 0) && category !== 'Booking Delivery') {
+            issues.push(`Row ${idx + 1}: Rate is required for the non-booked qty (${formatPrecisionInput(chargeableQty)}). Booked qty does not need a new rate.`);
+        }
+    });
+
+    if (validRows === 0) {
+        issues.push('Add at least one item row with material and qty.');
+    }
+    if (deliveryRowCount > 0 && totalDeliveryBags > (totalMaterialQty + 0.0001)) {
+        issues.push('Total delivery bags cannot exceed total material quantity.');
+    }
+
+    const total = parseFloat((form.querySelector('[name="amount"]')?.value || '0'));
+    const paid = parseFloat((form.querySelector('[name="paid_amount"]')?.value || '0'));
+    const discount = parseFloat((form.querySelector('[name="discount"]')?.value || '0'));
+    if (isCash && (paid + discount) < (total - 0.01)) {
+        issues.push('Cash Sale must be fully paid (Paid + Discount must match Total).');
+    }
+    const paymentAccount = (form.querySelector('[name="payment_account_id"]')?.value || '').trim();
+    if ((paid > 0.009 || isCash) && !paymentAccount) {
+        issues.push('Select an account (cash/bank) for the paid amount.');
+    }
+
+    if (issues.length > 0) {
+        alert(`Please fix these missing details before saving:\n\n- ${issues.join('\n- ')}`);
+        return false;
+    }
+    return true;
+}
+
+function resetAddSaleForm() {
+    const form = document.querySelector('#addSaleModal form');
+    form.reset();
+    saleMaterialRowCounter = 0;
+    const draftIdInput = document.getElementById('addSaleDraftId');
+    if (draftIdInput) draftIdInput.value = '';
+
+    // Fresh duplicate-submission key per form-open.  The backend ignores a
+    // re-submitted key, so a double click or network retry cannot create two
+    // sales from the same sheet.
+    const idemInput = document.getElementById('addSaleIdempotencyKey');
+    if (idemInput) {
+        let key = '';
+        try {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                key = window.crypto.randomUUID();
+            }
+        } catch (_) { /* fall through */ }
+        if (!key) {
+            key = 'sale-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+        }
+        idemInput.value = key;
+    }
+
+    // Re-enable Save + clear the in-flight flags so a previously failed submit
+    // never leaves the sheet locked or skips the precheck.
+    form.dataset.submitting = '';
+    form.dataset.finalSubmit = '';
+    form.dataset.skipValidation = '';
+    form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = false; });
+
+    // Clear Client Search & Display
+    const clientCodeInput = document.getElementById('addSaleClientCode');
+    const clientNameHidden = document.getElementById('addSaleClientNameHidden');
+    const clientNameDisplay = document.getElementById('addSaleClientNameDisplay');
+    
+    if (clientCodeInput) clientCodeInput.value = '';
+    if (clientNameHidden) clientNameHidden.value = '';
+    if (clientNameDisplay) clientNameDisplay.innerText = '';
+
+    // Clear Booking Status
+    currentClientBookings = {};
+    const bookingContainer = document.getElementById('bookingStatusContainer');
+    if (bookingContainer) {
+        bookingContainer.innerHTML = '<p class="text-white-50 text-center mt-5">Select a client to see booked items</p>';
+    }
+    const financialContainer = document.getElementById('clientFinancialContainer');
+    if (financialContainer) {
+        financialContainer.innerHTML = '<p class="text-white-50 text-center mt-3 mb-0">Select a client to see running balance</p>';
+    }
+
+    // Reset Items (Remove extra rows, reset first row)
+    const itemsContainer = document.getElementById('sale-items-container');
+    if (itemsContainer) {
+        while (itemsContainer.children.length > 1) {
+            itemsContainer.removeChild(itemsContainer.lastChild);
+        }
+        const firstRow = itemsContainer.firstElementChild;
+        if (firstRow) {
+            firstRow.classList.add('row-collapsed');
+            syncSaleRowToggleButton(firstRow);
+            firstRow.querySelectorAll('input').forEach(i => {
+                if(i.classList.contains('qty-input')) i.value = '1.00';
+                else i.value = '';
+            });
+            firstRow.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
+            const materialList = firstRow.querySelector('#addSaleMaterialList0');
+            if (materialList) materialList.style.display = 'none';
+            const materialDisplay = firstRow.querySelector('#addSaleMaterialDisplay0');
+            if (materialDisplay) materialDisplay.innerText = '';
+            const altDisplay = firstRow.querySelector('#addSaleAltMaterialDisplay0');
+            if (altDisplay) altDisplay.innerText = '';
+        }
+    }
+
+    setDeliveryPersonRows(form, [{}]);
+
+    // Trigger change events to restore UI state (Category visibility, Bill No readonly)
+    setAddSaleAutoOptions();
+    ensureAddSaleDateDefault();
+    initSaleDatePickers();
+}
+
+function applyAddSaleDraft(draft) {
+    if (!draft) return;
+    const form = document.querySelector('#addSaleModal form');
+    if (!form) return;
+
+    resetAddSaleForm();
+
+    const setField = (name, value) => {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (el && value !== undefined && value !== null) el.value = value;
+    };
+
+    if (draft.category) {
+        const categoryEl = document.getElementById('saleCategory');
+        if (categoryEl) {
+            categoryEl.value = draft.category;
+            categoryEl.dispatchEvent(new Event('change'));
+        }
+    }
+
+    setField('client_code', draft.client_code || '');
+    setField('client_name', draft.client_name || '');
+    const nameDisplay = document.getElementById('addSaleClientNameDisplay');
+    let displayName = draft.client_name || '';
+    if (!displayName && draft.client_code) {
+        // The draft keeps the client *code* even when the hidden name field was
+        // empty at submit time. Restore the display name from the combobox so
+        // the selected client is visible again after a validation resume.
+        const combo = document.getElementById('addSaleCombobox');
+        const items = combo ? combo.querySelectorAll('.combobox-item') : [];
+        for (const item of items) {
+            if ((item.getAttribute('data-client-code') || '').trim() === draft.client_code) {
+                displayName = item.getAttribute('data-combo-name') || '';
+                break;
+            }
+        }
+    }
+    if (nameDisplay) nameDisplay.innerText = displayName;
+    if (displayName) setField('client_name', displayName);
+    setField('manual_client_name', draft.manual_client_name || '');
+    setField('sale_date', draft.sale_date || '');
+    setField('manual_bill_no', draft.manual_bill_no || '');
+    setField('photo_url', draft.photo_url || '');
+    setField('note', draft.note || '');
+    setField('amount', draft.amount || '');
+    setField('paid_amount', draft.paid_amount || '0');
+    setField('discount', draft.discount || '0');
+    setField('discount_reason', draft.discount_reason || '');
+    setField('draft_id', draft.draft_id || '');
+    const allowNegEl = form.querySelector('[name="allow_negative_stock"]');
+    if (allowNegEl) allowNegEl.checked = !!draft.allow_negative_stock;
+    setDeliveryPersonRows(form, draft.delivery_persons || []);
+
+    const items = Array.isArray(draft.items) ? draft.items : [];
+    const container = document.getElementById('sale-items-container');
+    if (container && items.length > 0) {
+        while (container.children.length < items.length) {
+            addSaleItemRow();
+        }
+        const rows = container.querySelectorAll('.compact-item-row');
+        items.forEach((item, idx) => {
+            const row = rows[idx];
+            if (!row) return;
+            const p = row.querySelector('input[name="product_name[]"]');
+            const a = row.querySelector('input[name="alternate_material[]"]');
+            const q = row.querySelector('input[name="qty[]"]');
+            const r = row.querySelector('input[name="unit_rate[]"]');
+            const ib = row.querySelector('input[name="ignore_booking_item[]"]');
+            const ibToggle = row.querySelector('.ignore-booking-item');
+            if (p) p.value = item.product_name || '';
+            if (a) a.value = item.alternate_material || '';
+            if (q) q.value = item.qty || '1.00';
+            if (r) r.value = item.unit_rate || '';
+            if (ib) ib.value = item.ignore_booking ? '1' : '0';
+            if (ibToggle) ibToggle.checked = !!item.ignore_booking;
+        });
+    }
+
+    updateClientInputVisibility();
+    if (draft.client_code) updateBookingStatus(draft.client_code);
+    updateSalePrice(form);
+}
+
+function applyEditSaleDraft(draft) {
+    if (!draft || !draft.sale_id) return;
+    const form = document.querySelector(`#editSaleModal${draft.sale_id} form`);
+    if (!form) return;
+
+    const setField = (name, value) => {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (el && value !== undefined && value !== null) el.value = value;
+    };
+
+    setField('category', draft.category || '');
+    setField('client_code', draft.client_code || '');
+    setField('client_name', draft.client_name || '');
+    setField('manual_client_name', draft.manual_client_name || '');
+    setField('sale_date', draft.sale_date || '');
+    setField('manual_bill_no', draft.manual_bill_no || '');
+    setField('photo_url', draft.photo_url || '');
+    setField('note', draft.note || '');
+    setField('paid_amount', draft.paid_amount || '0');
+    setField('discount', draft.discount || '0');
+    setField('discount_reason', draft.discount_reason || '');
+    setDeliveryPersonRows(form, draft.delivery_persons || []);
+
+    const items = Array.isArray(draft.items) ? draft.items : [];
+    if (items.length > 0) {
+        const addBtn = form.querySelector('button[onclick^="addSaleItemRowEdit"]');
+        let rows = form.querySelectorAll('.compact-item-row');
+        while (addBtn && rows.length < items.length) {
+            addSaleItemRowEdit(addBtn);
+            rows = form.querySelectorAll('.compact-item-row');
+        }
+        rows = form.querySelectorAll('.compact-item-row');
+        items.forEach((item, idx) => {
+            const row = rows[idx];
+            if (!row) return;
+            const p = row.querySelector('input[name="product_name[]"]');
+            const q = row.querySelector('input[name="qty[]"]');
+            const r = row.querySelector('input[name="unit_rate[]"]');
+            const ib = row.querySelector('input[name="ignore_booking_item[]"]');
+            const ibToggle = row.querySelector('.ignore-booking-item');
+            if (p) p.value = item.product_name || '';
+            if (q) q.value = item.qty || '1.00';
+            if (r) r.value = item.unit_rate || '';
+            if (ib) ib.value = item.ignore_booking ? '1' : '0';
+            if (ibToggle) ibToggle.checked = !!item.ignore_booking;
+        });
+    }
+
+    updateSalePrice(form);
+}
+
+function initializeLazyEditSaleModal(modalEl) {
+    if (!modalEl || modalEl.dataset.lazyInitialized === '1') return;
+    modalEl.dataset.lazyInitialized = '1';
+    const form = modalEl.querySelector('form');
+    if (!form) return;
+
+    form.querySelectorAll('.compact-item-row').forEach(row => attachSaleListeners(row));
+    bindManualInputBehavior(modalEl);
+    attachFormListeners(form);
+    bindEditFormClientMode(form);
+    applyIgnoreBookingUI(form);
+
+    form.querySelectorAll('[id^="toggleIgnoreBookingEdit"]').forEach(toggle => {
+        toggle.addEventListener('change', () => applyIgnoreBookingUI(form));
+    });
+    modalEl.addEventListener('shown.bs.modal', () => {
+        const codeInput = form.querySelector('input[name="client_code"]');
+        const selectedClient = (codeInput && codeInput.value ? codeInput.value : '').trim();
+        if (!selectedClient) return;
+        const bookingId = form.dataset.bookingContainer || 'bookingStatusContainer';
+        const financialId = form.dataset.financialContainer || 'clientFinancialContainer';
+        updateBookingStatus(selectedClient, bookingId, financialId).finally(() => {
+            applyIgnoreBookingUI(form);
+            form.querySelectorAll('.compact-item-row').forEach(row => checkItemBookingStatus(row));
+            populateEditGRNDisplays(form);
+            updateSalePrice(form);
+        });
+    });
+    form.querySelectorAll('.edit-sale-date').forEach(input => {
+        if (!input.value) input.value = formatDateTimeLocal(new Date());
+        const scope = input.closest('.col-md-6') || input.closest('.mb-3');
+        const hint = scope ? scope.querySelector('.edit-sale-date-hint') : null;
+        updateSaleDateHint(input, hint);
+        input.addEventListener('input', () => updateSaleDateHint(input, hint));
+        input.addEventListener('change', () => updateSaleDateHint(input, hint));
+    });
+    form.querySelectorAll('.edit-has-bill-checkbox').forEach(cb => {
+        const manual = document.getElementById(cb.dataset.target);
+        if (!manual) return;
+        const setState = () => {
+            manual.readOnly = !cb.checked;
+            manual.classList.toggle('text-muted', !cb.checked);
+            if (!cb.checked) manual.value = '';
+        };
+        setState();
+        cb.addEventListener('change', setState);
+    });
+    form.querySelectorAll('select[name="payment_method"]').forEach(select => {
+        const accountSelect = form.querySelector('select[name="payment_account_id"]');
+        const run = () => {
+            updateSalePaymentSection(form);
+            updateSalePaymentMethod(select);
+        };
+        select.addEventListener('change', run);
+        if (accountSelect) accountSelect.addEventListener('change', run);
+        run();
+    });
+    initSaleDatePickers();
+    updateSalePrice(form);
+}
+
+function loadEditSaleModal(url, draft = null) {
+    AMSLazyModal.load({
+        hostId: 'lazyEditSaleModalHost',
+        url: url,
+        selector: '[id^="editSaleModal"]',
+        label: 'Loading sale form…',
+        onReady: function (modalEl) {
+            initializeLazyEditSaleModal(modalEl);
+            if (draft) applyEditSaleDraft(draft);
+        },
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('click', function(event) {
+        const editButton = event.target.closest('[data-edit-sale-url]');
+        if (!editButton) return;
+        event.preventDefault();
+        loadEditSaleModal(editButton.dataset.editSaleUrl);
+    });
+    // Other client logic...
+    saleMaterialRowCounter = 0;
+    document.querySelectorAll('.compact-item-row').forEach(row => attachSaleListeners(row));
+    bindManualInputBehavior(document);
+    setAddSaleAutoOptions();
+    filterAddSaleClientsByCategory();
+    const seedRow = document.querySelector('#sale-items-container .compact-item-row');
+    if (seedRow) {
+        window.saleRowTemplate = seedRow.cloneNode(true);
+    }
+    
+    // Attach listeners to Add Sale form
+    const addForm = document.querySelector('#addSaleModal form');
+    if (addForm) {
+        attachFormListeners(addForm);
+        applyIgnoreBookingUI(addForm);
+    }
+    const addToggle = document.getElementById('toggleIgnoreBookingAdd');
+    if (addToggle && addForm) {
+        addToggle.addEventListener('change', () => {
+            applyIgnoreBookingUI(addForm);
+        });
+    }
+    const addSaleDateInput = document.getElementById('addSaleDate');
+    const addSaleDateHint = document.getElementById('addSaleDateHint');
+    if (addSaleDateInput && addSaleDateHint) {
+        addSaleDateInput.addEventListener('input', () => updateSaleDateHint(addSaleDateInput, addSaleDateHint));
+        addSaleDateInput.addEventListener('change', () => updateSaleDateHint(addSaleDateInput, addSaleDateHint));
+    }
+    ensureAddSaleDateDefault();
+    initSaleDatePickers();
+    
+    // Attach listeners to all Edit Sale forms
+    document.querySelectorAll('[id^="editSaleModal"] form').forEach(form => attachFormListeners(form));
+    document.querySelectorAll('[id^="editSaleModal"] form').forEach(form => bindEditFormClientMode(form));
+    document.querySelectorAll('[id^="toggleIgnoreBookingEdit"]').forEach(toggle => {
+        const form = toggle.closest('form');
+        if (!form) return;
+        toggle.addEventListener('change', () => {
+            applyIgnoreBookingUI(form);
+        });
+    });
+    document.querySelectorAll('[id^="editSaleModal"]').forEach(modalEl => {
+        modalEl.addEventListener('shown.bs.modal', () => {
+            const form = modalEl.querySelector('form');
+            if (!form) return;
+            const codeInput = form.querySelector('input[name="client_code"]');
+            const selectedClient = (codeInput && codeInput.value ? codeInput.value : '').trim();
+            if (!selectedClient) return;
+            const bookingId = form.dataset.bookingContainer || 'bookingStatusContainer';
+            const financialId = form.dataset.financialContainer || 'clientFinancialContainer';
+            updateBookingStatus(selectedClient, bookingId, financialId).finally(() => {
+                applyIgnoreBookingUI(form);
+                form.querySelectorAll('.compact-item-row').forEach(row => checkItemBookingStatus(row));
+                populateEditGRNDisplays(form);
+                updateSalePrice(form);
+            });
+        });
+    });
+    document.querySelectorAll('[id^="editSaleModal"] .edit-sale-date').forEach(input => {
+        if (!input.value) input.value = formatDateTimeLocal(new Date());
+        const scope = input.closest('.col-md-6') || input.closest('.mb-3');
+        const hint = scope ? scope.querySelector('.edit-sale-date-hint') : null;
+        updateSaleDateHint(input, hint);
+        input.addEventListener('input', () => updateSaleDateHint(input, hint));
+        input.addEventListener('change', () => updateSaleDateHint(input, hint));
+    });
+
+    const modalEl = document.getElementById('addSaleModal');
+    if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            resetAddSaleForm();
+        });
+    }
+
+    // Auto-collapse expanded item editors when clicking anywhere outside item rows.
+    document.addEventListener('click', function(e) {
+        const inRow = e.target.closest('.compact-item-row');
+        const inCombo = e.target.closest('.combobox-list');
+        if (!inRow && !inCombo) {
+            collapseExpandedSaleRows();
+        }
+    });
+
+    // Toggle manual bill for each Edit modal
+    document.querySelectorAll('.edit-has-bill-checkbox').forEach(cb => {
+        const targetId = cb.dataset.target;
+        const manual = document.getElementById(targetId);
+        if (!manual) return;
+        const setState = () => {
+            if (cb.checked) {
+                manual.readOnly = false;
+                manual.classList.remove('text-muted');
+            } else {
+                manual.value = '';
+                manual.readOnly = true;
+                manual.classList.add('text-muted');
+            }
+        }
+        setState();
+        cb.addEventListener('change', setState);
+    });
+
+    const addFormInit = document.querySelector('#addSaleModal form');
+    if (addFormInit) updateSalePrice(addFormInit);
+    document.querySelectorAll('[id^="editSaleModal"] form').forEach(form => updateSalePrice(form));
+
+    // Payment method toggle for direct sales
+    document.querySelectorAll('select[name="payment_method"]').forEach(select => {
+        const form = select.closest('form');
+        const accountSelect = form ? form.querySelector('select[name="payment_account_id"]') : null;
+        const run = () => {
+            updateSalePaymentSection(form);
+            updateSalePaymentMethod(select);
+        };
+        select.addEventListener('change', run);
+        if (accountSelect) accountSelect.addEventListener('change', run);
+        run(); // Initialize on load
+    });
+
+    if (saleFormDraft && resumeMode === 'add') {
+        applyAddSaleDraft(saleFormDraft);
+        const modalEl = document.getElementById('addSaleModal');
+        if (modalEl) {
+            let modal = bootstrap.Modal.getInstance(modalEl);
+            if (!modal) modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+    } else if (saleFormDraft && resumeMode === 'edit' && saleFormDraft.sale_id) {
+        const editUrlTemplate = {{ url_for('direct_sale_edit_modal', sale_id=0)|tojson }};
+        const editUrl = editUrlTemplate.replace('/0/', `/${saleFormDraft.sale_id}/`);
+        loadEditSaleModal(editUrl, saleFormDraft);
+    }
+});
+</script>
+{% endblock %}

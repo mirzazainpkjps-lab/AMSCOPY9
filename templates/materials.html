@@ -1,0 +1,340 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-warning">Material Brands</h2>
+    <div class="d-flex gap-2">
+    <button class="btn btn-outline-info fw-bold px-4 rounded-pill shadow" data-bs-toggle="modal" data-bs-target="#mergeModal">
+        <i class="bi bi-intersect me-1"></i> Merge Brands
+    </button>
+    <button class="btn btn-outline-primary fw-bold px-4 rounded-pill shadow" data-bs-toggle="modal" data-bs-target="#renameLabelModal">
+        <i class="bi bi-arrow-repeat me-1"></i> Fix Old Names
+    </button>
+    <button class="btn btn-outline-warning fw-bold px-4 rounded-pill shadow" data-bs-toggle="modal" data-bs-target="#bulkUnitModal">
+        <i class="bi bi-pencil-square me-1"></i> Bulk Units
+    </button>
+    <form action="{{ url_for('activate_all_materials') }}" method="POST" class="d-inline" onsubmit="return confirm('Activate all suspended materials?')">
+        <button type="submit" class="btn btn-outline-success fw-bold px-4 rounded-pill shadow">
+            <i class="bi bi-play-circle me-1"></i> Activate All Suspended
+        </button>
+    </form>
+    <a href="/" class="btn btn-outline-light fw-bold px-4 rounded-pill shadow"><i class="bi bi-arrow-left me-1"></i> Back</a>
+    <button class="btn btn-warning text-dark fw-bold px-4 rounded-pill shadow" data-bs-toggle="modal" data-bs-target="#mModal">
+        <i class="bi bi-plus-lg me-1"></i> Add Brand
+    </button>
+    </div>
+</div>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <select id="materialCategoryFilter" class="form-select form-select-sm bg-dark text-white border-secondary" style="width: auto;">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat.id }}" {{ 'selected' if category_filter|int == cat.id }}>{{ cat.name }}</option>
+        {% endfor %}
+    </select>
+    <select id="materialUnitFilter" class="form-select form-select-sm bg-dark text-white border-secondary" style="width: auto;">
+        <option value="">All Units</option>
+        {% for u in units %}
+        <option value="{{ u }}" {{ 'selected' if unit_filter == u }}>{{ u }}</option>
+        {% endfor %}
+    </select>
+    <button class="btn btn-sm btn-outline-warning" onclick="applyMaterialFilter()">Apply Filter</button>
+</div>
+
+<script>
+function applyMaterialFilter(){
+    const cat = document.getElementById('materialCategoryFilter').value;
+    const unit = document.getElementById('materialUnitFilter').value;
+    const params = new URLSearchParams();
+    if (cat) params.set('category_id', cat);
+    if (unit) params.set('unit', unit);
+    location.href = '/materials?' + params.toString();
+}
+
+async function generateMaterialAutoCode() {
+    const categoryEl = document.getElementById('addMaterialCategoryId');
+    const nameEl = document.getElementById('addMaterialName');
+    const codeEl = document.getElementById('addMaterialCode');
+    const hintEl = document.getElementById('addMaterialCodeHint');
+    const btnEl = document.getElementById('addMaterialAutoCodeBtn');
+    if (!codeEl || !hintEl || !btnEl) return;
+
+    const categoryId = categoryEl ? categoryEl.value : '';
+    const materialName = nameEl ? nameEl.value.trim() : '';
+    btnEl.disabled = true;
+    const oldLabel = btnEl.innerHTML;
+    btnEl.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Checking...';
+    hintEl.textContent = '';
+
+    try {
+        const res = await fetch(`/api/material_next_code?category_id=${encodeURIComponent(categoryId || '')}&material_name=${encodeURIComponent(materialName || '')}`);
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.code) {
+            hintEl.textContent = 'Unable to generate code right now.';
+            hintEl.className = 'small mt-2 text-danger';
+            return;
+        }
+        codeEl.value = data.code;
+        if (data.is_ft_product) {
+            hintEl.textContent = `Generated (FT product) from category "${data.category_name}": ${data.code}`;
+        } else {
+            hintEl.textContent = `Generated from category "${data.category_name}": ${data.code}`;
+        }
+        hintEl.className = 'small mt-2 text-info';
+    } catch (err) {
+        hintEl.textContent = 'Auto-code request failed. Please try again.';
+        hintEl.className = 'small mt-2 text-danger';
+    } finally {
+        btnEl.disabled = false;
+        btnEl.innerHTML = oldLabel;
+    }
+}
+</script>
+
+<!-- Merge Modal -->
+<div class="modal fade" id="mergeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="/merge_materials" method="POST" class="modal-content border-secondary" style="background: #1e293b; border-radius: 15px;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Merge/Shift Material</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-white-50 small">This will move all bills, entries, and transactions from the "Source" material to the "Target" material, then delete the source.</p>
+                
+                <label class="text-white fw-bold mb-2 small text-uppercase">Source Brand (To Delete)</label>
+                <select name="source_material_id" class="form-select bg-dark text-white border-secondary mb-3" required>
+                    <option value="">Select source...</option>
+                    {% for m in all_materials %}
+                    <option value="{{ m.id }}">{{ m.name }} ({{ m.code }})</option>
+                    {% endfor %}
+                </select>
+
+                <label class="text-white fw-bold mb-2 small text-uppercase">Target Brand (To Keep)</label>
+                <select name="target_material_id" class="form-select bg-dark text-white border-secondary" required>
+                    <option value="">Select target...</option>
+                    {% for m in all_materials %}
+                    <option value="{{ m.id }}">{{ m.name }} ({{ m.code }})</option>
+                    {% endfor %}
+                </select>
+                
+                <div class="alert alert-danger mt-3 small">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> This action cannot be undone.
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-danger text-white fw-bold w-100 py-2 rounded-pill shadow" onclick="return confirm('Are you absolutely sure you want to merge these materials? This will permanently delete the source material.')">Confirm & Merge Materials</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Rename Old Label Modal -->
+<div class="modal fade" id="renameLabelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="/materials/rename_label" method="POST" class="modal-content border-secondary" style="background: #1e293b; border-radius: 15px;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Fix Old Material Name in History</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-white-50 small mb-3">
+                    Old receipts and bills store the material name as text (not linked by ID).
+                    Use this to replace an old label everywhere (e.g. <code>12MM STEEL</code>) with the selected brand.
+                </p>
+
+                <label class="text-white fw-bold mb-2 small text-uppercase">Old Name (as printed on old receipts)</label>
+                <input name="old_label" class="form-control bg-dark text-white border-secondary mb-3" placeholder="e.g. 12MM STEEL" required>
+
+                <label class="text-white fw-bold mb-2 small text-uppercase">Replace With (Target Brand)</label>
+                <select name="target_material_id" class="form-select bg-dark text-white border-secondary" required>
+                    <option value="">Select target...</option>
+                    {% for m in all_materials %}
+                    <option value="{{ m.id }}">{{ m.name }} ({{ m.code }})</option>
+                    {% endfor %}
+                </select>
+
+                <div class="alert alert-warning mt-3 small">
+                    <i class="bi bi-info-circle-fill me-2"></i> Tip: This matches ignoring case and spaces.
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-primary text-white fw-bold w-100 py-2 rounded-pill shadow"
+                        onclick="return confirm('Update historical material names everywhere?');">
+                    Apply Fix
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bulk Update Unit Modal -->
+<div class="modal fade" id="bulkUnitModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="/bulk_update_material_unit" method="POST" class="modal-content border-secondary" style="background: #1e293b; border-radius: 15px;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Bulk Update Units</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-white-50 small">Update the unit size for all materials in a selected category.</p>
+                
+                <label class="text-white fw-bold mb-2 small text-uppercase">Category (Optional)</label>
+                <select name="category_id" class="form-select bg-dark text-white border-secondary mb-3">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label class="text-white fw-bold mb-2 small text-uppercase">New Unit</label>
+                <input type="text" name="new_unit" list="unitsList" class="form-control bg-dark text-white border-secondary fs-5 py-2" placeholder="e.g. KG" required>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-info text-dark fw-bold w-100 py-2 rounded-pill shadow">Update Units</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm" style="background: #1e293b; border: 2px solid #475569; border-radius: 15px; overflow: hidden;">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead style="background: #0f172a;">
+                <tr>
+                    <th class="text-white-50 fw-bold py-3 ps-4 border-0">Brand Name</th>
+                    <th class="text-white-50 fw-bold py-3 border-0">Category</th>
+                    <th class="text-white-50 fw-bold py-3 border-0">Unit</th>
+                    <th class="text-white-50 fw-bold py-3 border-0">Code</th>
+                    <th class="text-white-50 fw-bold py-3 border-0">Status</th>
+                    <th class="text-white-50 fw-bold py-3 text-end pe-4 border-0">Actions</th>
+                </tr>
+            </thead>
+            <tbody style="background: #1e293b;">
+                {% for m in materials %}
+                <tr style="border-bottom: 1px solid #334155; background: #1e293b;">
+                    <td class="ps-4 py-3 border-0">
+                        <span class="fw-bold text-white fs-5">{{ m.name }}</span>
+                    </td>
+                    <td class="border-0">
+                        <span class="badge bg-dark border border-secondary text-info">{{ m.category.name if m.category else 'General' }}</span>
+                    </td>
+                    <td class="border-0">
+                        <span class="badge bg-dark border border-secondary text-light">{{ m.unit or 'Bags' }}</span>
+                    </td>
+                    <td class="border-0">
+                        <span class="badge bg-dark border border-secondary text-warning">{{ m.code }}</span>
+                    </td>
+                    <td class="border-0">
+                        <span class="badge {{ 'bg-success' if m.is_active else 'bg-secondary' }}">{{ 'Active' if m.is_active else 'Suspended' }}</span>
+                    </td>
+                    <td class="text-end pe-4 border-0">
+                        <button class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" data-bs-toggle="modal" data-bs-target="#editMModal{{ m.id }}">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <form action="{{ url_for('delete_material', id=m.id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ 'Suspend' if m.is_active else 'Activate' }} this material?')">
+                            <button type="submit" class="btn {{ 'btn-outline-danger' if m.is_active else 'btn-outline-success' }} btn-sm border-2 rounded-pill shadow-sm">
+                                <i class="bi {{ 'bi-pause-circle' if m.is_active else 'bi-play-circle' }}"></i> {{ 'Suspend' if m.is_active else 'Activate' }}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination %}
+    <div class="card-footer bg-transparent border-0 py-3">
+        <nav>
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                {% if pagination.has_prev %}
+                <li class="page-item"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('materials', page=pagination.prev_num) }}">Previous</a></li>
+                {% endif %}
+                <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ pagination.page }}</span></li>
+                {% if pagination.has_next %}
+                <li class="page-item"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('materials', page=pagination.next_num) }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+{% for m in materials %}
+<div class="modal fade" id="editMModal{{ m.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form action="/edit_material/{{ m.id }}" method="POST" class="modal-content border-secondary" style="background: #1e293b; border-radius: 15px;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Rename Brand</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="text-white fw-bold mb-2 small text-uppercase">Brand Name</label>
+                <input type="text" name="material_name" value="{{ m.name }}" class="form-control bg-dark text-white border-secondary fs-5 py-2 mb-3" required>
+                <label class="text-white fw-bold mb-2 small text-uppercase">Category</label>
+                <select name="category_id" class="form-select bg-dark text-white border-secondary mb-3">
+                    {% for cat in categories %}
+                    {% if cat.is_active or (m.category and m.category.id == cat.id) %}
+                    <option value="{{ cat.id }}" {{ 'selected' if m.category and m.category.id == cat.id }}>{{ cat.name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <label class="text-white fw-bold mb-2 small text-uppercase">Unit</label>
+                <input type="text" name="material_unit" value="{{ m.unit or 'Bags' }}" list="unitsList" class="form-control bg-dark text-white border-secondary fs-5 py-2 mb-3" placeholder="e.g. Bags, KG">
+                <label class="text-white fw-bold mb-2 small text-uppercase">Code <span class="text-danger">*</span></label>
+                <input type="text" name="material_code" value="{{ m.code }}" class="form-control bg-dark text-white border-secondary fs-5 py-2" required>
+                <p class="text-white-50 x-small mt-2 mb-0">Note: Renaming will update all past entries for this brand.</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning text-dark fw-bold w-100 py-2 rounded-pill shadow">Update Brand Name</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<div class="modal fade" id="mModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="/add_material" method="POST" class="modal-content border-secondary" style="background: #1e293b; border-radius: 15px;">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Add New Material Brand</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="text-white fw-bold mb-2 small text-uppercase">Brand Name</label>
+                <input type="text" name="material_name" id="addMaterialName" class="form-control bg-dark text-white border-secondary fs-5 py-2 mb-3" placeholder="e.g. Lucky Cement or FT-KOHAT" required>
+                <label class="text-white fw-bold mb-2 small text-uppercase">Category</label>
+                <select name="category_id" id="addMaterialCategoryId" class="form-select bg-dark text-white border-secondary mb-3">
+                    {% for cat in categories %}
+                    {% if cat.is_active %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <label class="text-white fw-bold mb-2 small text-uppercase">Unit</label>
+                <input type="text" name="material_unit" value="Bags" list="unitsList" class="form-control bg-dark text-white border-secondary fs-5 py-2 mb-3" placeholder="e.g. Bags, KG">
+                <label class="text-white fw-bold mb-2 small text-uppercase">Code <span class="text-danger">*</span></label>
+                <div class="input-group">
+                    <input type="text" name="material_code" id="addMaterialCode" class="form-control bg-dark text-white border-secondary fs-5 py-2" placeholder="e.g. CEM-0001" required>
+                    <button type="button" id="addMaterialAutoCodeBtn" class="btn btn-outline-info fw-bold" onclick="generateMaterialAutoCode()">
+                        <i class="bi bi-magic me-1"></i> Auto Code
+                    </button>
+                </div>
+                <p id="addMaterialCodeHint" class="small mt-2 text-white-50 mb-0">Format: FBM{CAT}-000000. If name starts with FT-, format becomes FTP{CAT}-0000.</p>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2">
+                <button type="reset" class="btn btn-outline-secondary flex-grow-1 py-2 rounded-pill fw-bold">Reset</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold flex-grow-1 py-2 rounded-pill shadow">Save Brand</button>
+            </div>
+        </form>
+    </div>
+</div>
+<datalist id="unitsList">
+    <option value="Bags">
+    <option value="KG">
+    <option value="Foot">
+    <option value="Litre">
+    <option value="Meter">
+    <option value="Sq. Ft">
+    <option value="Ton">
+    <option value="Pcs">
+</datalist>
+{% endblock %}

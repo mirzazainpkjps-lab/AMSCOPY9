@@ -1,0 +1,192 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+  .payables-hero { background: linear-gradient(135deg, #172554, #1e293b); border: 1px solid #334155; }
+  .payables-total { font-size: clamp(1.55rem, 3vw, 2.35rem); }
+  .payables-table th, .payables-table td { white-space: nowrap; vertical-align: middle; }
+  .payables-table td.client-cell { white-space: normal; min-width: 235px; }
+  .payables-table .amount { font-variant-numeric: tabular-nums; }
+  .filter-help { font-size: .78rem; }
+  @media (max-width: 767px) {
+    .payables-table { min-width: 920px; }
+  }
+</style>
+
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h2 class="fw-bold text-white mb-0"><i class="bi bi-wallet2 text-warning me-2"></i>Current Payables</h2>
+      <span class="badge bg-warning text-dark">{{ total_records }} client{{ '' if total_records == 1 else 's' }}</span>
+    </div>
+    <p class="text-white-50 mb-0 mt-1">One consolidated record per client. Underlying bills and payments remain available in the ledger.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-success fw-bold" href="{{ url_for('export_current_payables', **filters) }}">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export filtered data
+    </a>
+    <a class="btn btn-outline-light" href="{{ url_for('pending_bills') }}"><i class="bi bi-receipt me-1"></i>Pending bills</a>
+  </div>
+</div>
+
+<div class="card payables-hero shadow-sm mb-4">
+  <div class="card-body p-4">
+    <div class="row align-items-center g-3">
+      <div class="col-md-7">
+        <div class="text-white-50 small text-uppercase fw-bold">Total Outstanding Payables</div>
+        <div class="payables-total text-warning fw-bold">Rs. {{ "{:,.2f}".format(total_outstanding or 0) }}</div>
+        <div class="text-white-50 filter-help mt-1">Calculated from the shared client ledger projection, including partial payments, returns, credits and adjustments.</div>
+      </div>
+      <div class="col-md-5 text-md-end">
+        <span class="badge rounded-pill bg-success-subtle text-success border border-success border-opacity-25 px-3 py-2">Live ledger balance</span>
+        <div class="text-white-50 small mt-2">Showing grouped clients, not raw bill rows</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card bg-slate-800 border-slate-700 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-secondary d-flex justify-content-between align-items-center">
+    <div><h5 class="mb-0 text-warning"><i class="bi bi-funnel me-2"></i>Payable filters</h5><div class="text-white-50 filter-help mt-1">Date filters use the client's last contributing transaction date; the amount remains the complete current balance.</div></div>
+    <a href="{{ url_for('unpaid_transactions_page') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-x-circle me-1"></i>Clear filters</a>
+  </div>
+  <div class="card-body p-4">
+    <form method="GET" action="{{ url_for('unpaid_transactions_page') }}" id="payablesFilterForm" class="row g-3">
+      <div class="col-12 col-lg-4">
+        <label for="payablesClientSearch" class="form-label text-white-50 small fw-bold">Client</label>
+        <div class="position-relative">
+          <div class="input-group">
+            <input type="search" id="payablesClientSearch" name="client" value="{{ filters.client or '' }}"
+                   class="form-control bg-dark text-white border-secondary" placeholder="Search name or code…"
+                   autocomplete="off" list="payablesClientOptions">
+            <button type="button" class="btn btn-outline-secondary" id="clearPayablesClient" title="Clear client"><i class="bi bi-x"></i></button>
+          </div>
+          <datalist id="payablesClientOptions">
+            {% for client in clients %}
+            <option value="{{ client.code }}">{{ client.name }}</option>
+            <option value="{{ client.name }}">{{ client.code }}</option>
+            {% endfor %}
+          </datalist>
+          {% if selected_client %}<div class="text-info small mt-1">Selected: {{ selected_client.name }}{% if selected_client.code %} · {{ selected_client.code }}{% endif %}</div>{% endif %}
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label for="amountOperator" class="form-label text-white-50 small fw-bold">Amount condition</label>
+        <select name="amount_operator" id="amountOperator" class="form-select bg-dark text-white border-secondary">
+          <option value="">Between / range</option>
+          <option value="eq" {{ 'selected' if filters.amount_operator == 'eq' }}>Exactly</option>
+          <option value="gt" {{ 'selected' if filters.amount_operator == 'gt' }}>Greater than</option>
+          <option value="lt" {{ 'selected' if filters.amount_operator == 'lt' }}>Less than</option>
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label for="amountMin" class="form-label text-white-50 small fw-bold">Minimum / exact</label>
+        <input type="number" step="0.01" min="0" name="amount_min" id="amountMin" value="{{ filters.amount_min or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Rs. 0">
+      </div>
+      <div class="col-6 col-lg-2">
+        <label for="amountMax" class="form-label text-white-50 small fw-bold">Maximum</label>
+        <input type="number" step="0.01" min="0" name="amount_max" id="amountMax" value="{{ filters.amount_max or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="No limit">
+      </div>
+      <div class="col-6 col-lg-2">
+        <label for="exactAmount" class="form-label text-white-50 small fw-bold">Exact amount</label>
+        <input type="number" step="0.01" min="0" name="exact_amount" id="exactAmount" value="{{ filters.exact_amount or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Optional">
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label text-white-50 small fw-bold">Start date</label>
+        <input type="date" name="start_date" value="{{ filters.start_date or '' }}" class="form-control bg-dark text-white border-secondary">
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label text-white-50 small fw-bold">End date</label>
+        <input type="date" name="end_date" value="{{ filters.end_date or '' }}" class="form-control bg-dark text-white border-secondary">
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label text-white-50 small fw-bold">Status</label>
+        <select name="status" class="form-select bg-dark text-white border-secondary">
+          <option value="outstanding" {{ 'selected' if filters.status == 'outstanding' }}>Outstanding only</option>
+          <option value="all" {{ 'selected' if filters.status == 'all' }}>All balances</option>
+          <option value="settled" {{ 'selected' if filters.status == 'settled' }}>Settled only</option>
+          <option value="credit" {{ 'selected' if filters.status == 'credit' }}>Credit balances</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-2 d-flex align-items-end">
+        <button class="btn btn-warning text-dark fw-bold w-100" type="submit"><i class="bi bi-filter me-1"></i>Apply filters</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card bg-slate-800 border-slate-700 shadow-sm">
+  <div class="card-header bg-transparent border-secondary d-flex justify-content-between align-items-center">
+    <span class="text-white-50 small">Grouped result {{ ((page - 1) * per_page) + 1 if total_records else 0 }}–{{ ((page - 1) * per_page) + (rows|length) if total_records else 0 }} of {{ total_records }}</span>
+    <span class="text-white-50 small">Page {{ page }} of {{ total_pages }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle mb-0 payables-table">
+      <thead class="bg-slate-900">
+        <tr>
+          <th class="ps-4 py-3">Client</th>
+          <th class="py-3">Account / Code</th>
+          <th class="py-3 text-end">Outstanding</th>
+          <th class="py-3">Last transaction</th>
+          <th class="py-3">Last payment</th>
+          <th class="py-3 text-center">Status</th>
+          <th class="py-3 text-end pe-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="ps-4 client-cell">
+            <a href="{{ url_for('financial_ledger', client_id=row.client_id) }}" class="text-warning fw-bold text-decoration-none">{{ row.client_name }}</a>
+            {% if row.status == 'Credit' %}<span class="badge bg-info-subtle text-info ms-2">Credit</span>{% endif %}
+          </td>
+          <td><span class="badge bg-dark border border-secondary text-white-50">{{ row.client_code or '—' }}</span></td>
+          <td class="text-end amount fw-bold {{ 'text-warning' if row.outstanding > 0 else 'text-success' }}">Rs. {{ "{:,.2f}".format(row.outstanding or 0) }}</td>
+          <td class="text-white-50">{{ row.last_transaction_date.strftime('%Y-%m-%d %H:%M') if row.last_transaction_date else '—' }}</td>
+          <td class="text-white-50">{{ row.last_payment_date.strftime('%Y-%m-%d %H:%M') if row.last_payment_date else '—' }}</td>
+          <td class="text-center"><span class="badge rounded-pill {{ 'bg-danger-subtle text-danger border border-danger border-opacity-25' if row.status == 'Outstanding' else ('bg-info-subtle text-info border border-info border-opacity-25' if row.status == 'Credit' else 'bg-success-subtle text-success border border-success border-opacity-25') }}">{{ row.status }}</span></td>
+          <td class="text-end pe-4">
+            <a href="{{ url_for('financial_ledger', client_id=row.client_id) }}" class="btn btn-sm btn-outline-info me-1" title="Open complete ledger"><i class="bi bi-journal-text"></i></a>
+            {% if row.outstanding > 0 %}
+            <a href="{{ url_for('accounts.client_payments', client=row.client_code or row.client_name) }}" class="btn btn-sm btn-outline-success" title="Record payment"><i class="bi bi-cash-stack"></i></a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center py-5 text-white-50"><i class="bi bi-check2-circle fs-2 d-block text-success mb-2"></i>No clients match the current payable filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="mt-3" aria-label="Current payables pagination">
+  <ul class="pagination pagination-sm justify-content-center flex-wrap">
+    <li class="page-item {{ 'disabled' if page <= 1 else '' }}"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('unpaid_transactions_page', client_id=filters.client_id, client=filters.client, amount_operator=filters.amount_operator, amount_min=filters.amount_min, amount_max=filters.amount_max, exact_amount=filters.exact_amount, start_date=filters.start_date, end_date=filters.end_date, status=filters.status, page=1, per_page=per_page) if page > 1 else '#' }}">First</a></li>
+    <li class="page-item {{ 'disabled' if page <= 1 else '' }}"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('unpaid_transactions_page', client_id=filters.client_id, client=filters.client, amount_operator=filters.amount_operator, amount_min=filters.amount_min, amount_max=filters.amount_max, exact_amount=filters.exact_amount, start_date=filters.start_date, end_date=filters.end_date, status=filters.status, page=page-1, per_page=per_page) if page > 1 else '#' }}">Previous</a></li>
+    <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ page }}</span></li>
+    <li class="page-item {{ 'disabled' if page >= total_pages else '' }}"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('unpaid_transactions_page', client_id=filters.client_id, client=filters.client, amount_operator=filters.amount_operator, amount_min=filters.amount_min, amount_max=filters.amount_max, exact_amount=filters.exact_amount, start_date=filters.start_date, end_date=filters.end_date, status=filters.status, page=page+1, per_page=per_page) if page < total_pages else '#' }}">Next</a></li>
+    <li class="page-item {{ 'disabled' if page >= total_pages else '' }}"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('unpaid_transactions_page', client_id=filters.client_id, client=filters.client, amount_operator=filters.amount_operator, amount_min=filters.amount_min, amount_max=filters.amount_max, exact_amount=filters.exact_amount, start_date=filters.start_date, end_date=filters.end_date, status=filters.status, page=total_pages, per_page=per_page) if page < total_pages else '#' }}">Last</a></li>
+  </ul>
+</nav>
+{% endif %}
+
+<script>
+(function () {
+  const client = document.getElementById('payablesClientSearch');
+  const clear = document.getElementById('clearPayablesClient');
+  if (clear && client) clear.addEventListener('click', function () { client.value = ''; client.focus(); });
+  const operator = document.getElementById('amountOperator');
+  const exact = document.getElementById('exactAmount');
+  const min = document.getElementById('amountMin');
+  const max = document.getElementById('amountMax');
+  function syncAmountInputs() {
+    const isExact = operator && operator.value === 'eq';
+    if (exact) exact.disabled = !isExact;
+    if (min) min.disabled = isExact;
+    if (max) max.disabled = isExact;
+  }
+  if (operator) { operator.addEventListener('change', syncAmountInputs); syncAmountInputs(); }
+})();
+</script>
+{% endblock %}

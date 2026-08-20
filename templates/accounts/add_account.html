@@ -1,0 +1,375 @@
+{% extends "layout.html" %}
+
+{% block title %}Add Account{% endblock %}
+
+{% block content %}
+<style>
+    .acc-page-header{
+        background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(236,72,153,0.18));
+        border: 1px solid rgba(148,163,184,0.18);
+        border-radius: 16px;
+        padding: 20px 24px; margin-bottom: 24px;
+        display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    }
+    .acc-page-header h2{ margin:0; font-weight:700; }
+    .acc-page-header .subtitle{ color: var(--text-muted); font-size: .9rem; margin-top: 4px; }
+
+    .form-card{
+        border: 1px solid var(--border-color);
+        border-radius: 14px; background: var(--surface-1); overflow: hidden;
+    }
+    .form-section{
+        padding: 20px 22px; border-bottom: 1px solid var(--border-color);
+    }
+    .form-section:last-of-type{ border-bottom: 0; }
+    .form-section .sec-head{
+        display:flex; align-items:center; gap: 10px;
+        margin-bottom: 14px;
+    }
+    .form-section .sec-head .step-badge{
+        width: 32px; height: 32px; border-radius: 10px;
+        background: linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff;
+        display:flex; align-items:center; justify-content:center; font-weight:700;
+    }
+    .form-section .sec-head .step-title{ font-weight: 700; font-size: 1.05rem; margin:0; }
+    .form-section .sec-head .step-sub{ font-size: .8rem; color: var(--text-muted); margin:0; }
+
+    .form-label{ font-weight: 600; }
+    .req{ color:#f43f5e; }
+
+    /* Channel choice */
+    .channel-choice{
+        display:flex; gap: 12px; flex-wrap: wrap;
+    }
+    .channel-option{
+        flex: 1 1 220px; cursor: pointer;
+        border: 2px solid var(--border-color);
+        border-radius: 14px; padding: 16px;
+        display: flex; align-items: center; gap: 12px;
+        background: var(--surface-1);
+        transition: all .15s ease;
+        position: relative;
+    }
+    .channel-option:hover{ border-color: var(--accent); }
+    .channel-option .channel-icon{
+        width: 46px; height: 46px; border-radius: 12px;
+        display:flex; align-items:center; justify-content:center; font-size:1.4rem; color:#fff; flex-shrink:0;
+    }
+    .channel-option .ch-title{ font-weight: 700; }
+    .channel-option .ch-sub{ font-size: .78rem; color: var(--text-muted); }
+    .channel-option input[type="radio"]{ position:absolute; opacity:0; pointer-events:none; }
+    .channel-option .ch-check{
+        margin-left:auto; width:22px; height:22px; border-radius: 50%;
+        border: 2px solid var(--border-color); display:flex; align-items:center; justify-content:center;
+    }
+    .channel-option.selected{
+        border-color: #6366f1;
+        box-shadow: 0 0 0 4px rgba(99,102,241,.15);
+        background: linear-gradient(135deg, rgba(99,102,241,.08), rgba(56,189,248,.08));
+    }
+    .channel-option.selected .ch-check{
+        background: #6366f1; border-color: #6366f1; color:#fff;
+    }
+    .channel-option.selected .ch-check::after{
+        content:'\2713'; font-weight:700; font-size: .85rem;
+    }
+    .ch-cash .channel-icon{ background: linear-gradient(135deg,#f59e0b,#d97706); }
+    .ch-bank .channel-icon{ background: linear-gradient(135deg,#3b82f6,#1d4ed8); }
+
+    .bank-panel{
+        margin-top: 16px;
+        border-radius: 12px;
+        background: rgba(56,189,248,.06);
+        border: 1px dashed rgba(56,189,248,.4);
+        padding: 16px;
+    }
+    .bank-panel .panel-head{
+        display:flex; align-items:center; gap:8px;
+        font-weight:700; color:#0ea5e9; margin-bottom: 10px;
+    }
+    html[data-theme="light"] .bank-panel{ background: rgba(56,189,248,.08); }
+
+    .group-quick-add{
+        margin-top: 6px; display:flex; align-items:center; gap: 8px;
+    }
+    .group-quick-add a{ font-size: .82rem; }
+
+    .preview-card{
+        border: 1px solid var(--border-color); border-radius: 14px;
+        background: linear-gradient(180deg, rgba(99,102,241,.06), transparent);
+        padding: 18px;
+    }
+    .preview-card h6{ font-weight:700; }
+    .preview-list{ list-style:none; padding:0; margin:0; }
+    .preview-list li{
+        display:flex; justify-content:space-between; padding: 6px 0;
+        border-bottom: 1px dashed var(--border-color); font-size: .9rem;
+    }
+    .preview-list li:last-child{ border-bottom: 0; }
+    .preview-list .pv-key{ color: var(--text-muted); }
+    .preview-list .pv-val{ font-weight: 600; }
+
+    .form-actions{
+        display:flex; gap:10px; justify-content:flex-end;
+        padding: 16px 22px; background: var(--surface-2);
+        border-top: 1px solid var(--border-color);
+    }
+</style>
+
+<div class="container-fluid">
+    <div class="acc-page-header">
+        <div>
+            <h2><i class="bi bi-plus-circle-fill me-2"></i>Add New Account</h2>
+            <div class="subtitle">Create a cash or bank account, assign it to a transaction group, and set the opening balance.</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('accounts.manage_accounts') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Back to Accounts
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <form method="POST" id="accountForm" class="form-card">
+                <!-- Section 1: Basics -->
+                <div class="form-section">
+                    <div class="sec-head">
+                        <div class="step-badge">1</div>
+                        <div>
+                            <div class="step-title">Basic Information</div>
+                            <div class="step-sub">Give this account a clear, recognizable name.</div>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label for="name" class="form-label">Account Name <span class="req">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" placeholder="e.g. Main Cash Drawer, HBL Business 1234" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Group + Type -->
+                <div class="form-section">
+                    <div class="sec-head">
+                        <div class="step-badge">2</div>
+                        <div>
+                            <div class="step-title">Classification</div>
+                            <div class="step-sub">Pick the business group and the account purpose.</div>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="source_category" class="form-label">Transaction Group <span class="req">*</span></label>
+                            <select class="form-select" id="source_category" name="source_category" required>
+                                <option value="">Select transaction group</option>
+                                {% for category in categories %}
+                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="group-quick-add">
+                                <span class="small text-muted">Need a new group?</span>
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
+                                    <i class="bi bi-plus-circle me-1"></i>Create one
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="account_type" class="form-label">Account Type <span class="req">*</span></label>
+                            <select class="form-select" id="account_type" name="account_type" required>
+                                <option value="">Select account type</option>
+                                <option value="Company Account">Company Account</option>
+                                <option value="Supplier Account">Supplier Account</option>
+                                <option value="Client Account">Client Account</option>
+                                <option value="Personal Account">Personal Account</option>
+                                <option value="Operating Account">Operating Account</option>
+                                <option value="Expense Account">Expense Account</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <div class="small text-muted mt-1">What kind of money this account represents.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Channel -->
+                <div class="form-section">
+                    <div class="sec-head">
+                        <div class="step-badge">3</div>
+                        <div>
+                            <div class="step-title">Account Channel</div>
+                            <div class="step-sub">Is this physical cash or a bank account?</div>
+                        </div>
+                    </div>
+                    <div class="channel-choice">
+                        <label class="channel-option ch-cash selected" for="categoryCash">
+                            <div class="channel-icon"><i class="bi bi-cash-coin"></i></div>
+                            <div>
+                                <div class="ch-title">Cash</div>
+                                <div class="ch-sub">Physical cash drawer or safe</div>
+                            </div>
+                            <div class="ch-check"></div>
+                            <input type="radio" name="category" id="categoryCash" value="cash" checked>
+                        </label>
+                        <label class="channel-option ch-bank" for="categoryBank">
+                            <div class="channel-icon"><i class="bi bi-bank"></i></div>
+                            <div>
+                                <div class="ch-title">Bank</div>
+                                <div class="ch-sub">Bank account with details</div>
+                            </div>
+                            <div class="ch-check"></div>
+                            <input type="radio" name="category" id="categoryBank" value="bank">
+                        </label>
+                    </div>
+
+                    <div id="bankDetails" class="bank-panel" style="display:none;">
+                        <div class="panel-head"><i class="bi bi-bank2"></i> Bank Account Details</div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="bank_name" class="form-label">Bank Name</label>
+                                <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="e.g. HBL, Meezan, Allied">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="account_holder_name" class="form-label">Account Holder Name</label>
+                                <input type="text" class="form-control" id="account_holder_name" name="account_holder_name" placeholder="As printed on the cheque book">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="account_number" class="form-label">Account Number</label>
+                                <input type="text" class="form-control" id="account_number" name="account_number" placeholder="e.g. 0123-4567890-01">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="branch_code" class="form-label">Branch Code</label>
+                                <input type="text" class="form-control" id="branch_code" name="branch_code" placeholder="Optional">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Balance + Note -->
+                <div class="form-section">
+                    <div class="sec-head">
+                        <div class="step-badge">4</div>
+                        <div>
+                            <div class="step-title">Opening Balance & Notes</div>
+                            <div class="step-sub">Set the starting balance to match your real-world balance today.</div>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="initial_balance" class="form-label">Initial Balance</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" class="form-control" id="initial_balance" name="initial_balance" step="0.01" value="0">
+                            </div>
+                            <div class="small text-muted mt-1">Use a negative value if this account starts with a debt.</div>
+                        </div>
+                        <div class="col-md-12">
+                            <label for="note" class="form-label">Note <span class="text-muted small">(optional)</span></label>
+                            <textarea class="form-control" id="note" name="note" rows="3" placeholder="Anything useful to remember about this account..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <a href="{{ url_for('accounts.manage_accounts') }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i> Create Account
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="preview-card sticky-top" style="top: 20px;">
+                <h6 class="mb-3"><i class="bi bi-eye-fill me-2 text-info"></i>Live Preview</h6>
+                <ul class="preview-list">
+                    <li><span class="pv-key">Name</span><span class="pv-val" id="pv-name">—</span></li>
+                    <li><span class="pv-key">Group</span><span class="pv-val" id="pv-group">—</span></li>
+                    <li><span class="pv-key">Type</span><span class="pv-val" id="pv-type">—</span></li>
+                    <li><span class="pv-key">Channel</span><span class="pv-val" id="pv-channel">Cash</span></li>
+                    <li><span class="pv-key">Bank</span><span class="pv-val" id="pv-bank">—</span></li>
+                    <li><span class="pv-key">Account #</span><span class="pv-val" id="pv-acct">—</span></li>
+                    <li><span class="pv-key">Opening</span><span class="pv-val" id="pv-balance">Rs. 0.00</span></li>
+                </ul>
+                <div class="alert alert-info mt-3 small mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Tip: A clear group makes receive/pay flows much faster later on.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Group Modal (inline category creation) -->
+<div class="modal fade" id="newCategoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('accounts.add_account_category') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-tag-fill me-2 text-info"></i>Create Transaction Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="new_category_name">Group Name <span class="req">*</span></label>
+                    <input type="text" class="form-control" id="new_category_name" name="name" placeholder="e.g. Company, Own Funds, Clients, External, Loan" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label fw-semibold" for="new_category_note">Note <span class="text-muted small">(optional)</span></label>
+                    <textarea class="form-control" id="new_category_note" name="note" rows="3"></textarea>
+                </div>
+                <div class="alert alert-warning small mb-0">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    The page will refresh after the group is created so it appears in the dropdown.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i> Create Group</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    const bankRadio   = document.getElementById('categoryBank');
+    const cashRadio   = document.getElementById('categoryCash');
+    const bankDetails = document.getElementById('bankDetails');
+    const cashOption  = cashRadio.closest('.channel-option');
+    const bankOption  = bankRadio.closest('.channel-option');
+
+    function toggleBankDetails() {
+        const isBank = bankRadio.checked;
+        bankDetails.style.display = isBank ? 'block' : 'none';
+        cashOption.classList.toggle('selected', !isBank);
+        bankOption.classList.toggle('selected', isBank);
+        updatePreview();
+    }
+    cashRadio.addEventListener('change', toggleBankDetails);
+    bankRadio.addEventListener('change', toggleBankDetails);
+
+    // Live preview wiring
+    function val(id){ const el = document.getElementById(id); return el ? (el.value || '').trim() : ''; }
+    function setText(id, text){ const el = document.getElementById(id); if (el) el.textContent = text || '—'; }
+
+    function updatePreview(){
+        setText('pv-name',  val('name'));
+        setText('pv-group', val('source_category'));
+        setText('pv-type',  val('account_type'));
+        setText('pv-channel', bankRadio.checked ? 'Bank' : 'Cash');
+        setText('pv-bank',  val('bank_name'));
+        setText('pv-acct',  val('account_number'));
+        const bal = parseFloat(val('initial_balance') || '0') || 0;
+        setText('pv-balance', 'Rs. ' + bal.toFixed(2));
+    }
+    ['name','source_category','account_type','bank_name','account_number','initial_balance']
+        .forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', updatePreview);
+            if (el && el.tagName === 'SELECT') el.addEventListener('change', updatePreview);
+        });
+
+    toggleBankDetails();
+    updatePreview();
+})();
+</script>
+{% endblock %}

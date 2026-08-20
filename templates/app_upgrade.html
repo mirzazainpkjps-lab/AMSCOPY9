@@ -1,0 +1,307 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mt-4 mb-4 text-warning fw-bold">App Upgrade</h2>
+
+    <div class="card border-secondary bg-dark text-white mb-4">
+        <div class="card-header border-secondary bg-transparent">
+            <h5 class="card-title mb-0 text-info">Upload Release ZIP</h5>
+        </div>
+        <div class="card-body">
+            <div class="small text-white-50 mb-3">
+                This uses a staged deploy: ZIP is extracted to <code>{{ base_dir }}</code> and
+                <code>{{ current_path }}</code> is updated. WSGI reload file:
+                <code>{{ wsgi_reload_path or 'NOT SET' }}</code>.
+            </div>
+            <div class="small text-white-50 mb-3">
+                Auto data-upgrade queue folder:
+                <code>{{ data_upgrade_queue_dir }}</code>
+                <span class="text-info">({{ data_upgrade_queue_count }} pending file(s))</span>.
+                Any <code>.xlsx/.xls</code> file here is auto-imported during upgrade.
+            </div>
+            <form id="deployForm" method="POST" enctype="multipart/form-data" class="row g-2 align-items-end" data-no-global-loading>
+                <div class="col-md-6">
+                    <label class="form-label small text-white-50 mb-1">Release ZIP</label>
+                    <input id="deployFileInput" type="file" name="file" class="form-control bg-dark text-white border-secondary" accept=".zip" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-white-50 mb-1">After Deploy</label>
+                    <div class="form-check mt-1">
+                        <input class="form-check-input" type="checkbox" name="run_migrate" id="runMigrate" value="1" checked>
+                        <label class="form-check-label small text-white-50" for="runMigrate">Run migration</label>
+                    </div>
+                    <div class="form-check mt-1">
+                        <input class="form-check-input" type="checkbox" name="require_data_upgrade" id="requireDataUpgrade" value="1" checked>
+                        <label class="form-check-label small text-white-50" for="requireDataUpgrade">Require data payload</label>
+                    </div>
+                </div>
+                <div class="col-md-3 text-md-end">
+                    <button id="deployBtn" type="submit" class="btn btn-danger" onclick="return confirm('Deploy this release?');">
+                        <i class="bi bi-cloud-arrow-up me-2"></i>Deploy Release
+                    </button>
+                </div>
+            </form>
+            <div class="mt-3 small text-white-50">
+                Current target:
+                <span class="text-white">{{ current_target or 'Not a symlink yet' }}</span>
+            </div>
+            {% if not current_target %}
+            <div class="mt-2 small text-warning">
+                Setup required: set your WSGI path to <code>{{ current_path }}</code> and ensure it is a symlink.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card border-secondary bg-dark text-white mb-4">
+        <div class="card-header border-secondary bg-transparent">
+            <h5 class="card-title mb-0 text-warning">Rollback</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('import_export.app_upgrade_rollback') }}" class="row g-2 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label small text-white-50 mb-1">Select Release</label>
+                    <select name="release" class="form-select bg-dark text-white border-secondary">
+                        {% for r in releases %}
+                        <option value="{{ r.name }}">{{ r.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <button type="submit" class="btn btn-outline-warning" onclick="return confirm('Rollback to selected release?');">
+                        <i class="bi bi-arrow-counterclockwise me-2"></i>Rollback
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card border-secondary bg-dark text-white mb-4">
+        <div class="card-header border-secondary bg-transparent">
+            <h5 class="card-title mb-0 text-success">Migrate Database</h5>
+        </div>
+        <div class="card-body">
+            <div class="small text-white-50 mb-2">
+                Runs: 1) automatic schema sync (`_bootstrap_database`) and
+                2) SQL files in <code>{{ migrations_dir }}</code>.
+                Found: {{ migration_files|length }} SQL file(s).
+            </div>
+            <form method="POST" action="{{ url_for('import_export.app_upgrade_migrate') }}">
+                <button type="submit" class="btn btn-outline-success" onclick="return confirm('Run database migration now?');">
+                    <i class="bi bi-database-gear me-2"></i>Migrate Now
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card border-secondary bg-dark text-white mb-4">
+        <div class="card-header border-secondary bg-transparent">
+            <h5 class="card-title mb-0 text-white">Upgrade History</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Action</th>
+                            <th>Release</th>
+                            <th>ZIP</th>
+                            <th>Reloaded</th>
+                            <th>User</th>
+                            <th>Backup</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in history %}
+                        <tr>
+                            <td class="text-white-50">{{ h.timestamp }}</td>
+                            <td class="text-white-50">{{ h.action }}</td>
+                            <td class="text-white-50">{{ h.release_dir }}</td>
+                            <td class="text-white-50">{{ h.zip_name }}</td>
+                            <td class="text-white-50">{{ h.reloaded }}</td>
+                            <td class="text-white-50">{{ h.user }}</td>
+                            <td class="text-white-50">{{ h.backup_name }}</td>
+                            <td class="text-danger">{{ h.error }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if history|length == 0 %}
+                        <tr>
+                            <td colspan="7" class="text-center text-white-50">No history yet.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deployProgressModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-success">
+            <div class="modal-header border-success">
+                <h5 class="modal-title text-success">
+                    <i class="bi bi-cloud-arrow-up me-2"></i>Upgrade Progress
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div id="deployProgressWrap" class="mt-1">
+                    <div class="small text-white-50 mb-2">
+                        <span id="deployProgressText">Starting...</span>
+                        <span class="float-end" id="deployProgressPercent">0%</span>
+                    </div>
+                    <div class="progress" style="height: 14px;">
+                        <div
+                            id="deployProgressBar"
+                            class="progress-bar bg-success"
+                            role="progressbar"
+                            style="width: 0%;"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="0"
+                        ></div>
+                    </div>
+                </div>
+                <div class="small text-white-50 mt-3">Please keep this window open until completion.</div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    const form = document.getElementById('deployForm');
+    const fileInput = document.getElementById('deployFileInput');
+    const deployBtn = document.getElementById('deployBtn');
+    const progressModalEl = document.getElementById('deployProgressModal');
+    const wrap = document.getElementById('deployProgressWrap');
+    const bar = document.getElementById('deployProgressBar');
+    const percentLabel = document.getElementById('deployProgressPercent');
+    const textLabel = document.getElementById('deployProgressText');
+    if (!form || !fileInput || !deployBtn || !progressModalEl || !wrap || !bar || !percentLabel || !textLabel) return;
+
+    let progressModal = null;
+    let pollingHandle = null;
+
+    function openProgressModal() {
+        if (!progressModal) {
+            progressModal = new bootstrap.Modal(progressModalEl, { backdrop: 'static', keyboard: false });
+        }
+        progressModal.show();
+    }
+
+    function setProgress(percent, text) {
+        const p = Math.max(0, Math.min(100, Math.floor(percent || 0)));
+        bar.style.width = p + '%';
+        bar.setAttribute('aria-valuenow', String(p));
+        percentLabel.textContent = p + '%';
+        textLabel.textContent = text || '';
+    }
+
+    function stopPolling() {
+        if (pollingHandle) {
+            clearInterval(pollingHandle);
+            pollingHandle = null;
+        }
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        window.__disableGlobalLoading = true;
+        if (!fileInput.files || fileInput.files.length === 0) {
+            window.__disableGlobalLoading = false;
+            alert('Select a ZIP file first.');
+            return;
+        }
+        if (typeof hideLoading === 'function') hideLoading();
+        openProgressModal();
+        deployBtn.disabled = true;
+        setProgress(0, 'Uploading release...');
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '{{ url_for("import_export.app_upgrade_start") }}');
+        xhr.responseType = 'json';
+
+        xhr.upload.onprogress = function(evt) {
+            if (!evt.lengthComputable) return;
+            const uploadPct = Math.floor((evt.loaded / evt.total) * 50);
+            setProgress(uploadPct, 'Uploading release...');
+        };
+
+        xhr.onerror = function() {
+            deployBtn.disabled = false;
+            setProgress(100, 'Upgrade failed.');
+            window.__disableGlobalLoading = false;
+            alert('Network/upload error. This is often caused by upload size limit at proxy/server. Check max upload limits and retry.');
+        };
+
+        xhr.onload = function() {
+            let data = xhr.response || {};
+            if (!data || typeof data !== 'object') {
+                try {
+                    data = JSON.parse(xhr.responseText || '{}');
+                } catch (_) {
+                    data = {};
+                }
+            }
+            if (xhr.status !== 200 || !data.job_id) {
+                deployBtn.disabled = false;
+                const fallbackErr = (xhr.status === 413)
+                    ? 'Upload rejected (HTTP 413: file too large at server/proxy limit).'
+                    : ('Upgrade failed (HTTP ' + xhr.status + ').');
+                const errText = data.error || fallbackErr;
+                setProgress(100, errText);
+                window.__disableGlobalLoading = false;
+                alert(errText);
+                return;
+            }
+            const jobId = data.job_id;
+            setProgress(55, 'Upload complete. Deploying files...');
+
+            pollingHandle = setInterval(function() {
+                fetch('{{ url_for("import_export.app_upgrade_status", job_id="__JOB__") }}'.replace('__JOB__', jobId))
+                    .then(function(res) { return res.json(); })
+                    .then(function(state) {
+                        if (state.error) {
+                            stopPolling();
+                            deployBtn.disabled = false;
+                            setProgress(100, state.error);
+                            window.__disableGlobalLoading = false;
+                            alert(state.error);
+                            return;
+                        }
+                        setProgress(state.percent || 0, state.message || 'Deploying...');
+                        if (state.done) {
+                            stopPolling();
+                            deployBtn.disabled = false;
+                            if (state.success) {
+                                setProgress(100, (state.message || 'Done.') + ' Refreshing...');
+                                window.__disableGlobalLoading = false;
+                                setTimeout(function() {
+                                    window.location.reload();
+                                }, 900);
+                            } else {
+                                setProgress(100, state.error || 'Upgrade failed.');
+                                window.__disableGlobalLoading = false;
+                                alert(state.error || 'Upgrade failed.');
+                            }
+                        }
+                    })
+                    .catch(function() {
+                        stopPolling();
+                        deployBtn.disabled = false;
+                        setProgress(100, 'Upgrade failed while reading status.');
+                        window.__disableGlobalLoading = false;
+                        alert('Upgrade failed while reading status. Click OK and retry.');
+                    });
+            }, 1000);
+        };
+
+        const formData = new FormData(form);
+        xhr.send(formData);
+    });
+})();
+</script>
+{% endblock %}

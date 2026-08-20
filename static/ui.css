@@ -1,0 +1,943 @@
+/* =========================================================================
+   AMS UI v2 — shared design tokens and component primitives.
+   Loaded AFTER theme.css (theme.css legacy mappings still apply for
+   non-migrated screens). Pages opted into v2 add the .ui-v2 class on
+   their root element and pick up the cleaner spacing + alignment.
+   ========================================================================= */
+
+:root {
+    /* Surfaces (extend theme.css) */
+    --ui-bg:           #0b1020;
+    --ui-surface:      #161e33;
+    --ui-surface-2:    #0f1730;
+    --ui-surface-3:    #1d2647;
+
+    /* Borders */
+    --ui-border:        #2a3553;
+    --ui-border-strong: #3a486a;
+
+    /* Text */
+    --ui-text:        #eef2ff;
+    --ui-text-muted:  #94a3b8;
+    --ui-text-soft:   #cbd5f5;
+
+    /* Accents (mirror theme.css accent) */
+    --ui-accent:       #fbbf24;
+    --ui-accent-hover: #f59e0b;
+
+    /* Status */
+    --ui-success: #10b981;
+    --ui-success-strong: #059669;
+    --ui-warn:    #f59e0b;
+    --ui-danger:  #f43f5e;
+    --ui-info:    #06b6d4;
+    --ui-violet:  #8b5cf6;
+
+    /* Shape + rhythm */
+    --ui-radius:    10px;
+    --ui-radius-lg: 16px;
+    --ui-radius-pill: 999px;
+    --ui-shadow-1: 0 4px 12px rgba(2, 6, 23, 0.18);
+    --ui-shadow-2: 0 10px 28px rgba(2, 6, 23, 0.28);
+    --ui-shadow-hover: 0 16px 36px rgba(2, 6, 23, 0.42);
+
+    /* Form sizing */
+    --ui-field-h:    40px;
+    --ui-field-h-sm: 34px;
+    --ui-label-size: 0.78rem;
+    --ui-label-tracking: 0.04em;
+
+    /* Layout */
+    --ui-page-gutter: 24px;
+}
+
+html[data-theme="light"] {
+    --ui-bg:           #f6f8fc;
+    --ui-surface:      #ffffff;
+    --ui-surface-2:    #eef2f9;
+    --ui-surface-3:    #e3e9f3;
+
+    --ui-border:        #dde4ef;
+    --ui-border-strong: #c1cad8;
+
+    --ui-text:       #0f172a;
+    --ui-text-muted: #475569;
+    --ui-text-soft:  #334155;
+
+    --ui-accent:       #b45309;
+    --ui-accent-hover: #92400e;
+
+    --ui-shadow-1: 0 2px 6px rgba(15, 23, 42, 0.08);
+    --ui-shadow-2: 0 8px 18px rgba(15, 23, 42, 0.10);
+    --ui-shadow-hover: 0 14px 30px rgba(15, 23, 42, 0.16);
+}
+
+/* =========================================================================
+   Page header (icon + title + subtitle + right-side toolbar)
+   ========================================================================= */
+.ui-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: var(--ui-page-gutter);
+    padding: 18px 22px;
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--ui-accent) 14%, transparent),
+        color-mix(in srgb, var(--ui-violet) 14%, transparent));
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+}
+.ui-page-header .ui-title {
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: var(--ui-text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.45rem;
+}
+.ui-page-header .ui-title .ui-title-icon {
+    color: var(--ui-accent);
+    font-size: 1.25em;
+    display: inline-flex;
+}
+.ui-page-header .ui-subtitle {
+    color: var(--ui-text-muted);
+    font-size: 0.9rem;
+    margin-top: 4px;
+}
+.ui-page-header .ui-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* =========================================================================
+   Card (the base surface for everything in v2)
+   ========================================================================= */
+.ui-card {
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-1);
+    color: var(--ui-text);
+    overflow: hidden;
+}
+.ui-card-header {
+    padding: 14px 18px;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--ui-accent) 8%, transparent),
+        transparent);
+    border-bottom: 1px solid var(--ui-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.ui-card-header h3,
+.ui-card-header h4,
+.ui-card-header h5 {
+    margin: 0;
+    font-weight: 700;
+    color: var(--ui-text);
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ui-card-body { padding: 18px; }
+.ui-card-body.flush { padding: 0; }
+
+/* =========================================================================
+   KPI tile — clickable, drills down to detail page
+   ========================================================================= */
+.ui-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.ui-kpi {
+    position: relative;
+    display: block;
+    text-decoration: none;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--ui-surface-3), var(--ui-surface-2));
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+    padding: 18px 20px 20px;
+    min-height: 132px;
+    box-shadow: var(--ui-shadow-1);
+    overflow: hidden;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    cursor: pointer;
+}
+.ui-kpi:hover,
+.ui-kpi:focus-visible {
+    transform: translateY(-3px);
+    box-shadow: var(--ui-shadow-hover);
+    color: #ffffff;
+    text-decoration: none;
+    border-color: rgba(255, 255, 255, 0.45);
+    outline: none;
+}
+.ui-kpi-label {
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    opacity: 0.92;
+    margin-bottom: 6px;
+}
+.ui-kpi-value {
+    font-size: 1.7rem;
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 0;
+    word-break: break-word;
+}
+.ui-kpi-value small { font-size: 0.78rem; opacity: 0.85; font-weight: 600; }
+.ui-kpi-sub {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    opacity: 0.82;
+}
+.ui-kpi-icon {
+    position: absolute;
+    right: -10px;
+    bottom: -14px;
+    font-size: 5.2rem;
+    opacity: 0.18;
+    line-height: 1;
+    pointer-events: none;
+}
+.ui-kpi-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 5px 12px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: var(--ui-radius-pill);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+.ui-kpi-cta:hover { background: rgba(255, 255, 255, 0.32); color: #ffffff; }
+
+/* Status colour variants */
+.ui-kpi.amber  { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+.ui-kpi.green  { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+.ui-kpi.red    { background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%); }
+.ui-kpi.cyan   { background: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%); }
+.ui-kpi.violet { background: linear-gradient(135deg, #8b5cf6 0%, #4f46e5 100%); }
+.ui-kpi.indigo { background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); }
+.ui-kpi.slate  { background: linear-gradient(135deg, #475569 0%, #1e293b 100%); }
+.ui-kpi.teal   { background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%); }
+.ui-kpi.rose   { background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%); }
+.ui-kpi.sky    { background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); }
+.ui-kpi.lime   { background: linear-gradient(135deg, #65a30d 0%, #3f6212 100%); }
+
+/* =========================================================================
+   Form grid — every label same height, every input same height
+   ========================================================================= */
+.ui-form .ui-row {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+}
+.ui-form .ui-col-1  { grid-column: span 1; }
+.ui-form .ui-col-2  { grid-column: span 2; }
+.ui-form .ui-col-3  { grid-column: span 3; }
+.ui-form .ui-col-4  { grid-column: span 4; }
+.ui-form .ui-col-5  { grid-column: span 5; }
+.ui-form .ui-col-6  { grid-column: span 6; }
+.ui-form .ui-col-7  { grid-column: span 7; }
+.ui-form .ui-col-8  { grid-column: span 8; }
+.ui-form .ui-col-9  { grid-column: span 9; }
+.ui-form .ui-col-10 { grid-column: span 10; }
+.ui-form .ui-col-11 { grid-column: span 11; }
+.ui-form .ui-col-12 { grid-column: span 12; }
+@media (max-width: 768px) {
+    .ui-form .ui-row > [class*="ui-col-"] { grid-column: 1 / -1; }
+}
+
+.ui-form .ui-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.ui-form .ui-label {
+    font-size: var(--ui-label-size);
+    letter-spacing: var(--ui-label-tracking);
+    color: var(--ui-text-muted);
+    text-transform: uppercase;
+    font-weight: 700;
+    line-height: 1;
+    min-height: 1rem;
+}
+.ui-form .ui-helper {
+    font-size: 0.72rem;
+    color: var(--ui-text-muted);
+    line-height: 1.1;
+    min-height: 0.85rem;
+}
+.ui-form .ui-input,
+.ui-form .ui-select,
+.ui-form .ui-form .form-control,
+.ui-form .form-control,
+.ui-form .form-select {
+    width: 100%;
+    height: var(--ui-field-h);
+    min-height: var(--ui-field-h);
+    background: var(--ui-surface-2);
+    color: var(--ui-text);
+    border: 1px solid var(--ui-border-strong);
+    border-radius: var(--ui-radius);
+    padding: 0 12px;
+    font-size: 0.92rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ui-form textarea.form-control { height: auto; min-height: 90px; padding: 10px 12px; }
+.ui-form .form-control:focus,
+.ui-form .form-select:focus {
+    border-color: var(--ui-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 25%, transparent);
+    outline: none;
+}
+.ui-form .form-control::placeholder { color: color-mix(in srgb, var(--ui-text-muted) 80%, transparent); }
+.ui-form .ui-actions {
+    display: flex;
+    gap: 8px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+.ui-form .ui-actions .btn { min-height: var(--ui-field-h); }
+
+/* =========================================================================
+   Buttons — preserve Bootstrap, just normalise sizing + glow
+   ========================================================================= */
+.ui-v2 .btn { min-height: var(--ui-field-h); border-radius: var(--ui-radius); font-weight: 600; }
+.ui-v2 .btn-sm { min-height: var(--ui-field-h-sm); border-radius: 8px; }
+.ui-v2 .btn-pill { border-radius: var(--ui-radius-pill); }
+
+/* =========================================================================
+   Data table card
+   ========================================================================= */
+.ui-table-wrap { overflow-x: auto; }
+.ui-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--ui-text);
+    background: var(--ui-surface);
+    margin: 0;
+}
+.ui-table thead th {
+    background: var(--ui-surface-2);
+    color: var(--ui-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--ui-border);
+    white-space: nowrap;
+}
+.ui-table tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+    vertical-align: middle;
+    font-size: 0.92rem;
+}
+.ui-table tbody tr:hover td { background: color-mix(in srgb, var(--ui-accent) 6%, var(--ui-surface)); }
+.ui-table tbody tr.is-clickable td { cursor: pointer; }
+.ui-table tbody tr.is-clickable:hover td { background: color-mix(in srgb, var(--ui-accent) 10%, var(--ui-surface)); }
+.ui-table .ui-empty {
+    padding: 28px 14px;
+    text-align: center;
+    color: var(--ui-text-muted);
+    font-style: italic;
+}
+.ui-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ui-table .num.pos { color: var(--ui-success); font-weight: 700; }
+.ui-table .num.neg { color: var(--ui-danger); font-weight: 700; }
+.ui-table .num.warn { color: var(--ui-warn); font-weight: 700; }
+
+/* =========================================================================
+   Quick action panel (small grid of icon buttons inside a card)
+   ========================================================================= */
+.ui-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+.ui-quick {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    background: var(--ui-surface-2);
+    color: var(--ui-text);
+    text-decoration: none;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.ui-quick:hover {
+    border-color: var(--ui-accent);
+    transform: translateY(-2px);
+    color: var(--ui-text);
+}
+.ui-quick i { color: var(--ui-accent); font-size: 1.15rem; }
+
+/* =========================================================================
+   Side-sheet drawer (replaces fullscreen modal forms in Phase 3+)
+   ========================================================================= */
+.ui-sheet-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(2, 6, 23, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 1080;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+}
+.ui-sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+.ui-sheet {
+    position: fixed;
+    top: 0; right: 0;
+    height: 100vh;
+    width: min(560px, 100vw);
+    background: var(--ui-surface);
+    color: var(--ui-text);
+    border-left: 1px solid var(--ui-border);
+    box-shadow: var(--ui-shadow-2);
+    z-index: 1090;
+    transform: translateX(100%);
+    transition: transform 0.28s ease;
+    display: flex;
+    flex-direction: column;
+}
+.ui-sheet.show { transform: translateX(0); }
+.ui-sheet.wide { width: min(880px, 100vw); }
+.ui-sheet-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--ui-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.ui-sheet-body { flex: 1 1 auto; padding: 18px; overflow-y: auto; }
+.ui-sheet-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--ui-border);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    background: var(--ui-surface-2);
+}
+@media (max-width: 575.98px) {
+    .ui-sheet, .ui-sheet.wide { width: 100vw; }
+}
+
+/* =========================================================================
+   Theme-aware combobox (replaces the peach #ffe7c2 popup)
+   ========================================================================= */
+.ui-v2 .combobox-list,
+.combobox-list.ui-combobox-v2 {
+    background: var(--ui-surface) !important;
+    border: 1px solid var(--ui-border-strong) !important;
+    color: var(--ui-text);
+    border-radius: var(--ui-radius);
+    box-shadow: var(--ui-shadow-2);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 1200;
+}
+.ui-v2 .combobox-item,
+.combobox-list.ui-combobox-v2 .combobox-item {
+    background: transparent !important;
+    color: var(--ui-text) !important;
+    border-bottom: 1px solid var(--ui-border) !important;
+    padding: 8px 12px;
+}
+.ui-v2 .combobox-item:hover,
+.combobox-list.ui-combobox-v2 .combobox-item:hover {
+    background: color-mix(in srgb, var(--ui-accent) 18%, var(--ui-surface)) !important;
+}
+
+/* =========================================================================
+   Scoped overrides for opted-in pages (.ui-v2 root class)
+   These apply ONLY to migrated pages so legacy pages are untouched.
+   ========================================================================= */
+.ui-v2 .form-control,
+.ui-v2 .form-select,
+.ui-v2 .input-group-text {
+    background: var(--ui-surface-2) !important;
+    border-color: var(--ui-border-strong) !important;
+    color: var(--ui-text) !important;
+}
+.ui-v2 .form-control:focus,
+.ui-v2 .form-select:focus {
+    border-color: var(--ui-accent) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 25%, transparent) !important;
+}
+.ui-v2 .text-white,
+.ui-v2 .text-light { color: var(--ui-text) !important; }
+.ui-v2 .text-white-50 { color: var(--ui-text-muted) !important; }
+
+/* =========================================================================
+   Print: keep crisp on paper for migrated pages too
+   ========================================================================= */
+@media print {
+    .ui-page-header,
+    .ui-card { background: #fff !important; color: #000 !important; border-color: #000 !important; box-shadow: none !important; }
+    .ui-kpi { background: #fff !important; color: #000 !important; border: 1px solid #000 !important; }
+    .ui-sheet, .ui-sheet-backdrop { display: none !important; }
+}
+
+/* ============================================================
+   Phase 3.B — Bootstrap modal as right-side sheet drawer
+   Apply `.ui-sheet-modal` to a Bootstrap `.modal-dialog` to make
+   the modal slide in from the right as a fixed-width side panel
+   on desktop, and a full-screen drawer on mobile. All Bootstrap
+   modal mechanics (data-bs-toggle / data-bs-dismiss / JS API)
+   continue to work — only the visual presentation changes.
+   ============================================================ */
+.modal-dialog.ui-sheet-modal {
+    max-width: min(960px, 96vw);
+    width: min(960px, 96vw);
+    margin: 0 0 0 auto;
+    height: 100vh;
+    min-height: 100vh;
+    display: flex;
+}
+.modal-dialog.ui-sheet-modal .modal-content {
+    width: 100%;
+    height: 100vh;
+    min-height: 100vh;
+    border-radius: 0;
+    border: 0 !important;
+    border-left: 1px solid var(--ui-border) !important;
+    box-shadow: var(--ui-shadow-2);
+    display: flex;
+    flex-direction: column;
+}
+.modal.fade .modal-dialog.ui-sheet-modal {
+    transform: translateX(40px);
+    transition: transform 0.28s ease-out;
+}
+.modal.show .modal-dialog.ui-sheet-modal {
+    transform: translateX(0);
+}
+@media (max-width: 767.98px) {
+    .modal-dialog.ui-sheet-modal,
+    .modal-dialog.ui-sheet-modal .modal-content {
+        max-width: 100vw;
+        width: 100vw;
+        height: 100vh;
+    }
+}
+
+/* Direct sales sale-form sheet — token-driven surface so the form
+   inherits dark / light theme via --ui-* variables instead of a
+   hard-coded background hex. */
+.modal-content.ds-sale-sheet {
+    background: var(--ui-surface) !important;
+    color: var(--ui-text);
+}
+.modal-content.ds-sale-sheet .modal-header,
+.modal-content.ds-sale-sheet .modal-footer {
+    background: var(--ui-surface-2) !important;
+    border-color: var(--ui-border) !important;
+}
+.modal-content.ds-sale-sheet .modal-body {
+    background: var(--ui-surface) !important;
+}
+
+/* ============================================================
+   Phase 3 (Direct Sales) — page chrome classes
+   ============================================================ */
+
+/* Top-level label so .ui-card forms (without .ui-form) align */
+.ui-label {
+    display: block;
+    font-size: var(--ui-label-size);
+    letter-spacing: var(--ui-label-tracking);
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ui-text-muted);
+    margin-bottom: 4px;
+}
+
+/* Mode tabs row (Active / Voided / All) */
+.ds-mode-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Filter card uses .ui-card; just tighten body */
+.ds-filter-card .ui-card-body { padding: 14px 18px; }
+
+/* Two add-sale tiles (replaces inline-style cards with onmouseover) */
+.ds-add-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+@media (max-width: 575.98px) {
+    .ds-add-grid { grid-template-columns: 1fr; }
+}
+.ds-add-tile {
+    appearance: none;
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+    color: var(--ui-text);
+    border-radius: var(--ui-radius-lg);
+    padding: 22px 18px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+    box-shadow: var(--ui-shadow-1);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+}
+.ds-add-tile:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--ui-shadow-2);
+    border-color: var(--ui-border-strong);
+}
+.ds-add-tile:focus-visible {
+    outline: 2px solid var(--ui-accent);
+    outline-offset: 2px;
+}
+.ds-add-label {
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--ui-text-muted);
+}
+.ds-add-value {
+    font-size: 2.1rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+.ds-add-tile--billed .ds-add-value { color: var(--ui-info, #38bdf8); }
+.ds-add-tile--unbilled .ds-add-value { color: var(--ui-success, #22c55e); }
+.ds-add-cta {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.ds-add-cta--billed {
+    background: var(--ui-accent);
+    color: #1a120a;
+}
+.ds-add-cta--unbilled {
+    background: var(--ui-success, #22c55e);
+    color: #07210e;
+}
+
+/* Sales table card — clean wrapper using ui-card */
+.ds-table-card {
+    overflow: hidden;
+}
+.ds-sales-table {
+    margin: 0;
+}
+.ds-sales-table thead th {
+    background: var(--ui-surface-2);
+    color: var(--ui-text-muted);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--ui-border) !important;
+    border-top: 0;
+    white-space: nowrap;
+}
+.ds-sales-table tbody tr {
+    background: var(--ui-surface);
+    border-bottom: 1px solid var(--ui-border);
+}
+.ds-sales-table tbody tr:hover {
+    background: color-mix(in srgb, var(--ui-surface-2) 70%, var(--ui-surface));
+}
+.ds-sales-table tbody td {
+    border-color: var(--ui-border);
+    vertical-align: middle;
+}
+.ds-row-void {
+    opacity: 0.55;
+    text-decoration: line-through;
+}
+
+/* Light-mode polish */
+[data-theme="light"] .ds-sales-table thead th { color: var(--ui-text-muted); }
+[data-theme="light"] .ds-sales-table tbody tr { background: var(--ui-surface); color: var(--ui-text); }
+[data-theme="light"] .ds-sales-table tbody td { color: var(--ui-text); }
+[data-theme="light"] .ds-add-tile { background: var(--ui-surface); color: var(--ui-text); }
+[data-theme="light"] .ds-add-label { color: var(--ui-text-muted); }
+
+/* =========================================================================
+   Responsive ledger tables — "stack to cards" on small screens.
+   -------------------------------------------------------------------------
+   Wide, fixed-layout ledger tables (Client Ledger, Financial Ledger,
+   Material Ledger, Pending Bills, Supplier Ledger, …) get squeezed to an
+   unreadable sliver on phones. Adding .table-stack-cards to the <table>
+   and a data-label="…" attribute to every <td> turns each row into a
+   readable, full-width card on screens narrower than 768px — no pinch
+   zoom required (though pinch zoom stays enabled for those who want it).
+   ========================================================================= */
+@media (max-width: 767.98px) {
+    .table-stack-cards {
+        table-layout: auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        border: 0 !important;
+    }
+    .table-stack-cards thead {
+        display: none !important;
+    }
+    .table-stack-cards tbody,
+    .table-stack-cards tfoot,
+    .table-stack-cards tr,
+    .table-stack-cards td,
+    .table-stack-cards th {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    /* NOTE: these ledger pages are hardcoded dark, so the card palette is
+       hardcoded dark too (it must stay readable no matter the app theme). */
+    .table-stack-cards tr {
+        margin-bottom: 0.9rem;
+        border: 1px solid #334155 !important;
+        border-radius: 12px;
+        background: #1e293b;
+        box-shadow: 0 4px 12px rgba(2, 6, 23, 0.18);
+        /* No overflow:hidden here — it would clip action dropdowns. */
+    }
+    .table-stack-cards tbody tr:hover {
+        background: #1e293b !important;
+    }
+    .table-stack-cards td,
+    .table-stack-cards th {
+        padding: 0.55rem 0.9rem !important;
+        border: 0 !important;
+        border-bottom: 1px solid #334155 !important;
+        text-align: left !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        text-overflow: clip !important;
+        font-size: 0.95rem;
+        line-height: 1.4;
+        background: transparent !important;
+    }
+    .table-stack-cards td:last-child,
+    .table-stack-cards th:last-child {
+        border-bottom: 0 !important;
+    }
+    .table-stack-cards td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin-bottom: 0.18rem;
+    }
+    .table-stack-cards td.stack-no-label::before {
+        content: none;
+    }
+    /* Group/section heading rows inside a stacked table (e.g. a material name). */
+    .table-stack-cards .stack-card-heading {
+        background: #020617 !important;
+        font-weight: 700;
+        padding: 0.7rem 0.9rem !important;
+        border-bottom: 1px solid #475569 !important;
+        text-align: left !important;
+    }
+    .table-stack-cards .stack-card-heading::before {
+        content: none !important;
+    }
+    /* Keeps action buttons / dropdowns on one comfortable line inside cards. */
+    .table-stack-cards .stack-actions-cell {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+    /* A table footer (e.g. the TOTAL row) becomes one highlighted summary bar. */
+    .table-stack-cards tfoot tr {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0.75rem 0.9rem;
+        margin-bottom: 0.25rem;
+        background: #020617 !important;
+        border: 1px solid #475569 !important;
+        border-radius: 12px;
+    }
+    .table-stack-cards tfoot td {
+        display: block !important;
+        width: auto !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        text-align: left !important;
+    }
+    .table-stack-cards tfoot td:last-child {
+        text-align: right !important;
+    }
+    .table-stack-cards tfoot td::before {
+        content: none !important;
+    }
+}
+
+/* Ledger page toolbars: let the row of action buttons wrap into full-width
+   tappable buttons on phones instead of overflowing off-screen. */
+@media (max-width: 767.98px) {
+    .ledger-toolbar .btn {
+        flex: 1 1 auto;
+        min-width: 130px;
+        justify-content: center;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+}
+
+/* ============================================================
+   Direct Sales — refined table + responsive card fallback
+   ------------------------------------------------------------
+   Desktop: sticky column header, tabular numeric alignment and a
+   dedicated, truncated Notes column.
+   Mobile (<768px): the fixed table collapses into stacked, key-value
+   entry cards (data-label captions) so no horizontal scrolling is
+   needed on phones.
+   ============================================================ */
+
+/* Sticky column header so the labels stay visible while scrolling. */
+.ds-sales-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--ui-surface-2);
+}
+
+/* Alignment helpers — text left, numbers right, ids/status/actions centred. */
+.ds-sales-table th.text-end,
+.ds-sales-table td.text-end {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.ds-sales-table th.text-center,
+.ds-sales-table td.text-center {
+    text-align: center;
+}
+
+/* Notes column: single-line, truncated with an ellipsis; full text on hover. */
+.ds-note {
+    display: inline-block;
+    max-width: 20ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+    color: var(--ui-text-soft);
+    font-style: italic;
+    cursor: help;
+}
+
+/* Mobile card fallback (< 768px) */
+@media (max-width: 767.98px) {
+    .ds-table-card .table-responsive { overflow: visible; }
+    .ds-sales-table { min-width: 0; width: 100%; }
+    .ds-sales-table thead { display: none; }
+    .ds-sales-table,
+    .ds-sales-table tbody,
+    .ds-sales-table tr,
+    .ds-sales-table td { display: block; width: 100%; min-width: 0; max-width: 100%; }
+    .ds-sales-table tbody tr {
+        margin-bottom: 0.9rem;
+        border: 1px solid var(--ui-border-strong);
+        border-radius: 12px;
+        background: var(--ui-surface-2);
+        box-shadow: var(--ui-shadow-1);
+        padding: 0.35rem 0;
+    }
+    .ds-sales-table tbody tr:hover { background: var(--ui-surface-2); }
+    .ds-sales-table tbody tr.ds-row-void { text-decoration: none; }
+    .ds-sales-table td {
+        padding: 0.5rem 0.9rem;
+        border: 0;
+        border-bottom: 1px solid var(--ui-border);
+        text-align: left !important;
+        white-space: normal;
+        overflow: visible;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        text-overflow: clip;
+    }
+    .ds-sales-table td:last-child { border-bottom: 0; }
+    .ds-sales-table td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ui-text-muted);
+        margin-bottom: 0.18rem;
+    }
+    /* Bill No / System Ref / Status are the most important signals — tint
+       their captions with the accent colour so they read as the card header. */
+    .ds-sales-table td[data-label="Bill No."]::before,
+    .ds-sales-table td[data-label="System Ref"]::before,
+    .ds-sales-table td[data-label="Status"]::before { color: var(--ui-accent); }
+    .ds-sales-table td[data-label="Total Amount"] { font-size: 1.05rem; }
+    /* Action buttons sit at the bottom of each card and wrap neatly. */
+    .ds-sales-table td[data-label="Actions"] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+    .ds-sales-table td[data-label="Actions"]::before { width: 100%; }
+    .ds-sales-table td[data-label="Actions"] form { margin: 0; }
+    /* In cards, show the full note instead of truncating. */
+    .ds-note {
+        max-width: 100%;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+}

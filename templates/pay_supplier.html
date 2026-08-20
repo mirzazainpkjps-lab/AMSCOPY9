@@ -1,0 +1,269 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-cash-stack me-2"></i>Pay Supplier</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('suppliers') }}" class="btn btn-outline-light btn-sm fw-bold">
+            <i class="bi bi-list-ul me-1"></i> Supplier List
+        </a>
+        <a href="/" class="btn btn-outline-light btn-sm fw-bold">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-secondary bg-dark text-white shadow-sm" style="border-radius: 15px;">
+            <div class="card-body">
+                <h5 class="text-warning fw-bold mb-3"><i class="bi bi-pencil-square me-2"></i>Record Payment</h5>
+                <form action="{{ url_for('add_supplier_payment') }}" method="POST" id="paySupplierForm">
+                    <input type="hidden" name="return_to" value="">
+                    <div class="mb-3 position-relative">
+                        <label class="text-white-50 small fw-bold mb-1">SUPPLIER (search & select)</label>
+                        <input type="text" id="supplierSearch" class="form-control bg-dark text-white border-secondary" placeholder="Type supplier name..." autocomplete="off" onfocus="showCombobox('supplierSearch', 'supplierPayCombobox')" oninput="filterCombobox('supplierSearch', 'supplierPayCombobox')">
+                        <input type="hidden" name="supplier_id" id="supplierSelect">
+                        <div id="supplierPayCombobox" class="combobox-list shadow-lg" style="display:none;">
+                            {% for s in suppliers %}
+                            <div class="combobox-item"
+                                 data-id="{{ s.id }}"
+                                 data-balance="{{ '%.2f'|format(s.balance) }}"
+                                 data-bill="{{ '%.2f'|format(s.total_bill) }}"
+                                 data-paid="{{ '%.2f'|format(s.total_paid) }}"
+                                 data-phone="{{ s.phone or '' }}"
+                                 onclick="pickPaySupplier(this)">
+                                <span class="fw-bold text-warning">{{ s.name }}</span>
+                                <span class="text-white-50 small ms-2">Payable: Rs {{ "{:,.0f}".format(s.balance) }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <small class="text-white-50">Type to search. The list shows current payable for each supplier.</small>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-white-50 small fw-bold mb-1">DATE</label>
+                                <input type="date" name="date" class="form-control bg-dark text-white border-secondary" value="{{ today_date }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-white-50 small fw-bold mb-1">AMOUNT TO PAY (Rs)</label>
+                                <input type="number" step="0.01" min="0" name="amount" id="payAmount" class="form-control bg-dark text-white border-secondary" required>
+                                <small class="text-white-50">
+                                    <a href="#" id="payFullLink" class="text-warning text-decoration-none">Pay full payable</a>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">PAY FROM ACCOUNT</label>
+                        <select name="payment_account_id" id="paymentAccountSelect" class="form-select bg-dark text-white border-secondary" required>
+                            <option value="">— Select Cash/Bank Account —</option>
+                            {% for a in accounts %}
+                            <option value="{{ a.id }}"
+                                    data-method="{{ 'Bank Transfer' if a.category == 'bank' else 'Cash' }}"
+                                    data-bank="{{ a.bank_name or '' }}"
+                                    data-holder="{{ a.account_holder_name or a.name or '' }}"
+                                    data-no="{{ a.account_number or '' }}"
+                                    data-balance="{{ '%.2f'|format(a.balance or 0) }}">
+                                [{{ a.category|upper }}] {{ a.name }}{% if a.bank_name %} — {{ a.bank_name }}{% endif %} (Bal: Rs {{ "{:,.0f}".format(a.balance or 0) }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-white-50">Method, bank name and account number are filled automatically from the chosen account.</small>
+                    </div>
+
+                    <input type="hidden" name="method" id="methodHidden" value="Cash">
+                    <input type="hidden" name="bank_name" id="bankNameHidden">
+                    <input type="hidden" name="account_name" id="accountNameHidden">
+                    <input type="hidden" name="account_no" id="accountNoHidden">
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-white-50 small fw-bold mb-1">MANUAL BILL / VOUCHER NO (optional)</label>
+                                <input type="text" name="manual_bill_no" class="form-control bg-dark text-white border-secondary" placeholder="e.g. PV-1234">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-white-50 small fw-bold mb-1">NOTE (optional)</label>
+                                <input type="text" name="note" class="form-control bg-dark text-white border-secondary" placeholder="Any remarks">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid mt-2">
+                        <button type="submit" class="btn btn-success btn-lg fw-bold">
+                            <i class="bi bi-check-circle me-2"></i>SAVE PAYMENT
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-warning bg-dark text-white shadow-sm" style="border-radius: 15px;">
+            <div class="card-body">
+                <h5 class="text-warning fw-bold mb-3"><i class="bi bi-clipboard-data me-2"></i>Supplier Summary</h5>
+                <div id="summaryEmpty" class="text-center py-4 text-white-50">
+                    <i class="bi bi-arrow-left-circle" style="font-size: 2rem;"></i>
+                    <div class="mt-2">Select a supplier to see their balance.</div>
+                </div>
+                <div id="summaryBox" style="display:none;">
+                    <div class="mb-2">
+                        <div class="text-white-50 small">Supplier</div>
+                        <div class="fw-bold fs-5" id="sumName">—</div>
+                        <div class="text-white-50 small" id="sumPhone"></div>
+                    </div>
+                    <hr class="border-secondary">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-white-50">Total Billed (GRNs)</span>
+                        <span class="fw-bold" id="sumBill">Rs 0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-white-50">Total Paid So Far</span>
+                        <span class="fw-bold text-info" id="sumPaid">Rs 0</span>
+                    </div>
+                    <hr class="border-secondary">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold">Current Payable</span>
+                        <span class="fw-bold fs-4" id="sumBalance">Rs 0</span>
+                    </div>
+                    <hr class="border-secondary">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-white-50">After This Payment</span>
+                        <span class="fw-bold" id="sumRemaining">Rs 0</span>
+                    </div>
+                    <a href="#" id="openLedgerLink" class="btn btn-outline-info w-100 mt-3 fw-bold">
+                        <i class="bi bi-journal-text me-2"></i>Open Full Ledger
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const fmt = n => 'Rs ' + (Number(n) || 0).toLocaleString(undefined, {maximumFractionDigits: 2});
+    const sel = document.getElementById('supplierSelect');
+    const search = document.getElementById('supplierSearch');
+    const acc = document.getElementById('paymentAccountSelect');
+    const amt = document.getElementById('payAmount');
+    const payFullLink = document.getElementById('payFullLink');
+    let selectedMeta = {balance: 0, bill: 0, paid: 0, phone: '', name: ''};
+    window.pickPaySupplier = function(el) {
+        selectedMeta = {
+            id: el.dataset.id,
+            balance: parseFloat(el.dataset.balance || '0') || 0,
+            bill: parseFloat(el.dataset.bill || '0') || 0,
+            paid: parseFloat(el.dataset.paid || '0') || 0,
+            phone: el.dataset.phone || '',
+            name: (el.querySelector('.fw-bold') || el).textContent.trim()
+        };
+        sel.value = selectedMeta.id;
+        if (search) search.value = selectedMeta.name;
+        const box = document.getElementById('supplierPayCombobox');
+        if (box) box.style.display = 'none';
+        refreshSummary();
+    };
+
+    const empty = document.getElementById('summaryEmpty');
+    const box = document.getElementById('summaryBox');
+    const sumName = document.getElementById('sumName');
+    const sumPhone = document.getElementById('sumPhone');
+    const sumBill = document.getElementById('sumBill');
+    const sumPaid = document.getElementById('sumPaid');
+    const sumBalance = document.getElementById('sumBalance');
+    const sumRemaining = document.getElementById('sumRemaining');
+    const openLedgerLink = document.getElementById('openLedgerLink');
+
+    function currentBalance() {
+        return parseFloat(selectedMeta.balance || 0) || 0;
+    }
+
+    function updateRemaining() {
+        const bal = currentBalance();
+        const paying = parseFloat(amt.value || '0') || 0;
+        const remaining = bal - paying;
+        sumRemaining.textContent = fmt(remaining);
+        sumRemaining.classList.toggle('text-danger', remaining > 0.009);
+        sumRemaining.classList.toggle('text-success', Math.abs(remaining) <= 0.009);
+        sumRemaining.classList.toggle('text-warning', remaining < -0.009);
+    }
+
+    function refreshSummary() {
+        if (!sel.value) {
+            empty.style.display = 'block';
+            box.style.display = 'none';
+            return;
+        }
+        empty.style.display = 'none';
+        box.style.display = 'block';
+        sumName.textContent = selectedMeta.name || '—';
+        sumPhone.textContent = selectedMeta.phone || '';
+        sumBill.textContent = fmt(selectedMeta.bill || 0);
+        sumPaid.textContent = fmt(selectedMeta.paid || 0);
+        const bal = parseFloat(selectedMeta.balance || 0) || 0;
+        sumBalance.textContent = fmt(bal);
+        sumBalance.classList.toggle('text-danger', bal > 0.009);
+        sumBalance.classList.toggle('text-success', bal <= 0.009);
+        openLedgerLink.href = '/supplier_ledger/' + sel.value;
+        if (!amt.value || parseFloat(amt.value) === 0) {
+            amt.value = bal > 0 ? bal.toFixed(2) : '';
+        }
+        updateRemaining();
+
+        fetch('/api/supplier_balance/' + sel.value)
+            .then(r => r.json())
+            .then(d => {
+                if (!d || typeof d.balance === 'undefined') return;
+                opt.dataset.balance = (Number(d.balance) || 0).toFixed(2);
+                opt.dataset.bill = (Number(d.total_bill) || 0).toFixed(2);
+                opt.dataset.paid = (Number(d.total_paid) || 0).toFixed(2);
+                sumBill.textContent = fmt(d.total_bill);
+                sumPaid.textContent = fmt(d.total_paid);
+                sumBalance.textContent = fmt(d.balance);
+                updateRemaining();
+            }).catch(() => {});
+    }
+
+    function syncAccountFields() {
+        const opt = acc.options[acc.selectedIndex];
+        if (!opt || !opt.value) {
+            document.getElementById('methodHidden').value = 'Cash';
+            document.getElementById('bankNameHidden').value = '';
+            document.getElementById('accountNameHidden').value = '';
+            document.getElementById('accountNoHidden').value = '';
+            return;
+        }
+        document.getElementById('methodHidden').value = opt.dataset.method || 'Cash';
+        document.getElementById('bankNameHidden').value = opt.dataset.bank || '';
+        document.getElementById('accountNameHidden').value = opt.dataset.holder || '';
+        document.getElementById('accountNoHidden').value = opt.dataset.no || '';
+    }
+
+    if (sel.tagName === 'SELECT') sel.addEventListener('change', refreshSummary);
+    acc.addEventListener('change', syncAccountFields);
+    amt.addEventListener('input', updateRemaining);
+    payFullLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        const bal = currentBalance();
+        amt.value = bal > 0 ? bal.toFixed(2) : '0';
+        updateRemaining();
+    });
+
+    document.getElementById('paySupplierForm').addEventListener('submit', function (e) {
+        if (!sel.value) { e.preventDefault(); alert('Please select a supplier.'); return; }
+        if (!acc.value) { e.preventDefault(); alert('Please select the account to pay from.'); return; }
+        const v = parseFloat(amt.value || '0') || 0;
+        if (v <= 0) { e.preventDefault(); alert('Amount must be greater than zero.'); return; }
+    });
+})();
+</script>
+{% endblock %}

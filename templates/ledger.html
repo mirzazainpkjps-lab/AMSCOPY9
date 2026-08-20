@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="mb-4">Ledger - Select Client</h2>
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    {% for client in clients %}
+    <div class="col">
+        <a href="/ledger/{{ client.id }}" class="text-decoration-none">
+            <div class="card h-100 stat-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-person-circle fs-1 mb-2 text-primary"></i>
+                    <h5 class="card-title text-dark">{{ client.name }}</h5>
+                    <p class="card-text text-muted">{{ client.phone or 'No phone' }}</p>
+                    <span class="btn btn-sm btn-outline-primary">View Ledger</span>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

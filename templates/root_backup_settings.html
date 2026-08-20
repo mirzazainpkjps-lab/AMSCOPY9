@@ -1,0 +1,122 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="container-fluid px-0 px-sm-2">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+    <div>
+      <div class="text-white-50 small text-uppercase fw-bold">Master Console</div>
+      <h2 class="text-white fw-bold mb-1">Root Backup Settings</h2>
+      <div class="text-white-50">Auto ZIP backup email for all tenant data with history tracking.</div>
+    </div>
+    <div class="mt-3 mt-md-0">
+      <a class="btn btn-outline-warning fw-bold" href="{{ url_for('tenants_dashboard') }}">Back to Tenants</a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-5">
+      <div class="card border-secondary bg-dark text-white shadow-sm h-100">
+        <form method="post" action="{{ url_for('root_backup_settings_save') }}">
+        <div class="card-header bg-black text-white fw-bold border-secondary">Automation</div>
+        <div class="card-body">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="enabled" name="enabled" {% if row.enabled %}checked{% endif %}>
+            <label class="form-check-label fw-bold" for="enabled">Enable Hourly Backup Email</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Recipient Emails</label>
+            <textarea class="form-control bg-dark text-white border-secondary" rows="3" name="recipient_emails" placeholder="admin@example.com, ops@example.com">{{ row.recipient_emails or '' }}</textarea>
+            <div class="form-text text-white-50">Comma-separated emails.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Email Subject Prefix</label>
+            <input class="form-control bg-dark text-white border-secondary" name="subject_prefix" value="{{ row.subject_prefix or 'PWARE Root Backup' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Keep History Records</label>
+            <input class="form-control bg-dark text-white border-secondary" type="number" min="10" max="5000" name="keep_history_count" value="{{ row.keep_history_count or 200 }}">
+          </div>
+          <div class="mb-0">
+            <div class="fw-bold mb-2">ZIP Contents</div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="include_full_raw_xlsx" name="include_full_raw_xlsx" {% if row.include_full_raw_xlsx %}checked{% endif %}>
+              <label class="form-check-label" for="include_full_raw_xlsx">Include All-Tenants XLSX export</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="include_sqlite_db" name="include_sqlite_db" {% if row.include_sqlite_db %}checked{% endif %}>
+              <label class="form-check-label" for="include_sqlite_db">Include SQLite DB snapshot</label>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer border-secondary d-flex gap-2">
+          <button class="btn btn-warning fw-bold flex-fill" type="submit">Save Settings</button>
+        </form>
+          <form method="post" action="{{ url_for('root_backup_settings_send_now') }}" class="flex-fill">
+            <button class="btn btn-outline-info fw-bold w-100" type="submit">Send Now</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-7">
+      <div class="card border-secondary bg-dark text-white shadow-sm h-100">
+        <div class="card-header bg-black text-white fw-bold border-secondary d-flex justify-content-between align-items-center">
+          <span>Email Send History</span>
+          <form method="post" action="{{ url_for('root_backup_settings_history_clear') }}" onsubmit="return confirm('Clear entire root backup history and delete related ZIP files?');">
+            <button class="btn btn-sm btn-outline-danger fw-bold" type="submit">Clear History</button>
+          </form>
+        </div>
+        <div class="card-body">
+          <div class="small text-white-50 mb-3">
+            Last status:
+            <span class="fw-bold">{{ row.last_status or 'n/a' }}</span>
+            {% if row.last_sent_at %}| {{ row.last_sent_at.strftime('%Y-%m-%d %H:%M:%S') }}{% endif %}
+            {% if row.last_message %}<br>{{ row.last_message }}{% endif %}
+          </div>
+          <div class="table-responsive">
+            <table class="table table-dark table-striped align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Status</th>
+                  <th>Trigger</th>
+                  <th>Recipients</th>
+                  <th>File</th>
+                  <th>Message</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for h in history_rows %}
+                <tr>
+                  <td>{{ h.created_at.strftime('%Y-%m-%d %H:%M:%S') if h.created_at else '' }}</td>
+                  <td>
+                    <span class="badge {{ 'bg-success' if h.status == 'sent' else 'bg-danger' }}">{{ h.status }}</span>
+                  </td>
+                  <td>{{ h.trigger_type or '' }}</td>
+                  <td class="small">{{ h.recipient_emails or '' }}</td>
+                  <td class="small">
+                    <div>{{ h.attachment_name or '' }}</div>
+                    <div class="text-white-50">{{ h.attachment_size_kb or 0 }} KB</div>
+                  </td>
+                  <td class="small">{{ h.message or '' }}</td>
+                  <td>
+                    {% if h.backup_path %}
+                    <a class="btn btn-sm btn-outline-info fw-bold" href="{{ url_for('root_backup_settings_history_download', history_id=h.id) }}">Download</a>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="7" class="text-center text-white-50 py-4">No backup email history yet.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

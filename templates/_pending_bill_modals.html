@@ -1,0 +1,122 @@
+<!-- View Modal -->
+<div class="modal fade" id="viewBillModal{{ bill.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content border-secondary" style="background: #1e293b;">
+            <div class="modal-header border-0">
+                <h5 class="text-info fw-bold">View Bill Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-white">
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1 d-block">CLIENT</label>
+                    <div class="p-2 bg-dark rounded border border-secondary">{{ bill.client_name }} ({{ bill.client_code }})</div>
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1 d-block">BILL NO</label>
+                        <div class="p-2 bg-dark rounded border border-secondary">
+                            <a href="{{ url_for('view_bill', bill_no=bill.bill_no) }}" class="text-warning text-decoration-none">{{ bill.bill_no }}</a>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1 d-block">NIMBUS NO</label>
+                        <div class="p-2 bg-dark rounded border border-secondary">{{ bill.nimbus_no or '---' }}</div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1 d-block">AMOUNT</label>
+                    <div class="p-2 bg-dark rounded border border-secondary text-success fw-bold">{{ "%.2f"|format(bill.amount or 0) }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1 d-block">REASON</label>
+                    <div class="p-2 bg-dark rounded border border-secondary">{{ bill.reason or '---' }}</div>
+                </div>
+                <div class="mb-3" id="cement-content-{{ bill.id }}" style="display: none;">
+                    <label class="text-white-50 small fw-bold mb-1 d-block">CEMENT CONTENT</label>
+                    <div class="p-2 bg-dark rounded border border-secondary text-info fw-bold" id="cement-info-{{ bill.id }}"></div>
+                </div>
+                {% if bill.photo_url %}
+                <div class="mb-3">
+                    <a href="{{ bill.photo_url }}" target="_blank" class="btn btn-outline-light btn-sm w-100"><i class="bi bi-link-45deg me-1"></i> Open URL</a>
+                </div>
+                {% endif %}
+                {% if bill.photo_path %}
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1 d-block">PHOTO</label>
+                    <div class="border border-secondary rounded overflow-hidden mb-2">
+                        <img loading="lazy" src="{{ bill.photo_url }}" class="img-fluid w-100" style="max-height: 300px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <img loading="lazy" src="{{ url_for('uploaded_file', filename=bill.photo_path) }}" class="img-fluid w-100" style="max-height: 300px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display: none;" class="p-4 text-center text-white-50 small">Photo cannot be previewed directly. Use the button below.</div>
+                    </div>
+                    <a href="{{ bill.photo_url }}" target="_blank" class="btn btn-outline-info btn-sm w-100">
+                    <a href="{{ url_for('uploaded_file', filename=bill.photo_path) }}" target="_blank" class="btn btn-outline-info btn-sm w-100">
+                        <i class="bi bi-image me-1"></i> Open Photo In New Tab
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editBillModal{{ bill.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form action="/edit_pending_bill/{{ bill.id }}" method="POST" class="modal-content border-secondary" style="background: #1e293b;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold">Edit Bill</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 position-relative">
+                    <label class="text-white-50 small fw-bold mb-1">CLIENT (NAME OR CODE)</label>
+                    <div class="input-group">
+                        <input type="text" name="client_code" id="editClientCodeInput{{ bill.id }}" value="{{ bill.client_code }}" class="form-control bg-dark text-white border-secondary" placeholder="Search by name or code..." autocomplete="off" required onfocus="showCombobox('editClientCodeInput{{ bill.id }}', 'editComboboxList{{ bill.id }}')" oninput="filterCombobox('editClientCodeInput{{ bill.id }}', 'editComboboxList{{ bill.id }}', 'editClientNameDisplay{{ bill.id }}')">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCombobox('editClientCodeInput{{ bill.id }}', 'editComboboxList{{ bill.id }}')">
+                            <i class="bi bi-chevron-down text-warning"></i>
+                        </button>
+                    </div>
+                    <div id="editComboboxList{{ bill.id }}" class="combobox-list shadow-lg" style="display: none;">
+                        {% for client in clients %}
+                        <div class="combobox-item" data-combo-code="{{ client.code }}" data-combo-name="{{ client.name }}" data-combo-input="editClientCodeInput{{ bill.id }}" data-combo-display="editClientNameDisplay{{ bill.id }}">
+                            <span class="fw-bold text-warning code-span">{{ client.code }}</span>
+                            <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="editClientNameDisplay{{ bill.id }}" class="text-info small mt-1 fw-bold">Name: {{ bill.client_name }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">BILL NO</label>
+                        <input type="text" name="bill_no" value="{{ bill.bill_no }}" class="form-control bg-dark text-white border-secondary" required>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="text-white-50 small fw-bold mb-1">NIMBUS NO</label>
+                        <input type="text" name="nimbus_no" value="{{ bill.nimbus_no }}" class="form-control bg-dark text-white border-secondary">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">AMOUNT</label>
+                    <input type="number" step="0.01" name="amount" value="{{ bill.amount }}" class="form-control bg-dark text-white border-secondary">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">REASON</label>
+                    <textarea name="reason" class="form-control bg-dark text-white border-secondary" rows="2">{{ bill.reason }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">PHOTO URL (Google Drive)</label>
+                    <input type="url" name="photo_url" value="{{ bill.photo_url or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="https://drive.google.com/...">
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">UPLOAD PHOTO</label>
+                    <input type="file" name="photo" class="form-control bg-dark text-white border-secondary" accept="image/*">
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning text-dark fw-bold w-100 py-2 rounded-pill">Update Bill</button>
+            </div>
+        </form>
+    </div>
+</div>

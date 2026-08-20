@@ -1,0 +1,1931 @@
+<!DOCTYPE html>
+<html lang="en" data-server-theme="{{ ui_theme_preference or '' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS SYSTEM FOR EASE</title>
+    <!-- [Ahmed] Vendor UI libraries locally (bootstrap 5.3.0, bootstrap-icons
+         1.10.0, flatpickr 4.6.13).  Loading these from cdn.jsdelivr.net made
+         every Edit button silently dead whenever the yard PCs lost internet:
+         window.bootstrap stayed undefined and AMSLazyModal/inline modals
+         crashed with "bootstrap is not defined".  The app must work fully
+         offline on the LAN. -->
+    <link href="{{ url_for('static', filename='vendor/bootstrap/5.3.0/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/1.10.0/font/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/flatpickr/4.6.13/flatpickr.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+    <script>
+        (function () {
+            var serverTheme = "{{ ui_theme_preference or '' }}";
+            var saved = "";
+            try { saved = localStorage.getItem("ams_theme") || ""; } catch (_) {}
+            var t = (saved || serverTheme || "").toLowerCase();
+            if (t !== "light" && t !== "dark") {
+                t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+            }
+            document.documentElement.setAttribute("data-theme", t);
+            document.documentElement.style.colorScheme = t;
+        })();
+    </script>
+    
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --bg-dark: var(--surface-0);
+            --card-bg: var(--surface-1);
+            --sidebar-bg: var(--surface-2);
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* Sidebar Styles with Scrollbar */
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            position: fixed;
+            background: var(--sidebar-bg);
+            border-right: 2px solid var(--border-color);
+            transition: all 0.3s;
+            z-index: 1050;
+            left: 0;
+            top: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-nav-container {
+            flex-grow: 1;
+            overflow-y: auto; /* This enables the scrollbar for the menu items */
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        /* Custom Scrollbar for Sidebar */
+        .sidebar-nav-container::-webkit-scrollbar {
+            width: 5px;
+        }
+        .sidebar-nav-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar-nav-container::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 10px;
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 30px;
+            min-height: 100vh;
+            transition: all 0.3s;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            padding: 12px 25px;
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+            border-left: 4px solid transparent;
+            transition: 0.2s;
+            text-decoration: none;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--accent);
+            background: rgba(251, 191, 36, 0.05);
+            border-left: 4px solid var(--accent);
+        }
+
+        .nav-link i { font-size: 1.2rem; margin-right: 15px; }
+        .nav-toggle-btn {
+            width: 100%;
+            background: transparent;
+            border: 0;
+            text-align: left;
+            justify-content: space-between;
+        }
+        .nav-toggle-label {
+            display: inline-flex;
+            align-items: center;
+        }
+        .nav-caret {
+            margin-right: 0 !important;
+            font-size: 0.9rem !important;
+            transition: transform 0.2s ease;
+        }
+        .nav-caret.rotated {
+            transform: rotate(180deg);
+        }
+        .nav-submenu {
+            display: none;
+        }
+        .nav-submenu.show {
+            display: block;
+        }
+        .nav-submenu .nav-link {
+            padding-left: 56px;
+            font-size: 0.95rem;
+        }
+
+        /* Shared buttons use a restrained lift instead of mismatched neon glows. */
+        .btn {
+            box-shadow: 0 2px 5px rgba(2, 6, 23, 0.22);
+            transition: box-shadow 0.16s ease, transform 0.16s ease, filter 0.16s ease;
+        }
+        .btn:hover {
+            box-shadow: 0 5px 12px rgba(2, 6, 23, 0.28);
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            box-shadow: 0 1px 3px rgba(2, 6, 23, 0.2);
+            transform: translateY(0);
+        }
+        .btn:focus-visible {
+            outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent);
+            outline-offset: 2px;
+        }
+        html[data-theme="light"] .btn { box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14); }
+
+        /* Contrast hardening for dark UI */
+        .btn-outline-light {
+            color: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+        }
+        .btn-outline-light:hover,
+        .btn-outline-light:focus {
+            color: #020617 !important;
+            background: #f8fafc !important;
+            border-color: #f8fafc !important;
+        }
+        .btn-outline-secondary {
+            color: #e2e8f0 !important;
+            border-color: #94a3b8 !important;
+        }
+        .btn-outline-secondary:hover,
+        .btn-outline-secondary:focus {
+            color: #020617 !important;
+            background: #cbd5e1 !important;
+            border-color: #cbd5e1 !important;
+        }
+        .btn-secondary {
+            color: #ffffff !important;
+            background: #334155 !important;
+            border-color: #334155 !important;
+        }
+        .btn-primary {
+            color: #ffffff !important;
+            background: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
+        }
+        
+        /* Combobox Styles */
+        .combobox-list {
+            position: fixed;
+            background: #ffe7c2;
+            border: 1px solid #f59e0b;
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 1200;
+            border-radius: 8px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+            min-width: 180px;
+        }
+        .combobox-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            color: #1f2937 !important;
+            border-bottom: 1px solid #f7c97a;
+        }
+        .combobox-item:hover, .combobox-item.active { background: #dcfce7; color:#052e16; outline:none; }
+        .combobox-item:last-child { border-bottom: none; }
+
+        /* Mobile Adjustments */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--surface-2);
+            border-bottom: 2px solid var(--border-color);
+            z-index: 1040;
+            padding: 0 15px;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--overlay);
+            z-index: 1045;
+        }
+
+        @media (max-width: 991.98px) {
+            .sidebar { left: -100%; }
+            .sidebar.show { left: 0; }
+            .main-content { margin-left: 0; padding: 80px 15px 20px 15px; }
+            .mobile-header { display: flex; align-items: center; justify-content: space-between; }
+            .sidebar-overlay.show { display: block; }
+        }
+
+        @media print {
+            body {
+                background: #fff !important;
+                color: #000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .mobile-header,
+            .sidebar,
+            #sidebar,
+            .sidebar-overlay,
+            #sidebarOverlay,
+            .loading-overlay,
+            #loadingOverlay,
+            .modal,
+            .modal-backdrop {
+                display: none !important;
+            }
+
+            .main-content {
+                margin: 0 !important;
+                padding: 0 !important;
+                min-height: auto !important;
+            }
+
+            .container-fluid {
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+            }
+
+            .alert {
+                display: none !important;
+            }
+
+            a[href]::after {
+                content: none !important;
+            }
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .loading-overlay.show { display: flex; }
+        .loading-spinner {
+            width: 50px; height: 50px;
+            border: 4px solid #334155;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* ---- Top-level transaction dialogs -----------------------------------
+           The sale sheet and other in-page Bootstrap modals sit at the default
+           modal z-index (1055) and paint above these dialogs purely because
+           they appear later in the DOM.  Transaction progress/result/reminder
+           dialogs are *global* UI and must always stack ABOVE any open form
+           modal, so they live on their own layer (below the 9999 loading
+           overlay, which remains the strongest global blocker). */
+        #taskProgressModal,
+        #taskResultModal,
+        #dueReminderModal {
+            /* !important also wins while Bootstrap is applying an inline
+               z-index during modal transitions. */
+            z-index: 2600 !important;
+        }
+        /* The backdrop is a body-level sibling, not a child of the modal. */
+        body > .modal-backdrop.ams-top-modal-backdrop {
+            z-index: 2590 !important;
+        }
+        /* Backdrops are siblings appended to <body>, so they cannot inherit this
+           via a descendant rule; ensureTopModal() promotes the matching backdrop
+           in JS on show. */
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text mt-3 text-warning fw-bold">Processing...</div>
+    <button type="button" id="loadingDismissBtn" class="btn btn-outline-warning btn-sm mt-3 fw-bold" style="display:none;">
+        Still waiting? Tap to close
+    </button>
+</div>
+
+<div class="modal fade" id="taskProgressModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-white border-success">
+            <div class="modal-header border-success py-2">
+                <h6 class="modal-title text-success mb-0">
+                    <i class="bi bi-arrow-repeat me-2"></i><span id="taskProgressTitle">Processing</span>
+                </h6>
+            </div>
+            <div class="modal-body">
+                <div class="small text-white-50 mb-2 d-flex justify-content-between">
+                    <span id="taskProgressText">Please wait...</span>
+                    <span id="taskProgressPercent">0%</span>
+                </div>
+                <div class="progress" style="height: 12px;">
+                    <div id="taskProgressBar"
+                         class="progress-bar bg-success progress-bar-striped progress-bar-animated"
+                         role="progressbar"
+                         style="width: 0%;"
+                         aria-valuemin="0"
+                         aria-valuemax="100"
+                         aria-valuenow="0"></div>
+                </div>
+                <div id="taskProgressReport" class="mt-3 pt-3 border-top border-secondary" style="display:none;">
+                    <div class="fw-bold text-warning mb-2" id="taskProgressReportTitle">Import / export report</div>
+                    <div class="small text-white-50 mb-2" id="taskProgressReportSummary"></div>
+                    <div id="taskProgressReportBody"></div>
+                    <button type="button" class="btn btn-success btn-sm w-100 mt-3 fw-bold" id="taskProgressReportClose">Close & reload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="taskResultModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-white border-success" id="taskResultCard">
+            <div class="modal-header border-success py-2">
+                <h6 class="modal-title fw-bold" id="taskResultTitle">
+                    <i class="bi bi-check-circle-fill me-2"></i>Successful
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2 fw-bold" id="taskResultHeadline">Operation completed successfully.</p>
+                <div class="small text-white-50" id="taskResultDetails"></div>
+                <div id="taskResultTables" class="mt-3" style="display:none;"></div>
+            </div>
+            <div class="modal-footer border-secondary py-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success btn-sm" id="taskResultReloadBtn">Reload</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if current_user.is_authenticated %}
+<div class="modal fade" id="dueReminderModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-warning border-2">
+            <div class="modal-header border-warning">
+                <h5 class="modal-title fw-bold text-warning">
+                    <i class="bi bi-alarm-fill me-2"></i>Deadline Reminder
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p class="text-white-50 mb-3">Action required. Please review and mark reminders as done.</p>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-white-50">Due entries</small>
+                    <span class="badge bg-warning text-dark" id="dueReminderCount">0</span>
+                </div>
+                <div id="dueReminderList" class="d-grid gap-2" style="max-height: 52vh; overflow-y: auto;"></div>
+                <div class="small text-white-50 mt-3">To close a reminder, open Notifications and write customer response.</div>
+            </div>
+            <div class="modal-footer border-warning">
+                <a href="/notifications" class="btn btn-outline-info fw-bold">Open Notifications</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if current_user.is_authenticated %}
+    <div class="mobile-header">
+        <button class="btn btn-link text-white p-0" id="sidebarToggle">
+            <i class="bi bi-list fs-2"></i>
+        </button>
+        <h5 class="fw-bold text-white mb-0">AMS <span class="text-warning">SYSTEM</span></h5>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="theme-switch" data-theme-toggle id="mobileThemeToggle">
+                <i class="bi bi-moon-stars-fill"></i>
+                <span class="theme-label">Dark</span>
+            </button>
+            <a href="/logout" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                <i class="bi bi-box-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="sidebar shadow" id="sidebar">
+        <div class="p-4 text-center border-bottom border-secondary border-opacity-25">
+            <h4 class="fw-bold text-white mb-0">AMS <span class="text-warning">SYSTEM</span></h4>
+            <small class="text-white-50 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">FOR EASE</small>
+        </div>
+
+        <div class="sidebar-nav-container">
+            <nav class="py-3">
+                {% if current_user.role != 'root' %}
+                {% if current_user.can_view_dashboard or current_user.role == 'admin' %}
+                <a href="/" class="nav-link {{ 'active' if request.path == '/' }}" onclick="closeSidebar()">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+                {% endif %}
+
+                <div class="text-white-50 small fw-bold px-4 mt-4 mb-2 text-uppercase" style="font-size: 0.7rem;">Inventory</div>
+                
+                {% if current_user.can_view_stock or current_user.role == 'admin' %}
+                <a href="{{ url_for('inventory.stock_summary') }}" class="nav-link {{ 'active' if request.path.startswith('/inventory/stock_summary') }}" onclick="closeSidebar()">
+                    <i class="bi bi-graph-up"></i> Stock Summary
+                </a>
+                {% endif %}
+
+                {% if current_user.can_view_daily or current_user.role == 'admin' %}
+                <a href="{{ url_for('inventory.daily_transactions') }}" class="nav-link {{ 'active' if request.path.startswith('/inventory/daily_transactions') }}" onclick="closeSidebar()">
+                    <i class="bi bi-list-check"></i> Daily Breakdown
+                </a>
+                {% endif %}
+
+                {% if current_user.can_view_history or current_user.role == 'admin' %}
+                <a href="/tracking" class="nav-link {{ 'active' if request.path == '/tracking' }}" onclick="closeSidebar()">
+                    <i class="bi bi-clock-history"></i> History
+                </a>
+                {% set can_tx_grn = (current_user.can_manage_grn or current_user.role == 'admin') %}
+                {% set can_tx_booking = (current_user.can_manage_bookings or current_user.role == 'admin') %}
+                {% set can_tx_sale = (current_user.can_manage_sales or current_user.role == 'admin') %}
+                {% if can_tx_grn or can_tx_booking or can_tx_sale %}
+                {% set tx_open = request.path in ['/grn', '/bookings', '/direct_sales', '/material_returns'] %}
+                <button type="button" class="nav-link nav-toggle-btn {{ 'active' if tx_open }}" onclick="toggleNavGroup('navTxGroup', this)">
+                    <span class="nav-toggle-label">
+                        <i class="bi bi-diagram-3"></i> Transactions
+                    </span>
+                    <i class="bi bi-chevron-down nav-caret {{ 'rotated' if tx_open }}"></i>
+                </button>
+                <div id="navTxGroup" class="nav-submenu {{ 'show' if tx_open }}">
+                    {% if can_tx_grn %}
+                    <a href="/grn" class="nav-link {{ 'active' if request.path == '/grn' }}" onclick="closeSidebar()">
+                        <i class="bi bi-box-arrow-in-down"></i> GRN (Receiving)
+                    </a>
+                    {% endif %}
+                    {% if can_tx_booking %}
+                    <a href="/bookings" class="nav-link {{ 'active' if request.path == '/bookings' }}" onclick="closeSidebar()">
+                        <i class="bi bi-bookmark-plus"></i> Bookings
+                    </a>
+                    {% endif %}
+                    {% if can_tx_sale %}
+                    <a href="/direct_sales" class="nav-link {{ 'active' if request.path == '/direct_sales' }}" onclick="closeSidebar()">
+                        <i class="bi bi-cart-check"></i> Sales
+                    </a>
+                    <a href="/material_returns" class="nav-link {{ 'active' if request.path == '/material_returns' }}" onclick="closeSidebar()">
+                        <i class="bi bi-arrow-counterclockwise"></i> Material Return
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if current_user.can_manage_payments or current_user.role == 'admin' %}
+                <a href="/payments" class="nav-link {{ 'active' if request.path == '/payments' }}" onclick="closeSidebar()">
+                    <i class="bi bi-cash-stack"></i> Payments
+                </a>
+                <a href="{{ url_for('accounts.dashboard') }}" class="nav-link {{ 'active' if request.path.startswith('/accounts') }}" onclick="closeSidebar()">
+                    <i class="bi bi-calculator"></i> Accounts
+                </a>
+                <a href="{{ url_for('cash_flow') }}" class="nav-link {{ 'active' if request.path.startswith('/cash_flow') }}" onclick="closeSidebar()">
+                    <i class="bi bi-water"></i> Cash Flow
+                </a>
+                {% endif %}
+                {% if current_user.can_view_delivery_rent or current_user.role == 'admin' %}
+                <a href="/delivery_rents" class="nav-link {{ 'active' if request.path == '/delivery_rents' }}" onclick="closeSidebar()">
+                    <i class="bi bi-truck"></i> Delivery Rent
+                </a>
+                <a href="/delivery_persons" class="nav-link {{ 'active' if request.path.startswith('/delivery_person') or request.path.startswith('/delivery_ledger') }}" onclick="closeSidebar()">
+                    <i class="bi bi-journal-check"></i> Delivery Person Ledger
+                </a>
+                {% endif %}
+                {% if current_user.can_view_client_ledger or current_user.role == 'admin' %}
+                <a href="/clients" class="nav-link {{ 'active' if request.path.startswith('/ledger') or request.path == '/clients' }}" onclick="closeSidebar()">
+                    <i class="bi bi-journal-text"></i> Client Ledger
+                </a>
+                {% endif %}
+                {% if current_user.can_view_supplier_ledger or current_user.role == 'admin' %}
+                <a href="/suppliers" class="nav-link {{ 'active' if request.path == '/suppliers' }}" onclick="closeSidebar()">
+                    <i class="bi bi-journal-richtext"></i> Supplier Ledger
+                </a>
+                <a href="{{ url_for('accounts.supplier_payments') }}" class="nav-link {{ 'active' if request.path.startswith('/accounts/payments/suppliers') }}" onclick="closeSidebar()">
+                    <i class="bi bi-cash-stack"></i> Pay Supplier
+                </a>
+                {% endif %}
+                {% if current_user.can_view_decision_ledger or current_user.role == 'admin' %}
+                <a href="/decision_ledger" class="nav-link {{ 'active' if request.path == '/decision_ledger' }}" onclick="closeSidebar()">
+                    <i class="bi bi-clipboard-data"></i> Decision Ledger
+                </a>
+                {% endif %}
+                {% endif %}
+
+                {% if current_user.can_manage_pending_bills or current_user.role == 'admin' %}
+                <a href="/pending_bills" class="nav-link {{ 'active' if request.path == '/pending_bills' }}" onclick="closeSidebar()">
+                    <i class="bi bi-receipt"></i> Pending Bills
+                </a>
+                {% endif %}
+
+                {% if current_user.can_view_reports or current_user.role == 'admin' %}
+                <a href="/current_payables" class="nav-link {{ 'active' if request.path in ['/unpaid_transactions', '/current_payables'] }}" onclick="closeSidebar()">
+                    <i class="bi bi-wallet2"></i> Current Payables
+                </a>
+                <a href="/profit_reports" class="nav-link {{ 'active' if request.path == '/profit_reports' }}" onclick="closeSidebar()">
+                    <i class="bi bi-bar-chart-line"></i> Profit Reports
+                </a>
+                {% endif %}
+                {% if current_user.can_manage_notifications or current_user.role == 'admin' %}
+                <a href="/notifications" class="nav-link {{ 'active' if request.path == '/notifications' }}" onclick="closeSidebar()">
+                    <i class="bi bi-bell"></i> Notifications
+                </a>
+                {% endif %}
+
+                {% if current_user.can_import_export or current_user.role == 'admin' %}
+                <a href="{{ url_for('import_export.import_export_page') }}" class="nav-link {{ 'active' if request.path.startswith('/import_export') }}" onclick="closeSidebar()">
+                    <i class="bi bi-arrow-left-right"></i> Import & Export
+                </a>
+                {% endif %}
+
+                {% if current_user.can_manage_materials or current_user.can_manage_delivery_persons or current_user.role == 'admin' %}
+                <div class="text-white-50 small fw-bold px-4 mt-4 mb-2 text-uppercase" style="font-size: 0.7rem;">Directory</div>
+                {% if current_user.can_manage_materials or current_user.role == 'admin' %}
+                <a href="/materials" class="nav-link {{ 'active' if request.path == '/materials' }}" onclick="closeSidebar()">
+                    <i class="bi bi-tags"></i> Material Brands
+                </a>
+                {% endif %}
+                {% if current_user.can_manage_delivery_persons or current_user.role == 'admin' %}
+                <a href="/delivery_persons" class="nav-link {{ 'active' if request.path == '/delivery_persons' }}" onclick="closeSidebar()">
+                    <i class="bi bi-person-badge"></i> Delivery Persons
+                </a>
+                {% endif %}
+                {% endif %}
+                {% endif %}
+
+                <div class="text-white-50 small fw-bold px-4 mt-4 mb-2 text-uppercase" style="font-size: 0.7rem;">System</div>
+                {% if current_user.role != 'root' and (current_user.role == 'admin' or current_user.can_access_settings) %}
+<a href="/settings" class="nav-link {{ 'active' if request.path == '/settings' }}" onclick="closeSidebar()">
+                    <i class="bi bi-gear"></i> Settings
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+
+        <div class="p-3 border-top border-secondary">
+            <div class="d-flex align-items-center mb-3 px-2">
+                <div class="bg-warning rounded-circle me-2 d-flex align-items-center justify-content-center text-dark fw-bold" style="width: 32px; height: 32px; flex-shrink: 0;">
+                    {{ current_user.username[0]|upper }}
+                </div>
+                <div class="overflow-hidden">
+                    <div class="text-white fw-bold small text-truncate">{{ current_user.username }}</div>
+                    <div class="text-white-50 x-small" style="font-size: 0.7rem;">{{ current_user.role|upper }}</div>
+                </div>
+            </div>
+            <button type="button" class="theme-switch w-100 mb-2 justify-content-center" data-theme-toggle id="desktopThemeToggle">
+                <i class="bi bi-moon-stars-fill"></i>
+                <span class="theme-label">Dark</span>
+            </button>
+            <a href="/logout" class="btn btn-outline-danger w-100 btn-sm fw-bold py-2 rounded-pill">
+                <i class="bi bi-box-arrow-right me-2"></i> Logout
+            </a>
+        </div>
+    </div>
+{% endif %}
+
+<div class="main-content {{ 'ms-0' if not current_user.is_authenticated }}">
+    <div class="container-fluid px-0 px-sm-2">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show fw-bold mb-4" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/5.3.0/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/flatpickr/4.6.13/flatpickr.min.js') }}"></script>
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+<script src="{{ url_for('static', filename='ui.js') }}"></script>
+<script src="{{ url_for('static', filename='lazy_modal_loader.js') }}?v=3"></script>
+
+<script>
+    if (window.AMSTheme) {
+        window.AMSTheme.init("{{ ui_theme_preference or '' }}");
+    }
+    // Sidebar Logic
+    const sidebar = document.getElementById('sidebar');
+    const sidebarNav = document.querySelector('.sidebar-nav-container');
+    const overlay = document.getElementById('sidebarOverlay');
+    const toggle = document.getElementById('sidebarToggle');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const taskProgressModalEl = document.getElementById('taskProgressModal');
+    const taskResultModalEl = document.getElementById('taskResultModal');
+    const taskProgressBar = document.getElementById('taskProgressBar');
+    const taskProgressPercent = document.getElementById('taskProgressPercent');
+    const taskProgressText = document.getElementById('taskProgressText');
+    const taskProgressTitle = document.getElementById('taskProgressTitle');
+    const taskResultCard = document.getElementById('taskResultCard');
+    const taskResultTitle = document.getElementById('taskResultTitle');
+    const taskResultHeadline = document.getElementById('taskResultHeadline');
+    const taskResultDetails = document.getElementById('taskResultDetails');
+    const taskResultReloadBtn = document.getElementById('taskResultReloadBtn');
+    let taskProgressModal = null;
+    let taskResultModal = null;
+    let taskProgressTimer = null;
+    let taskProgressWatchdog = null;
+    let taskProgressValue = 0;
+
+    // Promote the transaction/reminder dialogs (and their backdrops) onto a
+    // dedicated layer ABOVE any in-page Bootstrap modal such as the full-screen
+    // sale sheet.  Both have the default modal z-index, so the sale sheet — which
+    // appears later in the DOM — used to paint on top of the progress dialog.
+    function ensureTopModal(modalEl, z) {
+        if (!modalEl || modalEl.dataset.amsTopModal === '1') return;
+        modalEl.dataset.amsTopModal = '1';
+        const promote = function () {
+            modalEl.style.zIndex = String(z);
+            // Bootstrap appends this modal's backdrop as the last .modal-backdrop.
+            // Mark the exact backdrop rather than relying only on DOM order; a
+            // second modal can otherwise cause the wrong backdrop to be raised.
+            setTimeout(function () {
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(function (backdrop) {
+                    backdrop.classList.remove('ams-top-modal-backdrop');
+                });
+                if (backdrops.length) {
+                    backdrops[backdrops.length - 1].classList.add('ams-top-modal-backdrop');
+                    backdrops[backdrops.length - 1].style.zIndex = String(z - 10);
+                }
+            }, 0);
+        };
+        modalEl.addEventListener('show.bs.modal', promote);
+        modalEl.addEventListener('shown.bs.modal', promote);
+    }
+
+    function openSidebar() {
+        sidebar.classList.add('show');
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+function closeSidebar() {
+        if (sidebar) sidebar.classList.remove('show');
+        if (overlay) overlay.classList.remove('show');
+        document.body.style.overflow = '';
+}
+
+function toggleNavGroup(groupId, btn) {
+    const box = document.getElementById(groupId);
+    if (!box) return;
+    box.classList.toggle('show');
+    const caret = btn ? btn.querySelector('.nav-caret') : null;
+    if (caret) caret.classList.toggle('rotated');
+}
+
+    if (toggle) toggle.addEventListener('click', openSidebar);
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+
+    // Keep sidebar scroll position across page navigation.
+    if (sidebarNav) {
+        const savedScroll = parseInt(localStorage.getItem('sidebar_scroll_top') || '0', 10);
+        if (!Number.isNaN(savedScroll) && savedScroll > 0) {
+            sidebarNav.scrollTop = savedScroll;
+        }
+        sidebarNav.addEventListener('scroll', function() {
+            localStorage.setItem('sidebar_scroll_top', String(sidebarNav.scrollTop || 0));
+        });
+    }
+
+</script>
+<script>
+    // Global Utilities
+    let loadingShownAt = 0;
+    let loadingWatchTimer = null;
+    let __formSubmitting = false;
+    function showLoading() {
+        if (!loadingOverlay) return;
+        loadingOverlay.classList.add('show');
+        loadingShownAt = Date.now();
+        const dismiss = document.getElementById('loadingDismissBtn');
+        if (dismiss) {
+            dismiss.style.display = 'none';
+            setTimeout(() => { if (loadingOverlay.classList.contains('show')) dismiss.style.display = 'inline-block'; }, 8000);
+        }
+        if (loadingWatchTimer) clearTimeout(loadingWatchTimer);
+        // Reduced from 120s to 30s — users should not wait 2 minutes for a stuck overlay
+        loadingWatchTimer = setTimeout(hideLoading, 30000);
+    }
+    function lockForm(form, lock) {
+        // Immediate visual + behavioural submit lock: disable submit controls so
+        // a second click cannot fire another request, and re-enable them when the
+        // flow ends (validation failure / navigation interrupted).  The
+        // __formSubmitting latch below is the authoritative second guard.
+        if (!form) return;
+        form.classList.toggle('ams-submitting', !!lock);
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (btn) {
+            btn.disabled = !!lock;
+        });
+    }
+    function unlockAllForms() {
+        document.querySelectorAll('form').forEach(function (f) { lockForm(f, false); });
+    }
+    function hideLoading() {
+        if (loadingOverlay) loadingOverlay.classList.remove('show');
+        loadingShownAt = 0;
+        __formSubmitting = false;
+        unlockAllForms();
+        const dismiss = document.getElementById('loadingDismissBtn');
+        if (dismiss) dismiss.style.display = 'none';
+        if (loadingWatchTimer) { clearTimeout(loadingWatchTimer); loadingWatchTimer = null; }
+    }
+    // Catch unhandled errors and release every overlay so the page never stays locked.
+    window.addEventListener('error', function (e) {
+        if (loadingOverlay && loadingOverlay.classList.contains('show')) {
+            console.warn('Uncaught error while loading overlay was active — hiding overlay.', e.message || e);
+            hideLoading();
+        }
+        if (typeof closeTaskProgressNow === 'function') closeTaskProgressNow();
+    });
+    // Also catch unhandled promise rejections.
+    window.addEventListener('unhandledrejection', function (e) {
+        if (loadingOverlay && loadingOverlay.classList.contains('show')) {
+            console.warn('Unhandled promise rejection while loading overlay was active — hiding overlay.', e.reason || e);
+            hideLoading();
+        }
+        if (typeof closeTaskProgressNow === 'function') closeTaskProgressNow();
+    });
+    window.showLoading = showLoading;
+    window.hideLoading = hideLoading;
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.id === 'loadingDismissBtn') hideLoading();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') hideLoading();
+    });
+    function escapeReportHtml(value) {
+        // NOTE: this function runs inside a <script> element, so the entity
+        // strings below must never appear literally in the source.  Browsers
+        // decode character references in script data (e.g. &#39; -> '), which
+        // previously turned the "'" entry into ''' and killed this entire
+        // script block with a SyntaxError on every page.
+        return String(value == null ? '' : value).replace(/[&<>'"]/g, (ch) => {
+            switch (ch) {
+                case '&': return '&amp;';
+                case '<': return '&lt;';
+                case '>': return '&gt;';
+                case '"': return '&quot;';
+                case "'": return '\u0026#39;';
+                default: return ch;
+            }
+        });
+    }
+    function fillJobReport(title, summary, tableRows, people, keepOpen) {
+        const wrap = document.getElementById('taskProgressReport');
+        const body = document.getElementById('taskProgressReportBody');
+        const sum = document.getElementById('taskProgressReportSummary');
+        const ttl = document.getElementById('taskProgressReportTitle');
+        if (!wrap || !body) return;
+        if (ttl) ttl.textContent = title || 'Completed — table report';
+        if (sum) sum.textContent = summary || '';
+        const statusBadge = (st) => {
+            const s = String(st || 'ok').toLowerCase();
+            const cls = s === 'ok' || s === 'exported' ? 'bg-success'
+                : (s === 'failed' ? 'bg-danger'
+                    : (s === 'skipped' || s === 'unavailable' ? 'bg-secondary' : 'bg-warning text-dark'));
+            return '<span class="badge ' + cls + '">' + escapeReportHtml(s) + '</span>';
+        };
+        let html = '';
+        if (tableRows && tableRows.length) {
+            const orderedRows = tableRows.slice().sort((a, b) => {
+                const rank = (row) => ['failed', 'partial', 'warning', 'unavailable', 'skipped'].includes(String(row.status || '').toLowerCase()) ? 0 : 1;
+                return rank(a) - rank(b);
+            });
+            html += '<div class="small text-white-50 mb-2">Problems and unavailable data are shown first. Successful tables remain listed for verification.</div>';
+            html += '<div class="table-responsive"><table class="table table-dark table-sm align-middle mb-0">';
+            html += '<thead><tr><th>Table / setting</th><th>Status</th><th>In</th><th>Upd</th><th>Skip</th><th>Fail</th><th>Note</th></tr></thead><tbody>';
+            orderedRows.forEach((r) => {
+                html += '<tr><td class="fw-bold">' + escapeReportHtml(r.name || '') + '</td><td>' + statusBadge(r.status)
+                    + '</td><td>' + escapeReportHtml(r.inserted || r.rows || 0) + '</td><td>' + escapeReportHtml(r.updated || 0)
+                    + '</td><td>' + escapeReportHtml(r.skipped || 0) + '</td><td>' + escapeReportHtml(r.failed || 0)
+                    + '</td><td class="text-white-50 small">' + escapeReportHtml(r.error || '') + '</td></tr>';
+            });
+            html += '</tbody></table></div>';
+        } else {
+            html += '<div class="text-white-50 small">No per-table breakdown was returned. Check the summary above.</div>';
+        }
+        if (people && people.length) {
+            html += '<div class="fw-bold text-warning mt-3 mb-1">Users / roles</div><ul class="small mb-0">';
+            people.forEach((u) => {
+                html += '<li><span class="text-info">' + escapeReportHtml(u.username || '') + '</span> — '
+                    + escapeReportHtml(u.role || '') + ' — ' + escapeReportHtml(u.action || '')
+                    + (u.error ? ' <span class="text-danger">(' + escapeReportHtml(u.error) + ')</span>' : '') + '</li>';
+            });
+            html += '</ul>';
+        }
+        body.innerHTML = html;
+        wrap.style.display = 'block';
+        const closer = document.getElementById('taskProgressReportClose');
+        if (closer) {
+            closer.onclick = () => {
+                if (taskProgressModal) taskProgressModal.hide();
+                window.location.reload();
+            };
+        }
+        if (keepOpen && taskProgressTimer) {
+            clearInterval(taskProgressTimer);
+            taskProgressTimer = null;
+        }
+    }
+    async function runImportAction(opts) {
+        const url = opts.url;
+        if (typeof hideLoading === 'function') hideLoading();
+        startTaskProgress('Import', 'Uploading and applying...');
+        const reportEl = document.getElementById('taskProgressReport');
+        if (reportEl) reportEl.style.display = 'none';
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                body: opts.formData,
+                credentials: 'same-origin',
+                redirect: 'follow',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
+            });
+            setTaskProgress(100, 'Completed');
+            if (taskProgressTimer) { clearInterval(taskProgressTimer); taskProgressTimer = null; }
+            const ctype = (res.headers.get('content-type') || '').toLowerCase();
+            if (ctype.includes('application/json')) {
+                const data = await res.json();
+                const rep = (data && typeof data === 'object' && data.report && typeof data.report === 'object') ? data.report : (data || {});
+                const ok = data && data.ok !== false && data.success !== false;
+                const rows = data && data.table_results ? data.table_results : (rep.table_results || []);
+                const people = data && data.users ? data.users : (rep.users || []);
+                const inserted = (data && data.inserted != null) ? data.inserted : (rep.inserted != null ? rep.inserted : (rep.imported != null ? rep.imported : 0));
+                const updated = (data && data.updated != null) ? data.updated : (rep.updated != null ? rep.updated : 0);
+                const skipped = (data && data.skipped != null) ? data.skipped : (rep.skipped != null ? rep.skipped : 0);
+                const failed = (data && data.failed != null) ? data.failed : (rep.failed != null ? rep.failed : (rep.errors || 0));
+                const warnings = (data && data.warnings != null) ? data.warnings : (rep.warnings || 0);
+                const reportStatus = String((data && data.status) || rep.status || '').toLowerCase();
+                const headline = (data && data.headline)
+                    || (data && data.error ? 'Import failed: ' + data.error : '')
+                    || ('Inserted ' + inserted + ', updated ' + updated + ', skipped ' + skipped + ', failed ' + failed);
+                const hasProblems = !ok || Number(failed) > 0 || ['failed', 'partial'].includes(reportStatus);
+                const hasWarnings = Number(warnings) > 0 || reportStatus === 'warning';
+                setTaskProgress(100, hasProblems ? 'Completed with problems' : (hasWarnings ? 'Completed with warnings' : 'Completed'));
+                fillJobReport(
+                    hasProblems ? 'Import finished with problems' : (hasWarnings ? 'Import completed with warnings' : 'Import completed — table report'),
+                    headline,
+                    rows,
+                    people,
+                    true
+                );
+                return;
+            }
+            if (!res.ok) {
+                const raw = await res.text();
+                const flashMsg = extractFlashMessage(raw);
+                fillJobReport('Import failed', flashMsg || extractErrorText(raw), [], [], true);
+                return;
+            }
+            // 2xx but not JSON: the server redirected to a page instead of a report.
+            // The flash on that page (if any) carries the real outcome.
+            const raw = await res.text();
+            const flashMsg = extractFlashMessage(raw);
+            fillJobReport(
+                'Import not confirmed',
+                flashMsg || 'The server responded with a page instead of an import report. Reload to verify whether any data was imported.',
+                [],
+                [],
+                true
+            );
+        } catch (err) {
+            setTaskProgress(100, 'Failed');
+            fillJobReport('Import failed', (err && err.message) || 'Network error', [], [], true);
+        }
+    }
+    window.runImportAction = runImportAction;
+    function ensureTaskProgressModal() {
+        if (!taskProgressModalEl) return null;
+        if (!taskProgressModal) {
+            taskProgressModal = new bootstrap.Modal(taskProgressModalEl, { backdrop: 'static', keyboard: false });
+            ensureTopModal(taskProgressModalEl, 2600);
+        }
+        return taskProgressModal;
+    }
+    function ensureTaskResultModal() {
+        if (!taskResultModalEl) return null;
+        if (!taskResultModal) {
+            taskResultModal = new bootstrap.Modal(taskResultModalEl);
+            ensureTopModal(taskResultModalEl, 2600);
+        }
+        return taskResultModal;
+    }
+    function setTaskProgress(value, text) {
+        const v = Math.max(0, Math.min(100, Math.floor(value || 0)));
+        taskProgressValue = v;
+        if (taskProgressBar) {
+            taskProgressBar.style.width = v + '%';
+            taskProgressBar.setAttribute('aria-valuenow', String(v));
+        }
+        if (taskProgressPercent) taskProgressPercent.textContent = v + '%';
+        if (typeof text === 'string' && taskProgressText) taskProgressText.textContent = text;
+    }
+    function startTaskProgress(title, text) {
+        if (typeof hideLoading === 'function') hideLoading();  // one progress state at a time
+        const modal = ensureTaskProgressModal();
+        if (!modal) return;
+        if (taskProgressTitle) taskProgressTitle.textContent = title || 'Processing';
+        setTaskProgress(10, text || 'Please wait...');
+        if (taskProgressTimer) clearInterval(taskProgressTimer);
+        taskProgressTimer = setInterval(() => {
+            if (taskProgressValue < 90) {
+                setTaskProgress(taskProgressValue + 3);
+            }
+        }, 250);
+        // Watchdog: a native POST should unload the page.  If the dialog is still
+        // open after this window, the request hung or the page never navigated —
+        // release the UI rather than leaving a permanent overlay.
+        if (taskProgressWatchdog) clearTimeout(taskProgressWatchdog);
+        taskProgressWatchdog = setTimeout(function () {
+            closeTaskProgressNow();
+            hideLoading();
+        }, 45000);
+        modal.show();
+    }
+    function finishTaskProgress() {
+        if (taskProgressWatchdog) { clearTimeout(taskProgressWatchdog); taskProgressWatchdog = null; }
+        if (taskProgressTimer) {
+            clearInterval(taskProgressTimer);
+            taskProgressTimer = null;
+        }
+        setTaskProgress(100, 'Completed');
+        setTimeout(() => {
+            if (taskProgressModal) taskProgressModal.hide();
+        }, 250);
+    }
+    function closeTaskProgressNow() {
+        if (taskProgressWatchdog) { clearTimeout(taskProgressWatchdog); taskProgressWatchdog = null; }
+        if (taskProgressTimer) {
+            clearInterval(taskProgressTimer);
+            taskProgressTimer = null;
+        }
+        if (taskProgressModal) taskProgressModal.hide();
+        // Hard fallback: some browsers leave a stuck backdrop after file download.
+        setTimeout(() => {
+            if (taskProgressModalEl) {
+                taskProgressModalEl.classList.remove('show');
+                taskProgressModalEl.style.display = 'none';
+                taskProgressModalEl.setAttribute('aria-hidden', 'true');
+                taskProgressModalEl.removeAttribute('aria-modal');
+            }
+            document.querySelectorAll('.modal-backdrop').forEach((bd) => bd.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+        }, 120);
+    }
+    function showTaskResult(success, headline, details) {
+        if (typeof hideLoading === 'function') hideLoading();
+        const modal = ensureTaskResultModal();
+        if (!modal) return;
+        if (taskResultCard) {
+            taskResultCard.classList.remove('border-success', 'border-danger');
+            taskResultCard.classList.add(success ? 'border-success' : 'border-danger');
+        }
+        if (taskResultTitle) {
+            taskResultTitle.className = 'modal-title fw-bold ' + (success ? 'text-success' : 'text-danger');
+            taskResultTitle.innerHTML = success
+                ? '<i class="bi bi-check-circle-fill me-2"></i>Successful'
+                : '<i class="bi bi-x-circle-fill me-2"></i>Unsuccessful';
+        }
+        if (taskResultHeadline) taskResultHeadline.textContent = headline || (success ? 'Completed.' : 'Failed.');
+        if (taskResultDetails) taskResultDetails.textContent = details || '';
+        const tablesBox = document.getElementById('taskResultTables');
+        if (tablesBox && !details) { /* keep existing report if already filled */ }
+        else if (tablesBox && !window.__keepImportReport) {
+            tablesBox.style.display = 'none';
+            tablesBox.innerHTML = '';
+        }
+        if (taskResultReloadBtn) {
+            taskResultReloadBtn.className = 'btn btn-sm ' + (success ? 'btn-success' : 'btn-danger');
+            taskResultReloadBtn.textContent = 'Reload';
+            taskResultReloadBtn.onclick = () => window.location.reload();
+        }
+        modal.show();
+    }
+    function hasFileIntentText(text) {
+        const t = (text || '').toLowerCase();
+        if (!t) return false;
+        return /(download|excel|csv|pdf|template)/i.test(t);
+    }
+    function isImportExportHub(pathname) {
+        const p = (pathname || '').toLowerCase().replace(/\/+$/, '');
+        return p === '/import_export';
+    }
+    function isLongImportUrl(rawHref) {
+        if (!rawHref) return false;
+        try {
+            const u = new URL(rawHref, window.location.origin);
+            const p = (u.pathname || '').toLowerCase();
+            if (isImportExportHub(p)) return false;
+            return /\/import_export\/.+(import|restore|upload|execute)/.test(p)
+                && !/export|template|report/.test(p.split('/').pop() || '');
+        } catch (_) {
+            return /import_export/.test(String(rawHref).toLowerCase()) && /import|restore/.test(String(rawHref).toLowerCase());
+        }
+    }
+    function isFileActionUrl(rawHref) {
+        if (!rawHref) return false;
+        try {
+            const u = new URL(rawHref, window.location.origin);
+            if (u.origin !== window.location.origin) return false;
+            const p = (u.pathname || '').toLowerCase();
+            if (isImportExportHub(p)) return false;
+            // "/import_export" ends with "export" — do not treat the hub (or import jobs) as a file.
+            if (p.includes('/import_export/') && /import|restore|upload|execute/.test(p) && !/export|template|report/.test(p)) {
+                return false;
+            }
+            const action = (u.searchParams.get('action') || '').toLowerCase();
+            if (action === 'print') return false;
+            const fileRoutePatterns = [
+                /\/download(?:_|\/|$)/,
+                /\/export_(?:clients|master|excel|grn|pending|unpaid|data)/,
+                /\/import_export\/(?:export|transfer\/export|full_raw_export|tenant_db_export)(?:\/|$)/,
+                /\/full_raw_export(?:\/|$)/,
+                /\/full_raw_import_report(?:\/|$)/,
+                /\/full_raw_import_history_export(?:\/|$)/,
+                /\/get_template(?:\/|$)/,
+                /\/download_supplier_ledger(?:\/|$)/,
+                /\/download_supplier_payment(?:\/|$)/,
+                /\/download_invoice(?:\/|$)/
+            ];
+            if (fileRoutePatterns.some((rx) => rx.test(p))) return true;
+            const fmt = (u.searchParams.get('format') || '').toLowerCase();
+            if (fmt && ['csv', 'excel', 'xlsx', 'pdf'].includes(fmt)) return true;
+            return false;
+        } catch (_) {
+            return false;
+        }
+    }
+    function isFileActionLinkElement(linkEl) {
+        if (!linkEl) return false;
+        if ((linkEl.dataset && linkEl.dataset.noFileIntercept === '1') || linkEl.getAttribute('data-no-file-intercept') === '1') {
+            return false;
+        }
+        const href = linkEl.getAttribute('href') || '';
+        if (isFileActionUrl(href)) return true;
+        const hintText = [
+            linkEl.getAttribute('title') || '',
+            linkEl.textContent || '',
+            linkEl.className || ''
+        ].join(' ');
+        return hasFileIntentText(hintText);
+    }
+    function collectSaveContext(form) {
+        if (!form) return null;
+        const actionRaw = form.getAttribute('action') || window.location.pathname || '';
+        const action = actionRaw.toLowerCase();
+        const read = (name) => {
+            const el = form.querySelector(`[name="${name}"]`);
+            return el ? String(el.value || '').trim() : '';
+        };
+        if (action.includes('/add_direct_sale') || action.includes('/edit_bill/directsale')) {
+            return {
+                kind: 'direct_sale',
+                category: read('category'),
+                manual_bill_no: read('manual_bill_no'),
+                create_invoice: read('create_invoice'),
+                amount: read('amount'),
+                paid_amount: read('paid_amount')
+            };
+        }
+        if (action.includes('/add_booking') || action.includes('/edit_bill/booking')) {
+            return { kind: 'booking' };
+        }
+        if (action.includes('/add_payment') || action.includes('/edit_bill/payment')) {
+            return { kind: 'payment' };
+        }
+        if (action === '/grn' || action.includes('/edit_grn/')) {
+            return { kind: 'grn' };
+        }
+        if (action.includes('/add_pending_bill') || action.includes('/edit_pending_bill/')) {
+            return { kind: 'pending_bill' };
+        }
+        if (action.includes('/add_record') || action.includes('/edit_entry/')) {
+            return { kind: 'entry' };
+        }
+        return null;
+    }
+    function getFilenameFromHeaders(headers, fallbackName) {
+        const cd = headers.get('content-disposition') || '';
+        let fn = '';
+        const utf = cd.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf && utf[1]) fn = decodeURIComponent(utf[1]);
+        if (!fn) {
+            const ascii = cd.match(/filename="?([^"]+)"?/i);
+            if (ascii && ascii[1]) fn = ascii[1];
+        }
+        return fn || fallbackName || ('download_' + Date.now());
+    }
+    function contextSuccessText(saveCtx) {
+        if (saveCtx && saveCtx.kind === 'direct_sale') {
+            const cat = (saveCtx.category || '').trim().toLowerCase();
+            if (cat === 'booking delivery') {
+                return 'Booked Sale saved. Reserved material is dispatched in Material Ledger and linked to the client booking trail.';
+            }
+            if (cat === 'mixed transaction') {
+                return 'Booked + Due sale saved. Reserved dispatch is posted in Material Ledger and due portion appears in Client Financial Ledger.';
+            }
+            if (cat === 'credit customer') {
+                return 'Due Sale saved. Credit amount is added in Client Financial Ledger and stock movement is recorded in History.';
+            }
+            if (cat === 'cash') {
+                return 'Cash Sale saved. Payment is recorded immediately and stock movement is visible in History.';
+            }
+            if (cat === 'open khata') {
+                return 'Open Khata sale saved. Amount is tracked for follow-up in pending/financial views and stock movement is recorded.';
+            }
+            return 'Direct Sale saved. Financial and stock effects are recorded in ledger and history.';
+        }
+        if (saveCtx && saveCtx.kind === 'booking') {
+            return 'Booking saved. Added to client ledger and reserved material is visible in Material Ledger.';
+        }
+        if (saveCtx && saveCtx.kind === 'payment') {
+            return 'Payment saved. Entry posted in Financial Ledger for this client.';
+        }
+        if (saveCtx && saveCtx.kind === 'grn') {
+            return 'GRN saved. Stock updated in receiving and reflected in inventory records.';
+        }
+        if (saveCtx && saveCtx.kind === 'pending_bill') {
+            return 'Pending bill saved and available in pending section and related client financial view.';
+        }
+        if (saveCtx && saveCtx.kind === 'entry') {
+            return 'Transaction saved. History and stock movement are now updated.';
+        }
+        const path = (window.location.pathname || '').toLowerCase();
+        if (path.startsWith('/bookings')) return 'Booking saved. Added to client ledger (credit/advance) and reserved material is visible in Material Ledger.';
+        if (path.startsWith('/payments')) return 'Payment saved. Entry posted in Financial Ledger for this client.';
+        if (path.startsWith('/direct_sales')) return 'Sale saved. Financial effect is visible in Client Ledger and stock movement in History.';
+        if (path.startsWith('/material_returns')) return 'Material return saved. Client ledger credited and inventory is increased safely.';
+        if (path.startsWith('/grn')) return 'GRN saved. Stock updated in receiving and reflected in inventory records.';
+        if (path.startsWith('/pending_bills')) return 'Pending bill saved and available in pending section and related client financial view.';
+        if (path.startsWith('/dispatch') || path.startsWith('/inventory/daily_transactions')) return 'Transaction saved. History and stock movement are now updated.';
+        return 'Transaction saved successfully.';
+    }
+    function dispatchFinancialRefresh(reason, context) {
+        try {
+            document.dispatchEvent(new CustomEvent('pware:financial-refresh', {
+                detail: {
+                    reason: reason || 'unspecified',
+                    context: context || null,
+                    at: Date.now()
+                }
+            }));
+        } catch (_) {}
+    }
+    function extractErrorText(htmlOrText) {
+        const raw = (htmlOrText || '').replace(/\s+/g, ' ').trim();
+        if (!raw) return 'Request failed.';
+        const dangerMatch = raw.match(/alert-danger[^>]*>(.*?)</i);
+        if (dangerMatch && dangerMatch[1]) return dangerMatch[1].replace(/<[^>]*>/g, '').trim();
+        return raw.slice(0, 260);
+    }
+    function extractFlashMessage(htmlOrText) {
+        // Pull the first server flash alert (any category) out of a rendered page.
+        const raw = (htmlOrText || '').replace(/\s+/g, ' ').trim();
+        const m = raw.match(/alert-(?:success|danger|warning|info)[^>]*>\s*(.*?)\s*<\/div>/i);
+        if (m && m[1]) {
+            const text = m[1].replace(/<[^>]*>/g, '').trim();
+            if (text) return text;
+        }
+        return '';
+    }
+    async function runFileAction(opts) {
+        const url = opts.url;
+        const method = (opts.method || 'GET').toUpperCase();
+        if (typeof hideLoading === 'function') hideLoading();
+        startTaskProgress('Download / Export', 'Preparing file...');
+        setTaskProgress(30, 'Fetching data...');
+        try {
+            const fetchOpts = { method, credentials: 'same-origin', redirect: 'follow' };
+            if (method !== 'GET' && opts.formData) fetchOpts.body = opts.formData;
+            const res = await fetch(url, fetchOpts);
+            if (!res.ok) {
+                const reason = extractErrorText(await res.text());
+                closeTaskProgressNow();
+                showTaskResult(false, 'Export/Download failed.', reason);
+                return;
+            }
+
+            const contentType = (res.headers.get('content-type') || '').toLowerCase();
+            const cd = (res.headers.get('content-disposition') || '').toLowerCase();
+            if (contentType.includes('text/html') && !cd.includes('attachment')) {
+                const html = await res.text();
+                const reason = extractErrorText(html) || 'Server returned HTML instead of a file.';
+                closeTaskProgressNow();
+                showTaskResult(false, 'Export/Download unsuccessful.', reason);
+                return;
+            }
+
+            setTaskProgress(85, 'Finalizing file...');
+            const blob = await res.blob();
+            if (!blob || blob.size === 0) {
+                closeTaskProgressNow();
+                showTaskResult(false, 'Export/Download unsuccessful.', 'File was empty.');
+                return;
+            }
+            const fallback = (new URL(url, window.location.origin).pathname.split('/').pop() || 'download').replace(/[^\w\-.]+/g, '_');
+            const fileName = getFilenameFromHeaders(res.headers, fallback);
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(objectUrl);
+
+            setTaskProgress(100, 'Completed');
+            if (taskProgressTimer) { clearInterval(taskProgressTimer); taskProgressTimer = null; }
+            const sheetsHdr = res.headers.get('X-AMS-Export-Sheets') || '';
+            const sheetRows = sheetsHdr
+                ? sheetsHdr.split(',').map((n) => ({ name: n.trim(), status: 'exported', rows: 0 }))
+                : [{ name: fileName, status: 'exported', rows: blob.size, error: Math.round(blob.size / 1024) + ' KB saved' }];
+            fillJobReport('Export completed — file report', 'Saved as: ' + fileName, sheetRows, [], true);
+        } catch (err) {
+            setTaskProgress(100, 'Failed');
+            if (typeof fillJobReport === 'function') {
+                fillJobReport('Export/Download failed', (err && err.message) || 'Unexpected network error', [], [], true);
+            } else {
+                closeTaskProgressNow();
+                showTaskResult(false, 'Export/Download failed.', (err && err.message) ? err.message : 'Unexpected network error.');
+            }
+        }
+    }
+
+</script>
+<script>
+    // Navigation and Form Loading States
+    document.querySelectorAll('a[href]:not([href^="#"]):not([data-bs-toggle])').forEach(link => {
+        link.addEventListener('click', function(e) {
+            const href = this.getAttribute('href');
+            const target = (this.getAttribute('target') || '').toLowerCase();
+            if (sidebarNav) {
+                localStorage.setItem('sidebar_scroll_top', String(sidebarNav.scrollTop || 0));
+            }
+            if (!href || href.startsWith('javascript')) return;
+            if (target === '_blank') return;
+            if (isFileActionLinkElement(this)) {
+                e.preventDefault();
+                runFileAction({ url: href, method: 'GET' });
+                return;
+            }
+            __formSubmitting = true;
+            showLoading();
+        });
+    });
+
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            if (e.defaultPrevented) return;
+            if (window.__disableGlobalLoading === true) return;
+            if (form.hasAttribute('data-no-global-loading')) return;
+            // Prevent double-submit: if the loading overlay is already shown or a submit is in flight, stop here.
+            if (__formSubmitting) {
+                e.preventDefault();
+                return;
+            }
+            const rawAction = form.getAttribute('action') || '';
+            const action = rawAction.toLowerCase();
+            const method = ((form.getAttribute('method') || 'GET') + '').toUpperCase();
+            if (form.id === 'deployForm') return;
+            if (action.includes('/import_export/app_upgrade')) return;
+            if (action.includes('/import_export/master/import/start')) return;
+            const submitter = e.submitter || document.activeElement;
+            const submitterText = submitter ? [submitter.textContent || '', submitter.value || '', submitter.getAttribute('title') || '', submitter.className || ''].join(' ') : '';
+            // Only infer file intent from button text for GET forms.
+            // For POST (restore/import/etc.), rely on URL rules to avoid hijacking normal redirects.
+            const fileIntentBySubmitter = method === 'GET' && hasFileIntentText(submitterText);
+            if (isFileActionUrl(rawAction) || fileIntentBySubmitter) {
+                e.preventDefault();
+                hideLoading();
+                let url = rawAction || window.location.pathname;
+                let formData = null;
+                if (method === 'GET') {
+                    const params = new URLSearchParams(new FormData(form));
+                    const u = new URL(url, window.location.origin);
+                    params.forEach((v, k) => u.searchParams.append(k, v));
+                    url = u.toString();
+                } else {
+                    formData = new FormData(form);
+                }
+                runFileAction({ url, method, formData });
+                return;
+            }
+            if (method !== 'GET' && isLongImportUrl(rawAction || window.location.pathname)) {
+                e.preventDefault();
+                hideLoading();
+                runImportAction({ url: rawAction || window.location.pathname, formData: new FormData(form) });
+                return;
+            }
+            if (method !== 'GET') {
+                const saveCtx = collectSaveContext(form);
+                // Only transactional save forms should trigger save-result modal flow.
+                // Destructive/admin actions (e.g., wipe/delete/restore) should rely on server flash only.
+                if (saveCtx) {
+                    sessionStorage.setItem('pending_save_context', JSON.stringify(saveCtx));
+                    sessionStorage.setItem('pending_save_feedback', '1');
+                    __formSubmitting = true;
+                    lockForm(form, true);  // disable Save immediately
+                    startTaskProgress('Saving', 'Saving transaction...');
+                    return;
+                }
+                __formSubmitting = true;
+                lockForm(form, true);
+                showLoading();
+                return;
+            }
+            __formSubmitting = true;
+            showLoading();
+        });
+    });
+
+    window.addEventListener('pageshow', function() { hideLoading(); closeTaskProgressNow(); });
+    window.addEventListener('load', hideLoading);
+    document.addEventListener('DOMContentLoaded', hideLoading);
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible' && loadingShownAt && (Date.now() - loadingShownAt) > 15000) {
+            hideLoading();
+        }
+    });
+    document.addEventListener('DOMContentLoaded', function() {
+        if (taskResultReloadBtn) {
+            taskResultReloadBtn.addEventListener('click', function() {
+                window.location.reload();
+            });
+        }
+        const qs = new URLSearchParams(window.location.search);
+        const hasAutoDownloadBill = !!qs.get('download_bill');
+        const pendingSave = sessionStorage.getItem('pending_save_feedback') === '1';
+        let pendingSaveContext = null;
+        try {
+            pendingSaveContext = JSON.parse(sessionStorage.getItem('pending_save_context') || 'null');
+        } catch (_) {
+            pendingSaveContext = null;
+        }
+        if (pendingSave) {
+            sessionStorage.removeItem('pending_save_feedback');
+            sessionStorage.removeItem('pending_save_context');
+            finishTaskProgress();
+            // Auto-download redirect after save should show only one UX flow (download),
+            // not an extra save-result modal.
+            if (hasAutoDownloadBill) return;
+            const successAlert = document.querySelector('.alert.alert-success');
+            const dangerAlert = document.querySelector('.alert.alert-danger');
+            if (successAlert) {
+                const headline = (successAlert.textContent || '').trim() || 'Saved successfully.';
+                showTaskResult(true, headline, contextSuccessText(pendingSaveContext));
+                dispatchFinancialRefresh('transaction-save-success', pendingSaveContext);
+            } else if (dangerAlert) {
+                const reason = (dangerAlert.textContent || '').trim() || 'Unable to save the transaction.';
+                showTaskResult(false, 'Transaction save unsuccessful.', reason);
+            }
+        }
+        const successAlertAny = document.querySelector('.alert.alert-success');
+        if (successAlertAny) {
+            dispatchFinancialRefresh('success-alert-present', null);
+        }
+    });
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            dispatchFinancialRefresh('tab-visible', null);
+        }
+    });
+    window.addEventListener('focus', function() {
+        dispatchFinancialRefresh('window-focus', null);
+    });
+    // NOTE: no unconditional timer here.  A fixed interval dispatched
+    // `pware:financial-refresh` on every page every 30s, which kept the
+    // client booking/financial widgets polling even when the user was idle.
+    // Financial widgets now refresh on real activity only: window focus,
+    // tab becoming visible, and after a transaction save.
+
+</script>
+<script>
+    // Combobox logic for reuse in sub-pages
+    function bindComboboxAnchor(inputId, listId) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        list.dataset.anchorInput = inputId;
+    }
+
+    function positionCombobox(inputId, listId) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        if (!input || !list) return;
+        const rect = input.getBoundingClientRect();
+        const top = rect.bottom + 2;
+        const left = rect.left;
+        const width = rect.width;
+        list.style.top = `${top}px`;
+        list.style.left = `${left}px`;
+        list.style.width = `${width}px`;
+    }
+
+    function toggleCombobox(inputId, listId) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        bindComboboxAnchor(inputId, listId);
+        const isOpen = list.style.display === 'block';
+        document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+        list.style.display = isOpen ? 'none' : 'block';
+        const input = document.getElementById(inputId);
+        if (input) input.setAttribute('aria-expanded', list.style.display === 'block' ? 'true' : 'false');
+        if (list.style.display === 'block') {
+            positionCombobox(inputId, listId);
+            input.focus();
+        }
+    }
+
+    function showCombobox(inputId, listId) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        bindComboboxAnchor(inputId, listId);
+        document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+        list.style.display = 'block';
+        const input = document.getElementById(inputId);
+        if (input) input.setAttribute('aria-expanded', 'true');
+        positionCombobox(inputId, listId);
+    }
+
+    function filterCombobox(inputId, listId, displayId) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        if (!input || !list) return;
+        bindComboboxAnchor(inputId, listId);
+        if (input.dataset.comboSuppress === '1') {
+            input.dataset.comboSuppress = '';
+            return;
+        }
+        document.querySelectorAll('.combobox-list').forEach(l => {
+            if (l.id !== listId) l.style.display = 'none';
+        });
+        const filter = input.value.toLowerCase();
+        const items = list.getElementsByClassName('combobox-item');
+        list.style.display = 'block';
+        input.setAttribute('aria-expanded', 'true');
+        input.removeAttribute('aria-activedescendant');
+        list.dataset.activeIndex = '-1';
+        positionCombobox(inputId, listId);
+        for (let i = 0; i < items.length; i++) {
+            const text = items[i].innerText.toLowerCase();
+            items[i].style.display = text.includes(filter) ? "" : "none";
+            items[i].classList.remove('active');
+            items[i].setAttribute('aria-selected', 'false');
+        }
+    }
+
+    function selectComboboxItem(inputId, listId, code, name, displayId, nameInputId, valueInputId) {
+        const input = document.getElementById(inputId);
+        const listEl = document.getElementById(listId);
+        const hiddenValueId = valueInputId || (listEl && listEl.dataset.valueInputId) || '';
+        const storeName = (listEl && listEl.dataset.store === 'name') || !!hiddenValueId;
+        const displayName = name || code || '';
+        const codeVal = code || '';
+        if (input) input.value = storeName ? displayName : codeVal;
+        if (hiddenValueId && document.getElementById(hiddenValueId)) {
+            const hid = document.getElementById(hiddenValueId);
+            hid.value = codeVal;
+            hid.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        if (listEl) listEl.style.display = 'none';
+        if (input) { input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); }
+        if (displayId && document.getElementById(displayId)) {
+            document.getElementById(displayId).innerText = displayName ? ("Name: " + displayName) : '';
+        }
+        if (nameInputId && document.getElementById(nameInputId)) {
+            document.getElementById(nameInputId).value = displayName || '';
+        }
+        if (input) {
+            input.dataset.comboSuppress = '1';
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+    }
+    window.showCombobox = showCombobox;
+    window.filterCombobox = filterCombobox;
+    window.toggleCombobox = toggleCombobox;
+    window.selectComboboxItem = selectComboboxItem;
+    window.positionCombobox = positionCombobox;
+
+    function comboIdsFromEl(el) {
+        if (!el) return null;
+        const input = el.matches('input,textarea') ? el : (el.closest('.input-group') && el.closest('.input-group').querySelector('input[data-combo-list],input[id]')) || document.getElementById(el.getAttribute('data-combo-input') || '');
+        const listId = (el.getAttribute('data-combo-list') || (input && input.getAttribute('data-combo-list')) || '').trim();
+        const inputId = (input && input.id) || el.getAttribute('data-combo-input') || '';
+        const displayId = (el.getAttribute('data-combo-display') || (input && input.getAttribute('data-combo-display')) || '').trim();
+        if (!inputId || !listId) return null;
+        return { inputId, listId, displayId };
+    }
+    document.addEventListener('focusin', function (e) {
+        const el = e.target.closest('[data-combo-list]');
+        if (!el || !el.matches('input,textarea')) return;
+        const ids = comboIdsFromEl(el);
+        if (ids) showCombobox(ids.inputId, ids.listId);
+    });
+    document.addEventListener('input', function (e) {
+        const el = e.target.closest('input[data-combo-list],textarea[data-combo-list]');
+        if (!el) return;
+        const ids = comboIdsFromEl(el);
+        if (ids) filterCombobox(ids.inputId, ids.listId, ids.displayId);
+    });
+    document.addEventListener('keydown', function (e) {
+        const input = e.target.closest('input[data-combo-list],textarea[data-combo-list]');
+        if (!input) return;
+        const ids = comboIdsFromEl(input);
+        if (!ids) return;
+        const list = document.getElementById(ids.listId);
+        if (!list) return;
+        if (e.key === 'Escape') {
+            list.style.display = 'none';
+            input.setAttribute('aria-expanded', 'false');
+            input.removeAttribute('aria-activedescendant');
+            e.preventDefault();
+            return;
+        }
+        if (e.key === 'Tab') {
+            list.style.display = 'none';
+            input.setAttribute('aria-expanded', 'false');
+            return;
+        }
+        const visible = Array.from(list.querySelectorAll('.combobox-item')).filter(function (item) {
+            return item.style.display !== 'none';
+        });
+        if (!visible.length) return;
+        let idx = Number(list.dataset.activeIndex || -1);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (list.style.display !== 'block') showCombobox(ids.inputId, ids.listId);
+            idx = e.key === 'ArrowDown' ? Math.min(idx + 1, visible.length - 1) : Math.max(idx - 1, 0);
+            visible.forEach(function (item) { item.classList.remove('active'); item.setAttribute('aria-selected', 'false'); });
+            const active = visible[idx];
+            active.classList.add('active');
+            active.setAttribute('aria-selected', 'true');
+            active.scrollIntoView({block: 'nearest'});
+            list.dataset.activeIndex = String(idx);
+            if (active.id) input.setAttribute('aria-activedescendant', active.id);
+            e.preventDefault();
+        } else if (e.key === 'Enter' && list.style.display === 'block') {
+            const active = visible[Math.max(0, idx)];
+            if (active) active.click();
+            e.preventDefault();
+        }
+    });
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-combo-toggle]');
+        if (!btn) return;
+        e.preventDefault();
+        const ids = comboIdsFromEl(btn);
+        if (ids) toggleCombobox(ids.inputId, ids.listId);
+    });
+
+    document.addEventListener('click', function(e) {
+        const item = e.target.closest('.combobox-item[data-combo-code]');
+        if (!item) return;
+        e.preventDefault();
+        const list = item.closest('.combobox-list');
+        if (!list) return;
+        const inputId = list.dataset.anchorInput || item.getAttribute('data-combo-input');
+        const displayId = item.getAttribute('data-combo-display') || list.dataset.displayId || '';
+        const nameInputId = item.getAttribute('data-combo-name-input') || list.dataset.nameInputId || '';
+        const valueInputId = item.getAttribute('data-combo-value-input') || list.dataset.valueInputId || '';
+        const extraFn = item.getAttribute('data-combo-after') || list.dataset.after || '';
+        const code = item.getAttribute('data-combo-code') || '';
+        const name = item.getAttribute('data-combo-name') || item.getAttribute('data-combo-code') || '';
+        if (inputId) selectComboboxItem(inputId, list.id, code, name, displayId, nameInputId, valueInputId);
+        const matId = item.getAttribute('data-material-id') || '';
+        if (inputId && (matId || item.hasAttribute('data-material-id'))) {
+            const picked = document.getElementById(inputId);
+            if (typeof window.setSelectedMaterialId === 'function') {
+                window.setSelectedMaterialId(picked, matId, name || code);
+            }
+        }
+        if (extraFn && typeof window[extraFn] === 'function') {
+            try { window[extraFn](code, name, inputId); } catch (_) {}
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.position-relative') && !e.target.closest('.combobox-list')) {
+            document.querySelectorAll('.combobox-list').forEach(l => l.style.display = 'none');
+        }
+    });
+
+    // Keep combobox aligned during page/section scroll instead of closing abruptly.
+    window.addEventListener('scroll', function() {
+        document.querySelectorAll('.combobox-list').forEach(l => {
+            if (l.style.display === 'block') {
+                const anchorInputId = l.dataset.anchorInput;
+                if (anchorInputId && document.getElementById(anchorInputId)) {
+                    positionCombobox(anchorInputId, l.id);
+                } else {
+                    l.style.display = 'none';
+                }
+            }
+        });
+    }, true);
+
+    document.addEventListener('wheel', function(e) {
+        const target = e && e.target;
+        if (!target || typeof target.closest !== 'function') return;
+        const list = target.closest('.combobox-list');
+        if (!list) return;
+        e.stopPropagation();
+        const delta = e.deltaY || 0;
+        const atTop = list.scrollTop <= 0;
+        const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+        if ((delta < 0 && atTop) || (delta > 0 && atBottom)) {
+            e.preventDefault();
+        }
+    }, { capture: true, passive: false });
+
+    document.addEventListener('touchmove', function(e) {
+        const target = e && e.target;
+        if (!target || typeof target.closest !== 'function') return;
+        if (target.closest('.combobox-list')) {
+            e.stopPropagation();
+        }
+    }, { capture: true, passive: true });
+
+    window.addEventListener('resize', function() {
+        document.querySelectorAll('.combobox-list').forEach(l => {
+            if (l.style.display === 'block') l.style.display = 'none';
+        });
+    });
+
+    // Attach the session-bound CSRF token to every mutating form. Keeping this
+    // central prevents individual Accounts partials/modals from drifting.
+    document.addEventListener('DOMContentLoaded', function () {
+        const csrfToken = {{ (csrf_token or '')|tojson }};
+        if (!csrfToken) return;
+        document.querySelectorAll('form').forEach(function (form) {
+            const method = (form.getAttribute('method') || 'GET').toUpperCase();
+            if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return;
+            if (form.querySelector('input[name="_csrf_token"]')) return;
+            const input = document.createElement('input');
+            input.type = 'hidden'; input.name = '_csrf_token'; input.value = csrfToken;
+            form.appendChild(input);
+        });
+    });
+
+    // Reusable searchable enhancement for native selects whose options are
+    // dynamically rebuilt by existing transaction scripts. It preserves the
+    // original <select> name/value/events while adding keyboard-friendly search.
+    function enhanceSearchableSelect(select) {
+        if (!select || select.dataset.searchEnhanced === '1') return;
+        select.dataset.searchEnhanced = '1';
+        const search = document.createElement('input');
+        search.type = 'search';
+        search.className = 'form-control form-control-sm mb-1 acc-select-search';
+        search.placeholder = select.dataset.searchPlaceholder || 'Search options…';
+        search.setAttribute('aria-label', search.placeholder);
+        select.parentNode.insertBefore(search, select);
+        const apply = function () {
+            const query = search.value.trim().toLowerCase();
+            let shown = 0;
+            Array.from(select.options).forEach(function (option, index) {
+                const visible = index === 0 || !query || option.text.toLowerCase().includes(query) || String(option.value).toLowerCase().includes(query);
+                option.hidden = !visible;
+                if (visible && index > 0) shown += 1;
+            });
+            select.dataset.visibleMatches = String(shown);
+        };
+        search.addEventListener('input', apply);
+        search.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowDown') { select.focus(); event.preventDefault(); }
+            if (event.key === 'Escape') { search.value = ''; apply(); }
+        });
+        new MutationObserver(apply).observe(select, {childList: true, subtree: true});
+        apply();
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('select.acc-searchable-select').forEach(enhanceSearchableSelect);
+    });
+
+    // Date Picker initialization
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.flatpickr) {
+            flatpickr(".datepicker, input[type='date']", {
+                dateFormat: "Y-m-d"
+            });
+        }
+    });
+
+    // Auto-download bill if param exists
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const downloadBill = urlParams.get('download_bill');
+        const downloadSrc = urlParams.get('download_src');
+        const downloadSrcId = urlParams.get('download_src_id');
+        const downloadClientCode = urlParams.get('download_client_code');
+        const downloadClientName = urlParams.get('download_client_name');
+        if (downloadBill) {
+            // Remove download params from URL to prevent loop on refresh
+            ['download_bill', 'download_src', 'download_src_id', 'download_client_code', 'download_client_name'].forEach((k) => {
+                urlParams.delete(k);
+            });
+            const remainingQs = urlParams.toString();
+            const newUrl = window.location.pathname + (remainingQs ? ('?' + remainingQs) : '');
+            window.history.replaceState({}, '', newUrl);
+
+            // Trigger hint-aware download to avoid bill collision ambiguity.
+            const dlParams = new URLSearchParams();
+            if (downloadSrc) dlParams.set('src', downloadSrc);
+            if (downloadSrcId) dlParams.set('src_id', downloadSrcId);
+            if (downloadClientCode) dlParams.set('client_code', downloadClientCode);
+            if (downloadClientName) dlParams.set('client_name', downloadClientName);
+            const dlUrl = '/download_invoice/' + encodeURIComponent(downloadBill) + (dlParams.toString() ? ('?' + dlParams.toString()) : '');
+            runFileAction({ url: dlUrl, method: 'GET' });
+        }
+    });
+
+    // Global field-size guardrails for smoother forms and predictable payload size.
+    document.querySelectorAll('input[name="manual_bill_no"], input[name="bill_no"], input[name="auto_bill_no"]').forEach((el) => {
+        if (!el.hasAttribute('maxlength')) el.setAttribute('maxlength', '40');
+    });
+    document.querySelectorAll('input[name="client_code"], input[name="client_name"], input[name="manual_client_name"]').forEach((el) => {
+        if (!el.hasAttribute('maxlength')) el.setAttribute('maxlength', '100');
+    });
+    document.querySelectorAll('input[name="driver_name"], input[name="account_name"], input[name="bank_name"]').forEach((el) => {
+        if (!el.hasAttribute('maxlength')) el.setAttribute('maxlength', '120');
+    });
+    document.querySelectorAll('input[name="account_no"], input[name="phone"]').forEach((el) => {
+        if (!el.hasAttribute('maxlength')) el.setAttribute('maxlength', '40');
+    });
+    document.querySelectorAll('textarea[name="note"], textarea[name="notes"], textarea[name="page_notes"]').forEach((el) => {
+        if (!el.hasAttribute('maxlength')) el.setAttribute('maxlength', '500');
+    });
+
+    {% if current_user.is_authenticated %}
+    // Reminder alert audio + blocking due-reminder popup (global)
+    let alarmAudioCtx = null;
+    let dueReminderModal = null;
+    let dueReminderIds = [];
+    let dueModalVisible = false;
+    let dueCheckInFlight = false;
+
+    // Stable per-tab id so server logs (via the ?src= query param) and the
+    // browser console can tell "two tabs polling" apart from "two loops in one
+    // tab". Random, non-sensitive.
+    if (!window.__AMS_TAB_ID) {
+        window.__AMS_TAB_ID = Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36);
+    }
+
+    function ensureAudioUnlocked() {
+        try {
+            if (!alarmAudioCtx) {
+                alarmAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (alarmAudioCtx.state === 'suspended') {
+                alarmAudioCtx.resume();
+            }
+        } catch (e) {}
+    }
+
+    function playAlarmFor10s() {
+        ensureAudioUnlocked();
+        if (!alarmAudioCtx) return;
+        const end = Date.now() + 10000;
+        const chime = () => {
+            const now = alarmAudioCtx.currentTime;
+            const tones = [
+                { freq: 659.25, start: 0.00, duration: 0.20 },
+                { freq: 783.99, start: 0.22, duration: 0.24 }
+            ];
+
+            tones.forEach((tone) => {
+                const o = alarmAudioCtx.createOscillator();
+                const g = alarmAudioCtx.createGain();
+                o.type = 'sine';
+                o.frequency.setValueAtTime(tone.freq, now + tone.start);
+                g.gain.setValueAtTime(0.0001, now + tone.start);
+                g.gain.linearRampToValueAtTime(0.08, now + tone.start + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + tone.start + tone.duration);
+                o.connect(g);
+                g.connect(alarmAudioCtx.destination);
+                o.start(now + tone.start);
+                o.stop(now + tone.start + tone.duration + 0.03);
+            });
+        };
+
+        const loop = setInterval(() => {
+            if (Date.now() >= end) {
+                clearInterval(loop);
+                return;
+            }
+            chime();
+        }, 1100);
+        chime();
+    }
+
+    function testAlarm() {
+        playAlarmFor10s();
+        alert('Alarm test started for 10 seconds.');
+    }
+
+    function renderDueReminderRows(items) {
+        const list = document.getElementById('dueReminderList');
+        const countEl = document.getElementById('dueReminderCount');
+        if (!list) return;
+        list.innerHTML = items.map(item => `
+            <div class="border border-secondary rounded p-3" id="dueRow-${item.id}">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <div class="fw-bold">${item.client || 'Unknown Client'} <span class="text-white-50">(${item.bill_no || 'No Bill'})</span></div>
+                        <div class="small text-warning">Due: ${item.remind_at}</div>
+                        <div class="small text-white-50">${item.note || 'No note'}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        dueReminderIds = items.map(i => i.id);
+        if (countEl) {
+            countEl.innerText = String(dueReminderIds.length);
+        }
+    }
+
+    function showDueReminderModal(items) {
+        const modalEl = document.getElementById('dueReminderModal');
+        if (!modalEl) return;
+        if (!dueReminderModal) {
+            dueReminderModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+            ensureTopModal(modalEl, 2600);
+            modalEl.addEventListener('shown.bs.modal', () => { dueModalVisible = true; });
+            modalEl.addEventListener('hidden.bs.modal', () => { dueModalVisible = false; });
+        }
+        renderDueReminderRows(items);
+        dueReminderModal.show();
+        playAlarmFor10s();
+    }
+
+    function isDuePollLeader() {
+        // Single controlled poller across open tabs: only the elected leader
+        // calls /api/notifications/due. The election self-heals via TTL when a
+        // leader tab is closed or backgrounded.
+        const KEY = 'ams_due_poll_leader';
+        const now = Date.now();
+        let leader = null;
+        try { leader = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (_) {}
+        if (leader && leader.id && (now - (leader.ts || 0)) < 25000) {
+            return leader.id === window.__AMS_TAB_ID;
+        }
+        try { localStorage.setItem(KEY, JSON.stringify({ id: window.__AMS_TAB_ID, ts: now })); } catch (_) {}
+        return true;
+    }
+
+    async function checkDueRemindersGlobal() {
+        if (dueModalVisible || dueCheckInFlight) return;
+        if (document.visibilityState !== 'visible') return;  // no hidden-tab churn
+        if (!isDuePollLeader()) return;                       // one poller across tabs
+        dueCheckInFlight = true;
+        try {
+            const src = encodeURIComponent('due-reminder/poll/' + window.__AMS_TAB_ID);
+            console.debug('[AMS-POLL] notifications/due source=due-reminder reason=interval tab=' + window.__AMS_TAB_ID);
+            const res = await fetch('/api/notifications/due?src=' + src, { cache: 'no-store' });
+            if (!res.ok) return;
+            const items = await res.json();
+            if (!items || !items.length) return;
+            showDueReminderModal(items);
+        } catch (e) {
+        } finally {
+            dueCheckInFlight = false;
+        }
+    }
+
+    window.addEventListener('click', ensureAudioUnlocked, { once: true });
+    window.addEventListener('keydown', ensureAudioUnlocked, { once: true });
+    setInterval(checkDueRemindersGlobal, 15000);
+    setTimeout(checkDueRemindersGlobal, 1200);
+    {% endif %}
+</script>
+</body>
+</html>
