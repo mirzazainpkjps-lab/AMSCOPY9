@@ -1,0 +1,4 @@
+name = "ams99"
+main = "ams99/main.py"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["python_workers"]
