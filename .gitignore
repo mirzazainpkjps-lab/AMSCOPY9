@@ -1,6 +1,4 @@
 .venv/
-instance/
-*.db
 deployment.log
 
 __pycache__/

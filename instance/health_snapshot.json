@@ -1,0 +1,16 @@
+{
+  "captured_at": "2026-08-19 21:46:21",
+  "counts": {
+    "booking": 391,
+    "client": 309,
+    "direct_sale": 2445,
+    "entry": 4628,
+    "pending_bill": 1553,
+    "user": 7
+  },
+  "db_path": "/home/tempservofbm/ams99/instance/ahmed_cement.db",
+  "mtime": 1787157980.0417583,
+  "schema_version": 2,
+  "size": 6512640,
+  "total": 9333
+}

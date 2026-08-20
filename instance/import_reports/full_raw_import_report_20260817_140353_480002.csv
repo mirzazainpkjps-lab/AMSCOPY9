@@ -1,0 +1,13 @@
+﻿table,sheet_row,status,reason,primary_key,label,row_json
+accounting_audit_log,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+booking_allocation_repair_archive,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+cash_flow_category,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+cash_flow_party,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+account_reconciliation,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+cash_flow_subcategory,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+import_upload,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+import_job,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+cash_flow_entry,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+import_history_entry,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+grn_allocation,,unavailable,Sheet is not available in this backup; existing table data was kept.,,,
+settings,,warning,"Ignored unavailable column(s): smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, smtp_use_tls, ams_openai_api_key, notify_daily_time",,,

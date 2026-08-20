@@ -1,0 +1,15 @@
+{
+  "name": "full_raw_import_report_20260817_140353_480002.csv",
+  "created_at": "2026-08-17 14:03:53",
+  "mode": "replace_tenant_data",
+  "scope": "single_store",
+  "inserted": 24584,
+  "updated": 1,
+  "skipped": 0,
+  "failed": 0,
+  "warnings": 12,
+  "tables": 50,
+  "status": "warning",
+  "source_file": "ALLEXPORT-CLEAN-17-08-2026.xlsx",
+  "issue_rows_count": 12
+}

@@ -1,0 +1,412 @@
+{
+  "source": "/home/runner/workspace/ams99/Realdata/ALLEXPORT-17-08-2026_01-54PM.xlsx",
+  "output": "instance/migration/ALLEXPORT-CLEAN-17-08-2026.xlsx",
+  "generated_at": "2026-08-17T09:03:08.402288+00:00",
+  "tables": {
+    "account": {
+      "total": 12,
+      "kept": 12,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "account_category": {
+      "total": 6,
+      "kept": 6,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "audit_log": {
+      "total": 717,
+      "kept": 717,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "bill_counter": {
+      "total": 6,
+      "kept": 6,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "booking": {
+      "total": 404,
+      "kept": 387,
+      "removed_void": 17,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "cash_flow_difference_adjustment": {
+      "total": 1,
+      "kept": 1,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "client": {
+      "total": 308,
+      "kept": 308,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "delivery": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "delivery_person": {
+      "total": 14,
+      "kept": 14,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "direct_sale_draft": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "fbm_cash_drawer_category": {
+      "total": 6,
+      "kept": 6,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "fbm_cash_drawer_entry": {
+      "total": 2,
+      "kept": 2,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "fbm_client": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "fbm_rental_item": {
+      "total": 1,
+      "kept": 1,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "future_account_audit_log": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "invoice": {
+      "total": 2251,
+      "kept": 2251,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "material_category": {
+      "total": 12,
+      "kept": 12,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "pending_bill": {
+      "total": 6836,
+      "kept": 1534,
+      "removed_void": 5302,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "recon_basket": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "root_backup_email_history": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "root_backup_settings": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "root_recovery_code": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "schema_version": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "settings": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "staff_email": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "supplier": {
+      "total": 6,
+      "kept": 6,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "system_lock": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "user": {
+      "total": 7,
+      "kept": 7,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "account_transaction": {
+      "total": 865,
+      "kept": 781,
+      "removed_void": 84,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "booking_item": {
+      "total": 925,
+      "kept": 885,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 40,
+      "removed_missing_parent": 0
+    },
+    "cash_flow_reconciliation_audit": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "delivery_item": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "direct_sale": {
+      "total": 2506,
+      "kept": 2410,
+      "removed_void": 96,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "entry": {
+      "total": 10015,
+      "kept": 4576,
+      "removed_void": 5370,
+      "removed_cancel": 70,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "fbm_rental": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "follow_up_reminder": {
+      "total": 20,
+      "kept": 17,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 3,
+      "removed_missing_parent": 0
+    },
+    "grn": {
+      "total": 58,
+      "kept": 48,
+      "removed_void": 10,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "material": {
+      "total": 66,
+      "kept": 66,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "payment": {
+      "total": 746,
+      "kept": 708,
+      "removed_void": 38,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "supplier_payment": {
+      "total": 78,
+      "kept": 78,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "delivery_rent": {
+      "total": 993,
+      "kept": 969,
+      "removed_void": 24,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "follow_up_contact": {
+      "total": 4,
+      "kept": 4,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "grn_item": {
+      "total": 57,
+      "kept": 48,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 9,
+      "removed_missing_parent": 0
+    },
+    "material_return": {
+      "total": 85,
+      "kept": 74,
+      "removed_void": 11,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "sale_delivery_persons": {
+      "total": 2801,
+      "kept": 2688,
+      "removed_void": 113,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "waive_off": {
+      "total": 378,
+      "kept": 371,
+      "removed_void": 7,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "delivery_person_payment": {
+      "total": 0,
+      "kept": 0,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 0
+    },
+    "direct_sale_item": {
+      "total": 4596,
+      "kept": 4431,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 165,
+      "removed_missing_parent": 0
+    },
+    "material_return_item": {
+      "total": 116,
+      "kept": 101,
+      "removed_void": 0,
+      "removed_cancel": 0,
+      "removed_cascade": 15,
+      "removed_missing_parent": 0
+    },
+    "booking_allocation": {
+      "total": 1374,
+      "kept": 1060,
+      "removed_void": 164,
+      "removed_cancel": 0,
+      "removed_cascade": 0,
+      "removed_missing_parent": 165
+    }
+  },
+  "totals": {
+    "rows_in_source": 36272,
+    "rows_kept": 24585,
+    "rows_removed": 11687
+  }
+}

@@ -30,12 +30,12 @@ def setup_gitignore():
     """Ignore only config credentials so PAT is not exposed."""
     gitignore_path = ".gitignore"
     needed_entries = [CONFIG_FILE, "__pycache__/", "*.pyc"]
-    
+
     existing = []
     if os.path.exists(gitignore_path):
         with open(gitignore_path, "r") as f:
             existing = [line.strip() for line in f.readlines()]
-    
+
     with open(gitignore_path, "a") as f:
         for entry in needed_entries:
             if entry not in existing:
@@ -88,7 +88,7 @@ def sync_to_github():
     # 7. List exact staged files queued for upload
     print("\n--- ALL STAGED FILES TO PUSH TO GITHUB ---")
     _, staged_files, _ = run_cmd("git ls-files")
-    
+
     if staged_files:
         for file_path in staged_files.split("\n"):
             print(f" -> {file_path}")
