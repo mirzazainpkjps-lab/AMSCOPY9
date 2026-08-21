@@ -150,7 +150,7 @@ Any one of these operations combined with Root Cause #1 can produce
 
 | # | Finding | Detail |
 |---|---|---|
-| A1 | **12 phantom sales (2530–2541)** | 2026-08-18 16:03–16:30: headers + invoices exist, **all line items and stock entries are missing** (e.g. `MB NO.11684` SHEHZAD KHAN SB DHINDA, 163,461.40, invoice OPEN). Stock, client ledgers and reports are wrong for these. |
+| A1 | **33 sales with no line items (2507–2541)** | Larger than first reported (was "12 phantom sales"). Two distinct populations: **22 sales (2507–2529, 08-03 → 08-19) kept their stock `entry` rows** — only `direct_sale_item` was lost, so they were rebuildable and **have now been restored** (see §5.1). The remaining **11 (2530–2541, minus 2538) lost items *and* entries** and are irreversible without re-entry (e.g. `MB NO.11684` SHEHZAD KHAN SB DHINDA, 163,461.40, invoice OPEN). 2538 was already re-entered by the yard as sale 2554. |
 | A2 | **Deleted sale 2255 resurrected** | Hard-deleted 2026-08-19 12:49, still present (duplicate bill `MB NO.11169` with sale 2508). |
 | A3 | **4 active `CANCEL` entry rows** | ids 10029, 10030 (MB NO.10659), 10049 (MB NO.11420), 10090 (MB NO.2405) — booking cancellations never voided; they distort stock. |
 
@@ -218,6 +218,68 @@ is never rolled back to a committed snapshot. `.instance_preserve/` is in
 This is a safe, self-contained change: the database files stay tracked in
 Git for now, so this commit alone cannot delete anything on the server.
 
+### 5.1 — 22 damaged sales repaired (line items rebuilt from stock entries)
+
+`tools/repair_controlled/restore_missing_sale_items.py` reconstructs
+`direct_sale_item` rows for sales that lost their items but **kept** their
+stock `entry` rows. Each surviving entry is one lost item line: it carries the
+material, the qty and (via `client_category`) whether the line was chargeable.
+Only the unit price had to be re-derived, using rules verified against the
+whole database first:
+
+* `Σ(qty × price) == sale.amount` — holds for 2,423 of 2,426 healthy sales;
+* `Σ(chargeable rent qty × price) == rent_item_revenue` — holds for 476/476
+  (so `rent_item_revenue` is the rent figure, **not** `delivery_rent_cost`);
+* entries with `client_category == 'Booking Delivery'` are always price 0
+  (material already paid for at booking), so the non-rent money pool is
+  `amount − rent_item_revenue`;
+* a chargeable line is never written at price 0.
+
+**Result (applied to `instance/ahmed_cement.db`):**
+
+| Metric | Before | After |
+|---|---|---|
+| `direct_sale_item` rows | 4,460 | **4,508** (+48) |
+| Active sales with zero items | 33 | **11** |
+| Active / voided `entry` rows | 4,658 / 5 | 4,658 / 5 (untouched) |
+
+22 sales repaired, 48 item lines rebuilt, **21 priced exactly** (reconstructed
+total matches `amount` to within 0.05) and **1 estimated** (sale 2516 — two
+chargeable steel lines share one blended rate of 244.00; the total is still
+exact, only the split between the two lines is an assumption). Every
+reconstructed price was cross-checked against that material's historical range
+(KOHAT 1,485–1,520 · CHAUGATH 268–271 · ISM 12MM 234–252 · 6MM 262–275 ·
+WIRE 400–430 · TILE 25–28). `PRAGMA quick_check` = ok, `foreign_key_check`
+empty, and the full test suite (195 tests) passes against the repaired DB.
+
+The script is **idempotent** (a second run reports "No damaged sales found"),
+defaults to a dry run, takes a `repair_guard` backup before writing, and only
+ever INSERTs into `direct_sale_item` — it never touches entries, invoices,
+pending bills or ledgers.
+
+### 5.2 — ⚠ Do NOT run the full consistency rebuild yet
+
+`repair_erp_consistency.py` / `rebuild_all_erp_consistency()` was tested on
+copies of the database, before and after the restore, and it **is still not
+safe to run**:
+
+* **Before the restore** it was actively destructive — with no item rows the
+  "desired" entry set for those 22 sales is empty, so the rebuild voided all
+  50 of their surviving stock entries and created nothing. That would have
+  destroyed the only remaining evidence of what was sold. Restoring the items
+  first (§5.1) removes this trap: the same run now voids 80 entries instead of
+  125, and the 22 sales end with 48 active entries instead of 0.
+* **A remaining bug blocks it.** `_entry_source_filter` matches stale entries
+  by bill reference + client name, so the duplicate-bill pair `MB NO.11169`
+  (sale 2255 and sale 2508, both RAJA MUDASIR) is conflated: the rebuild voids
+  entries 10183–10187 as if they belonged to 2508 and recreates them under
+  2508 only, leaving **sale 2255 with zero active stock entries** while its
+  item rows still exist.
+
+**Required before any full rebuild:** decide the `MB NO.11169` duplicate —
+void either sale 2255 or 2508 (D1/A2 above). Until then the rebuild will
+silently strand whichever of the pair it doesn't pick.
+
 ---
 
 ## 6. Recommended follow-ups (in order)
@@ -236,14 +298,22 @@ Git for now, so this commit alone cannot delete anything on the server.
    `SECRET_KEY`.
 4. **Repair the damaged data** (the app ships guarded tools for this; each
    takes its own backup first and requires `--confirm`):
-   * Re-enter the 12 phantom sales 2530–2541 from the client's paper bills
-     (invoice totals are intact), or hard-delete them and re-save;
-   * Run `python tools/repair_controlled/repair_erp_consistency.py --confirm`
-     to rebuild pending bills / ledgers / stock from source transactions —
-     this corrects the 25 under-reported dues and the B1–B2 gaps;
+   * ~~22 sales 2507–2529~~ — **done**, items rebuilt from their surviving
+     stock entries (§5.1). Worth a spot-check against the paper bills,
+     especially sale 2516 whose two steel lines share an estimated rate.
+   * Re-enter the **11 remaining phantom sales** (2530–2541 except 2538, which
+     is already re-entered as 2554) from the client's paper bills — invoice
+     totals are intact — or hard-delete them and re-save. These lost their
+     stock entries too, so nothing can be reconstructed from the database.
+   * Decide on `MB NO.11169`: keep sale 2255 or 2508 and **void the other**.
+     This is now a blocker, not just cleanup — see §5.2.
+   * Only **after** that duplicate is resolved, run
+     `python tools/repair_controlled/repair_erp_consistency.py --confirm` to
+     rebuild pending bills / ledgers / stock from source transactions (fixes
+     the 25 under-reported dues and the B1–B2 gaps). Running it today strands
+     one of the `MB NO.11169` sales with no stock entries.
    * Void the 4 active `CANCEL` entry rows and re-issue the correct
-     cancellation; decide on `MB NO.11169` (keep 2255 or 2508, void the
-     other).
+     cancellation.
 5. **Enable safety nets:** set `_AUTO_BACKUP_ENABLED`/`BACKUP_EMBEDDED_SCHEDULER`
    and `_WIPE_BACKUP_ENABLED` to `1` (hourly online backup + pre-wipe
    backup + wipe history row), and point backups somewhere off the
