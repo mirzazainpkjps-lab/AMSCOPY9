@@ -1,5 +1,6 @@
 .venv/
 deployment.log
+.instance_preserve/
 
 __pycache__/
 *.py[cod]
