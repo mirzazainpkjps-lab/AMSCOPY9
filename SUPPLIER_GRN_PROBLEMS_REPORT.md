@@ -62,6 +62,22 @@ Covered in F6 above — repair script provided.
 
 ---
 
+## 2-bis. Settings → User Roles: READ-ONLY / READ & WRITE access mode — ADDED (session 3)
+
+**Request:** a per-user setting in Settings → User Permissions to make an account **Read Only** (view everything, change nothing) or **Read & Write** (normal).
+
+| What | Detail |
+|---|---|
+| Where | Settings → User Permissions → **Access Mode** selector in both the *Create User* modal and the *Edit Permissions* modal; the users table shows a **READ ONLY** / **READ & WRITE** badge per user. |
+| Behaviour | `Read Only` keeps every ticked module for **viewing** (GET) but blocks **every** save / edit / delete (POST/PUT/PATCH/DELETE) with a clear message: *"Your account is READ-ONLY — viewing is allowed, saving/changing/deleting is blocked."* AJAX calls get a JSON 403. The user's own light/dark theme preference still works. `Read & Write` = exactly the old behaviour. Administrators are never restricted. |
+| Enforcement | One new `before_request` hook (`_enforce_read_only_access_mode` in `app/hooks.py`). Existing permission checkboxes, endpoint map and all module code are untouched — the hook only acts when a non-admin user's `access_mode` is `read_only`. |
+| Storage | New `user.access_mode` column (`read_write` default / `read_only`), auto-added to the DB at startup by the existing `_ensure_model_columns` migration — no manual step. Existing users default to Read & Write. |
+| Bonus bug fixed | `/add_user` (Create User in Settings) was **crashing with a NameError** on the original code — `generate_password_hash` was missing from the imports. Fixed and covered by tests. |
+
+Tests: `tests/test_read_only_access_mode.py` (5 tests: view allowed / write blocked, default = read & write, admin switch via Settings on & off, admins unaffected, theme exemption, Settings UI shows the selector). Full suite: **211 passed**.
+
+---
+
 ## 3. Remaining code-level problems (NOT yet changed — need your decision)
 
 1. **THE BIG ONE — your live database is still tracked in Git and deploys run `git reset --hard`.** Already proven in `DATA_LOSS_INVESTIGATION.md`: this is why data "disappears and reappears". `main.py` now preserves `instance/` around the reset, but `git ls-files` still shows `instance/ahmed_cement.db`, `-wal`, `-shm`, `secret_key` tracked, and `.gitignore` does not exclude them. **Recommended next step (say the word and I'll do it):** `git rm --cached instance/*` + `.gitignore` entries, deployed together with the existing preserve/restore mechanism.

@@ -233,6 +233,43 @@ def register_hooks(app):
         flash('Permission denied for this module.', 'danger')
         return redirect(url_for('index'))
 
+    @app.before_request
+    def _enforce_read_only_access_mode():
+        """Read-Only accounts: block every mutating request, keep all views.
+
+        Applies only to non-admin/non-root users whose ``access_mode`` is
+        'read_only'.  Existing behaviour for everyone else is untouched.
+        Personal preference endpoints (own UI theme) stay usable.
+        """
+        from flask import request as _req
+        if _req.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+            return None
+        if not current_user.is_authenticated:
+            return None
+        if current_user.role in ('admin', 'root'):
+            return None
+        mode = (getattr(current_user, 'access_mode', None) or 'read_write').strip().lower()
+        if mode != 'read_only':
+            return None
+        endpoint = _req.endpoint or ''
+        short = endpoint.rsplit('.', 1)[-1] if endpoint else ''
+        # Self-service endpoints a read-only user may still hit.
+        if short in ('api_ui_theme', 'ui_theme', 'ui_theme_preference_api'):
+            return None
+        if (_req.path or '').rstrip('/') in ('/api/ui/theme',):
+            return None
+        if (_req.path or '').startswith('/static'):
+            return None
+        # AJAX calls expect JSON, not a redirect.
+        if (_req.path or '').startswith('/api/'):
+            from flask import jsonify as _jsonify
+            return _jsonify({'success': False, 'error': 'Your account is READ-ONLY. Changes are not permitted.'}), 403
+        flash('Your account is READ-ONLY — viewing is allowed, saving/changing/deleting is blocked.', 'danger')
+        referrer = _req.referrer
+        if referrer:
+            return redirect(referrer)
+        return redirect(url_for('index'))
+
     @app.context_processor
     def inject_dropdown_data():
         if current_user.is_authenticated:

@@ -1,5 +1,6 @@
 """users_settings — split from misc.py."""
 from ._common import *  # noqa
+from werkzeug.security import generate_password_hash  # noqa: F401  (was missing: /add_user crashed with NameError)
 
 @bp.route('/export_clients')
 @login_required
@@ -77,10 +78,14 @@ def add_user():
     else:
         permission_values = _permissions_from_request_form()
         restrict_backdated_grn_edit = ('restrict_backdated_edit' in request.form)
+        access_mode = (request.form.get('access_mode') or 'read_write').strip().lower()
+        if access_mode not in ('read_only', 'read_write'):
+            access_mode = 'read_write'
         new_u = User(username=un,
                      password_hash=pw,
                      password_plain=None,
                      role=rl,
+                     access_mode=access_mode,
                      restrict_backdated_edit=restrict_backdated_grn_edit,
                      can_manage_directory=(
                          permission_values.get('can_manage_clients', False)
@@ -118,6 +123,8 @@ def edit_user_permissions(id):
             or permission_values.get('can_manage_delivery_persons', False)
         )
         u.restrict_backdated_edit = ('restrict_backdated_edit' in request.form)
+        access_mode = (request.form.get('access_mode') or 'read_write').strip().lower()
+        u.access_mode = access_mode if access_mode in ('read_only', 'read_write') else 'read_write'
         db.session.commit()
         flash('Permissions Updated', 'success')
     return redirect(url_for('settings'))
