@@ -210,6 +210,12 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     register_import_job_routes(app)
 
+    # Compile every Jinja template once at startup so the first request after a
+    # worker (re)start doesn't pay a ~200ms+ compile cost for layout.html +
+    # the large module pages.  Compilation is side-effect free and the bytecode
+    # cache then serves every later request.
+    _warm_template_cache(app)
+
     with app.app_context():
         try:
             from app.services.health import (
@@ -297,6 +303,28 @@ def _resolve_sqlite_journal_mode(db_path: str) -> str:
     if on_pythonanywhere or _on_network_filesystem(db_path):
         return "DELETE"
     return "WAL"
+
+
+def _warm_template_cache(app: Flask) -> None:
+    """Pre-compile templates so the first page hit after boot is already warm.
+
+    Only compiles (``jinja_env.get_template``); it never renders, so no request
+    context or context-processor data is needed.
+    """
+    try:
+        templates_root = Path(app.template_folder)
+        count = 0
+        for path in templates_root.rglob("*.html"):
+            rel = path.relative_to(templates_root).as_posix()
+            try:
+                app.jinja_env.get_template(rel)
+                count += 1
+            except Exception:
+                # A broken/optional template must not block startup.
+                continue
+        logging.getLogger(__name__).info("Warmed Jinja cache for %d templates", count)
+    except Exception:
+        logging.getLogger(__name__).warning("Template warm-up skipped", exc_info=True)
 
 
 def _alias_unprefixed_endpoints(app: Flask) -> None:

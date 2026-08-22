@@ -562,6 +562,23 @@ def _cancel_amount(entry, client_name_norm: str, *, snapshot=None) -> Decimal:
     return result
 
 
+def _same_name_id_groups(snapshot) -> dict:
+    """Map normalised client name -> list of client ids (one ledger identity).
+
+    Built once per snapshot and cached on it.  ``_make_client_obligations``
+    used to scan the whole client list for every client (O(clients²)), which
+    dominated the dashboard/payables page once the catalogue reached a few
+    hundred clients.
+    """
+    groups = snapshot.get("_same_name_groups")
+    if groups is None:
+        groups = defaultdict(list)
+        for other in snapshot.get("clients", []):
+            groups[_norm(getattr(other, "name", None))].append(other.id)
+        snapshot["_same_name_groups"] = groups
+    return groups
+
+
 def _make_client_obligations(client, *, snapshot=None, allocate_remaining=True):
     snapshot = snapshot or _client_snapshot()
     groups = snapshot["groups"]
@@ -570,10 +587,10 @@ def _make_client_obligations(client, *, snapshot=None, allocate_remaining=True):
     # same name while old source tables retain only a name.  Treat that name
     # as one financial identity for the ledger so a secondary master row does
     # not make bills disappear (or create a second payable).
-    same_name_ids = [
-        other.id for other in snapshot.get("clients", [])
-        if _norm(getattr(other, "name", None)) == _norm(getattr(client, "name", None))
-    ] or [client_id]
+    same_name_ids = (
+        _same_name_id_groups(snapshot).get(_norm(getattr(client, "name", None)))
+        or [client_id]
+    )
 
     def merged(kind):
         result = []
