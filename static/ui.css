@@ -8,13 +8,13 @@
 :root {
     /* Surfaces (extend theme.css) */
     --ui-bg:           #070b14;
-    --ui-surface:      #121a2c;
-    --ui-surface-2:    #182338;
-    --ui-surface-3:    #1e2b44;
+    --ui-surface:      #1b2742;
+    --ui-surface-2:    #16213a;
+    --ui-surface-3:    #24344f;
 
     /* Borders */
-    --ui-border:        rgba(186, 198, 220, 0.16);
-    --ui-border-strong: rgba(186, 198, 220, 0.30);
+    --ui-border:        rgba(148, 163, 184, 0.32);
+    --ui-border-strong: rgba(148, 163, 184, 0.52);
 
     /* Text */
     --ui-text:        #f4f7fb;
@@ -57,8 +57,8 @@ html[data-theme="light"] {
     --ui-surface-2:    #f6f8fc;
     --ui-surface-3:    #e8eef6;
 
-    --ui-border:        #d7e0ec;
-    --ui-border-strong: #c3cedc;
+    --ui-border:        #cdd8e6;
+    --ui-border-strong: #b6c3d4;
 
     --ui-text:       #0f172a;
     --ui-text-muted: #5b6b80;
