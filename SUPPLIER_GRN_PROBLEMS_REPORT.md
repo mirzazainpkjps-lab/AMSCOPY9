@@ -21,7 +21,19 @@
 
 ---
 
-## 2. Problems in YOUR DATA (found by querying `instance/ahmed_cement.db` directly)
+## 1-bis. Supplier-ledger viewing bugs reported 2026-08-22 (session 2) — FIXED
+
+**Reported:** In the Zia Traders supplier ledger, (1) every payment shows a fake `PAY-##` number with no tracking code, and clicking it opens a **random client's bill**; (2) no Action buttons (View/Edit/Print/Delete/Download) on any row.
+
+| # | Root cause found | Fix applied |
+|---|---|---|
+| F8 | **All 78 payments in the DB have NO bill number at all** (`auto_bill_no` and `manual_bill_no` both empty — they predate the auto-numbering that `save_supplier_payment` now does). The ledger therefore displayed an invented fallback label `PAY-<id>` — and the template linked that label to the generic bill lookup `/view_bill/PAY-22`, which resolves nothing and falls through to an unrelated client bill. | Ledger rows for supplier payments now link directly to the **supplier payment receipt** (`/download_supplier_payment/<id>`), and GRN rows link to `/view_bill/<ref>?src=grn&src_id=<id>` so a GRN's manual bill number can never collide with a client's bill. |
+| F9 | Same cause — no tracking numbers on existing payments. (New payments already get `SB-SP-####` automatically; the old ones never did.) | **Backfill tool:** `python3 tools/inventory/backfill_supplier_payment_bill_nos.py --apply` gives every existing payment a unique `SB-SP-####` in chronological order (verified on a copy of the live DB: all 78 numbered). Dry-run by default. |
+| F10 | The shared ledger template rendered Actions only for driver settlements; supplier rows showed "—". | Supplier-ledger rows now have actions (supplier ledger ONLY — client & driver ledgers untouched, guarded by a regression test): **GRN rows:** View · Print · Edit · Delete (identical endpoints to the GRN page). **Payment rows:** View · Download (PDF/HTML receipt) · Edit (jumps to Accounts → Supplier Payments, pre-filtered to this supplier, where the shared edit modal is one click away) · Delete (reverses accounting, keeps history). GRN-controlled auto-payments show "Edit GRN" instead, so they're managed at the source. |
+
+Tests: `tests/test_supplier_ledger_actions.py` (3 new — links, tracking numbers, and a guard that client ledgers got none of the new buttons). Full suite: **206 passed**.
+
+
 
 These are not code bugs — they are real inconsistencies sitting in your database right now. They are what you SEE when viewing stock/supplier data.
 
@@ -72,7 +84,10 @@ Covered in F6 above — repair script provided.
 | `app/blueprints/masters/suppliers.py` | page uses `build_supplier_payable_summaries` (bounded) instead of per-supplier full ledgers |
 | `app/services/api.py` | re-export `build_supplier_payable_summaries` |
 | `tools/inventory/fix_stale_grn_supplier_names.py` | NEW — one-shot repair for stale GRN supplier names (dry-run default) |
+| `tools/inventory/backfill_supplier_payment_bill_nos.py` | NEW — assigns SB-SP-#### tracking numbers to all existing supplier payments (dry-run default) |
+| `templates/financial_ledger.html` | supplier-ledger reference links point at payment receipts / GRN hints; supplier-only action buttons |
 | `tests/test_grn_bugcheck.py` | NEW — 8 regression tests covering F1–F7 |
+| `tests/test_supplier_ledger_actions.py` | NEW — 3 regression tests covering F8–F10 |
 
 ## 5. Suggested order of operations for you
 
