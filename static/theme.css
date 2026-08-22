@@ -1,11 +1,11 @@
 :root {
     --theme-mode: dark;
     --surface-0: #070b14;
-    --surface-1: #121a2c;
-    --surface-2: #0a1020;
-    --surface-3: #182338;
-    --border-color: rgba(186, 198, 220, 0.16);
-    --border-strong: rgba(186, 198, 220, 0.30);
+    --surface-1: #1b2742;
+    --surface-2: #101a2e;
+    --surface-3: #24344f;
+    --border-color: rgba(148, 163, 184, 0.32);
+    --border-strong: rgba(148, 163, 184, 0.52);
     --text-primary: #f4f7fb;
     --text-muted: #9aa8bd;
     --accent: #fbbf24;
@@ -13,9 +13,9 @@
     --accent-soft: rgba(251, 191, 36, 0.14);
     --accent-2: #818cf8;
     --overlay: rgba(2, 6, 23, 0.72);
-    --input-bg: #0c1322;
-    --input-border: rgba(186, 198, 220, 0.28);
-    --table-row: #121a2c;
+    --input-bg: #0d1526;
+    --input-border: rgba(148, 163, 184, 0.42);
+    --table-row: #16213a;
     --sidebar-bg: #0a1020;
     --sidebar-text: #e2e8f0;
     --sidebar-muted: #94a3b8;
@@ -43,8 +43,8 @@ html[data-theme="light"] {
     --surface-1: #ffffff;
     --surface-2: #f4f7fb;
     --surface-3: #e8eef6;
-    --border-color: #d7e0ec;
-    --border-strong: #c3cedc;
+    --border-color: #cdd8e6;
+    --border-strong: #b6c3d4;
     --text-primary: #0f172a;
     --text-muted: #5b6b80;
     --accent: #d97706;
@@ -53,7 +53,7 @@ html[data-theme="light"] {
     --accent-2: #4f46e5;
     --overlay: rgba(15, 23, 42, 0.42);
     --input-bg: #ffffff;
-    --input-border: #c3cedc;
+    --input-border: #b6c3d4;
     --table-row: #ffffff;
     --sidebar-bg: #0a1020;
     --sidebar-text: #e2e8f0;
@@ -206,6 +206,18 @@ html[data-theme="light"] .badge.bg-dark {
 .bg-black {
     background-color: var(--surface-2) !important;
     color: var(--text-primary) !important;
+}
+
+/*
+ * Cards must read as raised panels above the page in BOTH themes.
+ * Many screens combine `.card` with Bootstrap's `.bg-dark` utility; the
+ * generic `.bg-dark` rule above would otherwise flatten the card into the
+ * page background. Re-assert the card surface on the more specific selector.
+ */
+.card.bg-dark,
+.card.bg-black {
+    background-color: var(--surface-1) !important;
+    border-color: var(--border-color) !important;
 }
 
 .border-secondary,
