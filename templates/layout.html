@@ -13,8 +13,8 @@
     <link href="{{ url_for('static', filename='vendor/bootstrap/5.3.0/css/bootstrap.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/1.10.0/font/bootstrap-icons.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/flatpickr/4.6.13/flatpickr.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}?v=nova2">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}?v=nova2">
     <script>
         (function () {
             var serverTheme = "{{ ui_theme_preference or '' }}";
@@ -34,11 +34,10 @@
             --sidebar-width: 260px;
             --bg-dark: var(--surface-0);
             --card-bg: var(--surface-1);
-            --sidebar-bg: var(--surface-2);
         }
 
         body {
-            background-color: var(--bg-dark);
+            background: var(--bg-mesh, var(--bg-dark));
             color: var(--text-primary);
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             overflow-x: hidden;
@@ -50,8 +49,8 @@
             width: var(--sidebar-width);
             height: 100vh;
             position: fixed;
-            background: var(--sidebar-bg);
-            border-right: 2px solid var(--border-color);
+            background: linear-gradient(180deg, #0b1224 0%, #070b16 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
             transition: all 0.3s;
             z-index: 1050;
             left: 0;
@@ -87,23 +86,49 @@
         }
 
         .nav-link {
-            color: var(--text-muted);
-            padding: 12px 25px;
+            color: #cbd5e1;
+            padding: 8px 14px;
+            margin: 2px 8px;
             display: flex;
             align-items: center;
-            font-weight: 500;
-            border-left: 4px solid transparent;
+            font-weight: 600;
+            border-left: 0;
+            border-radius: 11px;
             transition: 0.2s;
             text-decoration: none;
         }
 
         .nav-link:hover, .nav-link.active {
-            color: var(--accent);
-            background: rgba(251, 191, 36, 0.05);
-            border-left: 4px solid var(--accent);
+            color: #fff;
+            background: linear-gradient(90deg, rgba(251, 191, 36, 0.16), rgba(99, 102, 241, 0.10));
+            border-left: 0;
         }
 
-        .nav-link i { font-size: 1.2rem; margin-right: 15px; }
+        .nav-link i {
+            font-size: 1rem;
+            margin-right: 12px;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fbbf24;
+            flex-shrink: 0;
+        }
+        .nav-link.active i {
+            background: #fbbf24;
+            color: #111827;
+        }
+        .nav-link i.nav-caret {
+            width: auto;
+            height: auto;
+            background: transparent !important;
+            color: inherit;
+            margin-right: 0;
+            border-radius: 0;
+        }
         .nav-toggle-btn {
             width: 100%;
             background: transparent;
@@ -130,8 +155,8 @@
             display: block;
         }
         .nav-submenu .nav-link {
-            padding-left: 56px;
-            font-size: 0.95rem;
+            padding-left: 22px;
+            font-size: 0.92rem;
         }
 
         /* Shared buttons use a restrained lift instead of mismatched neon glows. */
@@ -214,11 +239,22 @@
             left: 0;
             right: 0;
             height: 60px;
-            background: var(--surface-2);
-            border-bottom: 2px solid var(--border-color);
+            background: #0a1020;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             z-index: 1040;
             padding: 0 15px;
         }
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 18px 16px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            text-align: left;
+        }
+        .sidebar-brand h4 { margin: 0; letter-spacing: 0.3px; }
+        .sidebar-brand small { display: block; }
 
         .sidebar-overlay {
             display: none;
@@ -432,9 +468,12 @@
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <div class="sidebar shadow" id="sidebar">
-        <div class="p-4 text-center border-bottom border-secondary border-opacity-25">
-            <h4 class="fw-bold text-white mb-0">AMS <span class="text-warning">SYSTEM</span></h4>
-            <small class="text-white-50 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">FOR EASE</small>
+        <div class="sidebar-brand">
+            <div class="logo-orb" aria-hidden="true">A</div>
+            <div>
+                <h4 class="fw-bold text-white mb-0">AMS <span class="text-warning">SYSTEM</span></h4>
+                <small class="text-white-50 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">FOR EASE</small>
+            </div>
         </div>
 
         <div class="sidebar-nav-container">
