@@ -621,12 +621,11 @@ def add_direct_sale():
         _stamp_source(entry, 'sales', 'direct_sale', sale.id, ledger_bill_ref, item_category)
         db.session.add(entry)
 
-        # Update Material stock (reduce In Hand)
-        stock_name = item.get('booked_material') if item.get('is_alternate') else item['product_name']
-        mat_obj = Material.query.filter_by(name=stock_name).first()
-        if mat_obj:
-            mat_obj.total = (mat_obj.total or 0) - item['qty']
-
+    # Stock is NOT decremented per item here. finalize_transaction() below runs
+    # rebuild_direct_sale_effects(rebuild_stock=True) → _rebuild_material_totals(),
+    # which recomputes every material total from the freshly flushed entries in a
+    # single pass.  The old per-item Material.query + `total -= qty` was both
+    # redundant (immediately overwritten) and an N+1 query per sale line.
     db.session.flush()
     _apply_booking_allocations_for_sale(sale, sale_item_records)
     _apply_grn_allocations_for_sale(sale, sale_item_records)
