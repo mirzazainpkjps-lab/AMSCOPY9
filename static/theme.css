@@ -215,7 +215,9 @@ html[data-theme="light"] .badge.bg-dark {
  * page background. Re-assert the card surface on the more specific selector.
  */
 .card.bg-dark,
-.card.bg-black {
+.card.bg-black,
+.modal-content.bg-dark,
+.modal-content.bg-black {
     background-color: var(--surface-1) !important;
     border-color: var(--border-color) !important;
 }
