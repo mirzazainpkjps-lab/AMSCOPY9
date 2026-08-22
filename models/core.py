@@ -82,6 +82,10 @@ class User(UserMixin, db.Model):
     can_manage_accounts = db.Column(db.Boolean, default=False)
     can_view_cash_flow = db.Column(db.Boolean, default=False)
     restrict_backdated_edit = db.Column(db.Boolean, default=False)
+    # Account-level access mode: 'read_write' (default) or 'read_only'.
+    # Read-only users keep every view permission but every mutating request
+    # (POST/PUT/PATCH/DELETE) is blocked by a before_request hook.
+    access_mode = db.Column(db.String(20), default='read_write')
     created_at = db.Column(db.DateTime, default=pk_model_now)
 
 

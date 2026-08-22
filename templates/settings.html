@@ -122,7 +122,14 @@
                             {% for u in users %}
                             <tr class="border-secondary">
                                 <td class="fw-bold">{{ u.username }}</td>
-                                <td><span class="badge {{ 'bg-warning text-dark' if u.role == 'admin' else 'bg-secondary' }}">{{ u.role }}</span></td>
+                                <td>
+                                    <span class="badge {{ 'bg-warning text-dark' if u.role == 'admin' else 'bg-secondary' }}">{{ u.role }}</span>
+                                    {% if u.role not in ('admin', 'root') and (u.access_mode or 'read_write') == 'read_only' %}
+                                    <span class="badge bg-danger" title="Viewing only — all saves/edits/deletes blocked">READ ONLY</span>
+                                    {% elif u.role not in ('admin', 'root') %}
+                                    <span class="badge bg-success" title="Can save, edit and delete">READ &amp; WRITE</span>
+                                    {% endif %}
+                                </td>
                                 <td><span class="badge {{ 'bg-success' if (u.status or 'active')|lower == 'active' else 'bg-danger' }}">{{ u.status or 'active' }}</span></td>
                                 <td>
                                     <div class="d-flex flex-wrap gap-1">
@@ -553,6 +560,14 @@ document.addEventListener('DOMContentLoaded', function(){
                         <option value="admin">Administrator</option>
                     </select>
                 </div>
+                <div class="mb-3">
+                    <label class="x-small text-white-50">Access Mode</label>
+                    <select name="access_mode" class="form-select bg-dark text-white border-secondary">
+                        <option value="read_write">Read &amp; Write (can save, edit, delete)</option>
+                        <option value="read_only">Read Only (viewing only — all saves/edits/deletes blocked)</option>
+                    </select>
+                    <small class="text-white-50 d-block mt-1">Read Only keeps every module ticked below for <strong>viewing</strong>, but blocks every save / edit / delete. (Ignored for Administrators.)</small>
+                </div>
                 <h6 class="small fw-bold text-warning text-uppercase mb-2">Module Access (Grouped)</h6>
                 {{ perm_groups(permission_groups, default_permissions, 'addUser') }}
                 <div class="mt-3">
@@ -585,6 +600,15 @@ document.addEventListener('DOMContentLoaded', function(){
                         <option value="user" {{ 'selected' if u.role == 'user' }}>Standard User</option>
                         <option value="admin" {{ 'selected' if u.role == 'admin' }}>Administrator</option>
                     </select>
+                </div>
+                <div class="mb-3">
+                    <label class="x-small text-white-50">Access Mode</label>
+                    {% set u_mode = u.access_mode or 'read_write' %}
+                    <select name="access_mode" class="form-select bg-dark text-white border-secondary">
+                        <option value="read_write" {{ 'selected' if u_mode == 'read_write' }}>Read &amp; Write (can save, edit, delete)</option>
+                        <option value="read_only" {{ 'selected' if u_mode == 'read_only' }}>Read Only (viewing only — all saves/edits/deletes blocked)</option>
+                    </select>
+                    <small class="text-white-50 d-block mt-1">Read Only keeps every module ticked below for <strong>viewing</strong>, but blocks every save / edit / delete. (Ignored for Administrators.)</small>
                 </div>
                 <div class="mb-3">
                     <label class="x-small text-white-50">Reset Password (Optional)</label>
