@@ -6,7 +6,7 @@
     <title>Login - AMS SYSTEM FOR EASE</title>
     <link href="{{ url_for('static', filename='vendor/bootstrap/5.3.0/css/bootstrap.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/1.10.0/font/bootstrap-icons.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}?v=nova3">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
     <script>
         (function () {
             var saved = "";
@@ -22,100 +22,22 @@
     </script>
     <style>
         body {
-            background: var(--bg-mesh, var(--surface-0));
-            min-height: 100vh;
+            background-color: var(--surface-0);
+            height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: 'Segoe UI', sans-serif;
-            position: relative;
-            overflow: hidden;
-        }
-        .login-orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(42px);
-            pointer-events: none;
-            z-index: 0;
-        }
-        .login-orb.a {
-            width: 380px; height: 380px;
-            background: rgba(251, 191, 36, 0.20);
-            top: -90px; left: -70px;
-            animation: loginDrift 10s ease-in-out infinite;
-        }
-        .login-orb.b {
-            width: 420px; height: 420px;
-            background: rgba(99, 102, 241, 0.20);
-            right: -90px; bottom: -90px;
-            animation: loginDrift 12s ease-in-out infinite reverse;
-        }
-        @keyframes loginDrift {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(18px, -14px) scale(1.06); }
-        }
-        .login-intro {
-            position: fixed;
-            inset: 0;
-            z-index: 20;
-            display: grid;
-            place-items: center;
-            background: #05070f;
-            animation: loginIntroOut 0.65s 2.05s ease forwards;
-        }
-        html[data-theme="light"] .login-intro { background: #f4f7fb; }
-        .login-intro-mark {
-            width: 76px; height: 76px; margin: 0 auto 16px;
-            border-radius: 22px;
-            background: linear-gradient(145deg, #fbbf24, #f59e0b 50%, #6366f1);
-            display: grid; place-items: center;
-            font-size: 34px; font-weight: 900; color: #111;
-            box-shadow: 0 16px 40px rgba(245, 158, 11, 0.35);
-            animation: loginPop 0.7s cubic-bezier(.2, 1.2, .3, 1) both;
-        }
-        .login-intro h1 {
-            margin: 0; font-size: 40px; letter-spacing: 1px; color: var(--text-primary);
-            animation: loginFadeUp 0.55s 0.22s both;
-        }
-        .login-intro h1 em { font-style: normal; color: var(--accent); }
-        .login-gold-line {
-            width: 0; height: 3px; margin: 14px auto 10px; border-radius: 99px;
-            background: linear-gradient(90deg, transparent, #fbbf24, #818cf8, transparent);
-            animation: loginDraw 0.75s 0.5s ease forwards;
-        }
-        .login-intro p {
-            margin: 0; letter-spacing: 3px; font-size: 11px; font-weight: 800;
-            color: var(--text-muted);
-            animation: loginFadeUp 0.5s 0.8s both;
-        }
-        @keyframes loginPop { from { transform: scale(.4) rotate(-10deg); opacity: 0; } to { transform: none; opacity: 1; } }
-        @keyframes loginFadeUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
-        @keyframes loginDraw { to { width: 180px; } }
-        @keyframes loginIntroOut { to { opacity: 0; visibility: hidden; } }
-        @keyframes loginCardIn {
-            from { transform: translateY(26px) scale(.97); opacity: 0; }
-            to { transform: none; opacity: 1; }
         }
         .login-card {
             background: var(--surface-1);
-            border: 1px solid var(--border-color);
-            border-radius: 24px;
+            border: 2px solid var(--accent);
+            border-radius: 20px;
             width: 100%;
             max-width: 400px;
             padding: 40px;
             margin: 15px;
-            box-shadow: var(--shadow-2, 0 18px 40px rgba(0,0,0,0.35));
-            position: relative;
-            z-index: 2;
-            animation: loginCardIn 0.65s 2.1s cubic-bezier(.22,.8,.28,1) both;
-        }
-        body.login-skip-intro .login-intro { display: none; }
-        body.login-skip-intro .login-card { animation: none; }
-        @media (prefers-reduced-motion: reduce) {
-            .login-intro, .login-card, .login-orb, .login-intro-mark, .login-intro h1, .login-gold-line, .login-intro p {
-                animation: none !important;
-            }
-            .login-intro { display: none; }
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         @media (max-width: 576px) {
             .login-card {
@@ -130,17 +52,6 @@
 </head>
 <body>
 
-    <div class="login-orb a" aria-hidden="true"></div>
-    <div class="login-orb b" aria-hidden="true"></div>
-    <div class="login-intro" id="loginIntro" aria-hidden="true">
-        <div class="text-center">
-            <div class="login-intro-mark">A</div>
-            <h1>AMS <em>SYSTEM</em></h1>
-            <div class="login-gold-line"></div>
-            <p>FOR EASE ACCESS</p>
-        </div>
-    </div>
-
     <div class="login-card">
         <div class="d-flex justify-content-end mb-2">
             <button type="button" class="theme-switch" data-theme-toggle>
@@ -149,7 +60,6 @@
             </button>
         </div>
         <div class="text-center mb-4">
-            <div class="logo-orb mx-auto mb-3">A</div>
             <h2 class="fw-bold text-white mb-0">AMS <span class="text-warning">SYSTEM</span></h2>
             <p class="text-white-50 small text-uppercase tracking-wider">FOR EASE ACCESS</p>
         </div>
@@ -204,13 +114,6 @@
     if (window.AMSTheme) {
         window.AMSTheme.init("{{ ui_theme_preference or '' }}");
     }
-    (function () {
-        var hasFlash = !!document.querySelector('.alert');
-        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (hasFlash || reduce) {
-            document.body.classList.add('login-skip-intro');
-        }
-    })();
     const toggle = document.getElementById('showPasswordToggle');
     const passInput = document.getElementById('loginPassword');
     if (toggle && passInput) {
