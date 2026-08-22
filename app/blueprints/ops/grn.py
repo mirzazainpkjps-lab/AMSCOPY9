@@ -2,6 +2,26 @@
 from ._common import *  # noqa
 from app.services.void_rebuild import hard_delete_transaction
 
+
+def _parse_grn_money(raw, field_label):
+    """Parse a GRN money/qty field without crashing on user input.
+
+    Accepts '', None, plain numbers and numbers typed with thousands
+    separators ('1,500').  Anything else raises ValueError with a field
+    name so the route can flash a readable message instead of returning
+    HTTP 500 (or silently saving 0).
+    """
+    if raw is None:
+        return 0.0
+    text = str(raw).strip()
+    if not text:
+        return 0.0
+    cleaned = text.replace(',', '').replace(' ', '')
+    try:
+        return float(cleaned)
+    except ValueError:
+        raise ValueError(f"'{field_label}' has an invalid number: '{text}'. Use digits only, e.g. 1500.")
+
 @bp.route('/grn', methods=['GET', 'POST'])
 @login_required
 def grn():
@@ -35,10 +55,14 @@ def grn():
             note = request.form.get('note', '').strip()
             photo = save_photo(request.files.get('photo'))
             photo_url = request.form.get('photo_url', '').strip()
-            loading_cost = float(request.form.get('loading_cost', 0) or 0)
-            freight_cost = float(request.form.get('freight_cost', 0) or 0)
-            other_expense = float(request.form.get('other_expense', 0) or 0)
-            adjustment_amount = float(request.form.get('adjustment_amount', 0) or 0)
+            try:
+                loading_cost = _parse_grn_money(request.form.get('loading_cost', 0), 'Load Expense')
+                freight_cost = _parse_grn_money(request.form.get('freight_cost', 0), 'Freight Expense')
+                other_expense = _parse_grn_money(request.form.get('other_expense', 0), 'Other Expense')
+                adjustment_amount = _parse_grn_money(request.form.get('adjustment_amount', 0), 'Adjustment Amount')
+            except ValueError as ve:
+                flash(str(ve), 'danger')
+                return redirect(url_for('grn'))
             try:
                 discount, _ = _parse_discount_fields(
                     request.form.get('discount', 0),
@@ -49,14 +73,18 @@ def grn():
             except ValueError as ve:
                 flash(str(ve), 'danger')
                 return redirect(url_for('grn'))
-            paid_amount = float(request.form.get('paid_amount', 0) or 0)
+            try:
+                paid_amount = _parse_grn_money(request.form.get('paid_amount', 0), 'Paid Amount')
+                tax_percent = _parse_grn_money(request.form.get('tax_percent', 0), 'Purchase Tax %')
+                tax_amount = _parse_grn_money(request.form.get('tax_amount', 0), 'Purchase Tax Amount')
+            except ValueError as ve:
+                flash(str(ve), 'danger')
+                return redirect(url_for('grn'))
             payment_type = request.form.get('payment_type', '').strip()
             payment_account_id = request.form.get('payment_account_id')
             bank_name = request.form.get('bank_name', '').strip()
             account_name = request.form.get('account_name', '').strip()
             account_no = request.form.get('account_no', '').strip()
-            tax_percent = float(request.form.get('tax_percent', 0) or 0)
-            tax_amount = float(request.form.get('tax_amount', 0) or 0)
             tax_type = request.form.get('tax_type', '').strip()
             supplier_invoice_no = request.form.get('supplier_invoice_no', '').strip()
             due_date_str = request.form.get('due_date')
@@ -158,6 +186,7 @@ def grn():
             qtys = request.form.getlist('qty[]')
             prices = request.form.getlist('price[]')
 
+            skipped_lines = []
             for name, qty, price in zip(mat_names, qtys, prices):
                 if not name:
                     continue
@@ -173,6 +202,7 @@ def grn():
                         'GRN_ITEM_SKIPPED_INVALID_QTY mat=%s qty=%r user=%s',
                         name, qty, _actor,
                     )
+                    skipped_lines.append(f"{name} (qty={qty or 0})")
                     continue
                 price_val = float(price) if price else 0
                 item = GRNItem(grn_id=new_grn.id, mat_name=name, qty=qty_val, price_at_time=price_val)
@@ -215,6 +245,12 @@ def grn():
                 'GRN_COMMIT id=%s bill=%s items=%d elapsed_ms=%.1f',
                 new_grn.id, auto_bill, len(mat_names), (time.time() - _t0) * 1000.0,
             )
+            if skipped_lines:
+                flash(
+                    'GRN saved, but these item lines were NOT saved because quantity was 0 or negative: '
+                    + '; '.join(skipped_lines),
+                    'warning'
+                )
             flash('GRN added successfully!', 'success')
 
         elif action == 'delete':

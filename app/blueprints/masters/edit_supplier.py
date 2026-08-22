@@ -14,7 +14,44 @@ def edit_supplier(id):
             'address': supplier.address, 'opening_balance': supplier.opening_balance,
             'is_active': bool(supplier.is_active),
         }
-        supplier.name = request.form.get('name', '').strip()
+        new_name = (request.form.get('name', '') or '').strip()
+        if new_name:
+            # Duplicate supplier names break every name-based lookup/ledger
+            # join (GRN.supplier, Entry.client, get_supplier_by_input).
+            duplicate = Supplier.query.filter(
+                func.lower(func.trim(Supplier.name)) == new_name.lower(),
+                Supplier.id != supplier.id,
+            ).first()
+            if duplicate:
+                flash(
+                    f"Supplier already exists with name '{new_name}' (#{duplicate.id}). "
+                    "Use a different name — the supplier ledger joins GRNs by name for legacy rows.",
+                    'danger'
+                )
+                return redirect(url_for('suppliers'))
+            old_name = supplier.name
+            supplier.name = new_name
+            if old_name and new_name and old_name.strip().lower() != new_name.lower():
+                # Keep the denormalised display strings in sync so the GRN
+                # list/search and legacy name-matched ledger rows follow the
+                # rename (rows with supplier_id keep matching by id anyway).
+                grns = GRN.query.filter(
+                    or_(
+                        GRN.supplier_id == supplier.id,
+                        and_(
+                            GRN.supplier_id.is_(None),
+                            func.lower(func.trim(GRN.supplier)) == old_name.strip().lower(),
+                        ),
+                    )
+                ).all()
+                for g in grns:
+                    g.supplier = new_name
+                grn_bills = [g.auto_bill_no for g in grns if g.auto_bill_no]
+                if grn_bills:
+                    Entry.query.filter(
+                        Entry.auto_bill_no.in_(grn_bills),
+                        Entry.type == 'IN'
+                    ).update({'client': new_name}, synchronize_session=False)
         supplier.phone = request.form.get('phone', '')
         supplier.address = request.form.get('address', '')
         supplier.opening_balance = _to_float_or_zero(request.form.get('opening_balance', supplier.opening_balance))

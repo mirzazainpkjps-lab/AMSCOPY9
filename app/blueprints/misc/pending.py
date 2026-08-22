@@ -171,6 +171,7 @@ def import_pending_bills():
 @bp.route('/edit_grn/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_grn(id):
+    from app.blueprints.ops.grn import _parse_grn_money
     grn_obj = GRN.query.get_or_404(id)
     restricted = _enforce_grn_backdate_policy(grn_obj.date_posted, 'Edit GRN')
     if restricted:
@@ -217,16 +218,24 @@ def edit_grn(id):
         manual_bill_raw = request.form.get('manual_bill_no', '').strip()
         grn_obj.manual_bill_no = normalize_manual_bill(manual_bill_raw) if manual_bill_raw else ''
         grn_obj.note = request.form.get('note', '').strip()
-        grn_obj.photo_url = request.form.get('photo_url', '').strip()
-        
+        # Only overwrite photo_url when the form actually carries a value;
+        # the wizard has no photo_url input, so blindly assigning '' was
+        # erasing the stored link on every edit.
+        if (request.form.get('photo_url') or '').strip():
+            grn_obj.photo_url = request.form.get('photo_url', '').strip()
+
         new_photo = save_photo(request.files.get('photo'))
         if new_photo:
             grn_obj.photo_path = new_photo
-            
-        grn_obj.loading_cost = float(request.form.get('loading_cost', 0) or 0)
-        grn_obj.freight_cost = float(request.form.get('freight_cost', 0) or 0)
-        grn_obj.other_expense = float(request.form.get('other_expense', 0) or 0)
-        grn_obj.adjustment_amount = float(request.form.get('adjustment_amount', 0) or 0)
+
+        try:
+            grn_obj.loading_cost = _parse_grn_money(request.form.get('loading_cost', 0), 'Load Expense')
+            grn_obj.freight_cost = _parse_grn_money(request.form.get('freight_cost', 0), 'Freight Expense')
+            grn_obj.other_expense = _parse_grn_money(request.form.get('other_expense', 0), 'Other Expense')
+            grn_obj.adjustment_amount = _parse_grn_money(request.form.get('adjustment_amount', 0), 'Adjustment Amount')
+        except ValueError as ve:
+            flash(str(ve), 'danger')
+            return redirect(url_for('edit_grn', id=grn_obj.id))
         try:
             grn_obj.discount, _ = _parse_discount_fields(
                 request.form.get('discount', 0),
@@ -237,14 +246,22 @@ def edit_grn(id):
         except ValueError as ve:
             flash(str(ve), 'danger')
             return redirect(url_for('edit_grn', id=grn_obj.id))
-        grn_obj.paid_amount = float(request.form.get('paid_amount', 0) or 0)
+        try:
+            grn_obj.paid_amount = _parse_grn_money(request.form.get('paid_amount', 0), 'Paid Amount')
+        except ValueError as ve:
+            flash(str(ve), 'danger')
+            return redirect(url_for('edit_grn', id=grn_obj.id))
         grn_obj.payment_type = request.form.get('payment_type', '').strip()
         payment_account_id = request.form.get('payment_account_id')
         grn_obj.bank_name = request.form.get('bank_name', '').strip()
         grn_obj.account_name = request.form.get('account_name', '').strip()
         grn_obj.account_no = request.form.get('account_no', '').strip()
-        grn_obj.tax_percent = float(request.form.get('tax_percent', 0) or 0)
-        grn_obj.tax_amount = float(request.form.get('tax_amount', 0) or 0)
+        try:
+            grn_obj.tax_percent = _parse_grn_money(request.form.get('tax_percent', 0), 'Purchase Tax %')
+            grn_obj.tax_amount = _parse_grn_money(request.form.get('tax_amount', 0), 'Purchase Tax Amount')
+        except ValueError as ve:
+            flash(str(ve), 'danger')
+            return redirect(url_for('edit_grn', id=grn_obj.id))
         grn_obj.tax_type = request.form.get('tax_type', '').strip()
         grn_obj.supplier_invoice_no = request.form.get('supplier_invoice_no', '').strip()
 
@@ -311,11 +328,30 @@ def edit_grn(id):
             except ValueError:
                 pass
 
+        # Bill Date / Due Date are real form fields on the wizard — save them.
+        # (Previously they were read on ADD but silently ignored on EDIT.)
+        # Only touch the stored value when the form actually carries the key:
+        # a browser submit always includes it (empty = cleared by user),
+        # while programmatic posts that omit the key keep the old value.
+        if 'bill_date' in request.form:
+            bill_date_str = (request.form.get('bill_date') or '').strip()
+            try:
+                grn_obj.bill_date = datetime.strptime(bill_date_str, '%Y-%m-%d').date() if bill_date_str else None
+            except ValueError:
+                pass
+        if 'due_date' in request.form:
+            due_date_str = (request.form.get('due_date') or '').strip()
+            try:
+                grn_obj.due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date() if due_date_str else None
+            except ValueError:
+                pass
+
         # 4. Add / update items (preserve GRNItem IDs so linked DirectSaleItem.grn_item_id stays valid)
         item_ids = request.form.getlist('grn_item_id[]')
         mat_names = request.form.getlist('mat_name[]')
         qtys = request.form.getlist('qty[]')
         prices = request.form.getlist('price[]')
+        edit_skipped_lines = []
 
         existing_by_id = {
             int(i.id): i
@@ -340,6 +376,8 @@ def edit_grn(id):
                 price_val = 0.0
 
             if not name or qty_val <= 0:
+                if name and qty_val <= 0:
+                    edit_skipped_lines.append(f"{name} (qty={qty or 0})")
                 continue
 
             item_obj = None
@@ -379,6 +417,12 @@ def edit_grn(id):
         _sync_grn_auto_supplier_payment(grn_obj, old_supplier_id=old_supplier_id)
         
         db.session.commit()
+        if edit_skipped_lines:
+            flash(
+                'GRN updated, but these item lines were NOT saved because quantity was 0 or negative: '
+                + '; '.join(edit_skipped_lines),
+                'warning'
+            )
         flash('GRN updated successfully', 'success')
         return redirect(url_for('grn'))
 
