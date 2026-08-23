@@ -10,11 +10,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-DB_PATH = os.path.join(BASE_DIR, "instance", "ahmed_cement.db")
-# The application factory reads APP_DB_PATH. Keep the live database beside
-# this project and never substitute a backup database file.
+os.environ.setdefault("AMS_SCHEMA_VERSION", "v44")
+DB_PATH = os.path.join(BASE_DIR, "instance", "ahmed_cement_v44_fresh.db")
+# Official runtime database is the clean v4.4 file. Legacy ahmed_cement.db
+# is retired and is never opened.
 os.environ.setdefault("APP_DB_PATH", DB_PATH)
-# A missing live DB is a valid first-run state.
 os.environ.setdefault("ALLOW_EMPTY_DB", "1")
 # The web process must not create scheduled backup/database copies.
 os.environ["BACKUP_EMBEDDED_SCHEDULER"] = "0"

@@ -455,7 +455,8 @@ basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 legacy_instance_dir = os.path.join(basedir, 'instance')
 os.makedirs(legacy_instance_dir, exist_ok=True)
 legacy_db_path = os.path.join(legacy_instance_dir, 'ahmed_cement.db')
-db_path = os.environ.get('APP_DB_PATH') or legacy_db_path
+v44_db_path = os.path.join(legacy_instance_dir, 'ahmed_cement_v44_fresh.db')
+db_path = os.environ.get('APP_DB_PATH') or v44_db_path
 _DB_HEALTH_SNAPSHOT_PATH = os.environ.get('DB_HEALTH_SNAPSHOT_PATH') or os.path.join(legacy_instance_dir, 'health_snapshot.json')
 _max_upload_mb = int(os.environ.get('MAX_UPLOAD_MB', '256') or '256')
 
