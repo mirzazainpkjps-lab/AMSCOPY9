@@ -8,8 +8,8 @@ from pathlib import Path
 os.environ["ALLOW_EMPTY_DB"] = "1"
 os.environ["ALLOW_DB_DROP"] = "1"
 
-ROOT = Path("/home/user")
-DB = ROOT / "instance" / "ahmed_cement.db"
+ROOT = Path(__file__).resolve().parents[1]
+DB = ROOT / "instance" / "ahmed_cement_v44_fresh.db"
 REPORT = ROOT / "SMOKE_TEST_REPORT.md"
 
 
@@ -395,7 +395,7 @@ def main():
     lines = [
         "# ERP smoke test report",
         "",
-        "Database wiped (`instance/ahmed_cement.db`) and rebuilt from HTTP posts.",
+        "Database wiped (`instance/ahmed_cement_v44_fresh.db`) and rebuilt from HTTP posts.",
         "",
         "## Flows posted",
         "- Client SMK-001 / Smoke Client",

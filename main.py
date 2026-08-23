@@ -184,7 +184,7 @@ def restore_instance_data(preserved):
         logger.warning(
             "Skipping instance restore because the preserve step did not "
             "complete. The git reset may have overwritten live data — "
-            "verify instance/ahmed_cement.db immediately."
+            "verify instance/ahmed_cement_v44_fresh.db immediately."
         )
         return
     try:

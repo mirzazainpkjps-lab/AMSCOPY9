@@ -1,6 +1,8 @@
 # v4.4 Bundle
 
-The v4.4 schema is now the default clean-install schema for the Flask app. A new installation uses `instance/ahmed_cement_v44_fresh.db`, loads the schema and its safety seeds, and does not read or import the historical live database. The legacy app tables are also created as a compatibility surface while screens are being moved to the v4.4 names.
+The v4.4 schema is the **only active runtime schema**. The Flask app opens `instance/ahmed_cement_v44_fresh.db`, loads `SCHEMA_v4_4.sql` and its safety seeds, and never reads or imports historical live data. Retired files (`instance/ahmed_cement.db`, migrated `ahmed_cement_v44.db`) are deleted on startup.
+
+Existing Flask screens still use the legacy ORM table names as an empty compatibility surface on top of the same file while those queries are moved to v4.4 names. There is no leftover business data.
 
 ## Files
 
@@ -24,7 +26,7 @@ The v4.4 schema is now the default clean-install schema for the Flask app. A new
 
 Only the v4.4 catalog seeds are present: 4 roles, 68 permissions, 12 wipe scopes, and one administrator. Clients, suppliers, materials, purchases, sales, bookings, payments, and all other business data start at zero. Existing files are never overwritten; a non-v4.4 file supplied through `APP_DB_PATH` is rejected.
 
-The historical `../instance/ahmed_cement.db` and migrated `../instance/ahmed_cement_v44.db` are untouched and are not used by default.
+Historical `ahmed_cement.db` and migrated `ahmed_cement_v44.db` are deleted on startup and are not used.
 
 ## What the v4.4 DB contains (from live data)
 

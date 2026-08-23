@@ -36,10 +36,15 @@ def create_app(test_config: dict | None = None) -> Flask:
     if schema_version in {"legacy", "v3", "live"}:
         default_db_name = "ahmed_cement.db"
     else:
-        # v4.4 is the clean-install default.  The historical live database is
-        # never implicitly opened or migrated.
+        # v4.4 is the only supported runtime schema.
         default_db_name = "ahmed_cement_v44_fresh.db"
+        schema_version = "v44"
     db_path = os.environ.get("APP_DB_PATH") or str(instance_dir / default_db_name)
+    # Never silently reopen the retired live/migrated databases.
+    if Path(db_path).name in {"ahmed_cement.db", "ahmed_cement_v44.db"} and schema_version == "v44":
+        db_path = str(instance_dir / default_db_name)
+    os.environ["AMS_SCHEMA_VERSION"] = schema_version
+    os.environ["APP_DB_PATH"] = db_path
     app_schema_version = schema_version
     # SQLite creates the database file on first connection, but it does not
     # create a missing custom parent directory.  Make a configured database
@@ -230,9 +235,11 @@ def create_app(test_config: dict | None = None) -> Flask:
     with app.app_context():
         try:
             from app.services import health as health_service
-            # Health protection must follow the configured v4.4 file, not the
-            # historical live path retained by legacy service constants.
+            from app.services import constants as constants_svc
+            # Health protection and service helpers must follow the configured
+            # v4.4 file, not a retired live path captured at import time.
             health_service.db_path = db_path
+            constants_svc.db_path = db_path
             from app.services.health import (
                 _guard_db_file_before_bootstrap,
                 _db_health_check_after_bootstrap,
@@ -248,9 +255,15 @@ def create_app(test_config: dict | None = None) -> Flask:
                 # rely on the documented Admin login even when no rows exist.
                 _ensure_default_admin()
             else:
+                if app.config.get("AMS_SCHEMA_VERSION") == "v44":
+                    from app.services.v44_schema import (
+                        initialize_v44_database,
+                        retire_legacy_database_files,
+                    )
+                    retire_legacy_database_files(instance_dir, extra_dirs=[root / "v44"])
+                    _retire_stale_live_health_snapshot(instance_dir / "health_snapshot.json")
                 _guard_db_file_before_bootstrap()
                 if app.config.get("AMS_SCHEMA_VERSION") == "v44":
-                    from app.services.v44_schema import initialize_v44_database
                     initialize_v44_database(
                         db_path,
                         default_user=(os.environ.get("DEFAULT_ADMIN_USER") or "Admin").strip() or "Admin",
@@ -306,6 +319,21 @@ def _on_network_filesystem(path: str) -> bool:
             if len(point) >= len(best_point):
                 best_point, best_type = point, fstype
     return best_type.lower() in _NETWORK_FILESYSTEMS
+
+
+def _retire_stale_live_health_snapshot(snapshot_path: Path) -> None:
+    """Drop a health snapshot that still describes the retired live database."""
+    if not snapshot_path.exists():
+        return
+    try:
+        import json
+        payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except Exception:
+        snapshot_path.unlink(missing_ok=True)
+        return
+    db_name = Path(str(payload.get("db_path") or "")).name
+    if db_name in {"ahmed_cement.db", "ahmed_cement_v44.db"} or int(payload.get("total") or 0) > 0:
+        snapshot_path.unlink(missing_ok=True)
 
 
 def _resolve_sqlite_journal_mode(db_path: str) -> str:

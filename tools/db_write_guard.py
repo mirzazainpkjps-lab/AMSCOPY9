@@ -46,7 +46,7 @@ _WRITE_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
-_PROD_DB_NAMES = {"ahmed_cement.db"}
+_PROD_DB_NAMES = {"ahmed_cement_v44_fresh.db", "ahmed_cement.db"}
 
 _guard_lock = threading.Lock()
 _original_execute: Callable | None = None

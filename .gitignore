@@ -1,6 +1,13 @@
 .venv/
 deployment.log
 .instance_preserve/
+instance/*.db
+instance/*.db-wal
+instance/*.db-shm
+instance/health_snapshot.json
+v44/*.db
+v44/*.db-wal
+v44/*.db-shm
 
 __pycache__/
 *.py[cod]

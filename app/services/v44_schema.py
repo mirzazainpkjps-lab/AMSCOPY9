@@ -13,8 +13,38 @@ from pathlib import Path
 from werkzeug.security import generate_password_hash
 
 
+RETIRED_DB_NAMES = (
+    "ahmed_cement.db",
+    "ahmed_cement.db-wal",
+    "ahmed_cement.db-shm",
+    "ahmed_cement_v44.db",
+    "ahmed_cement_v44.db-wal",
+    "ahmed_cement_v44.db-shm",
+)
+
+
 def schema_path() -> Path:
     return Path(__file__).resolve().parents[2] / "v44" / "SCHEMA_v4_4.sql"
+
+
+def retire_legacy_database_files(instance_dir, extra_dirs=None) -> list[str]:
+    """Permanently remove retired live/migrated SQLite files.
+
+    v4.4 is a clean install. Historical business data is not imported.
+    """
+    removed: list[str] = []
+    roots = [Path(instance_dir)]
+    for extra in extra_dirs or []:
+        roots.append(Path(extra))
+    for root in roots:
+        if not root.exists():
+            continue
+        for name in RETIRED_DB_NAMES:
+            path = root / name
+            if path.exists() or path.is_symlink():
+                path.unlink()
+                removed.append(str(path))
+    return removed
 
 
 def is_v44_database(connection: sqlite3.Connection) -> bool:
