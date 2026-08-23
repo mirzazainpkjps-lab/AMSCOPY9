@@ -30,7 +30,13 @@ app = create_app()
 # IMPORTANT:
 # Use a NEW token. Do not use the old token you exposed.
 #
-WEBHOOK_TOKEN = "PakistanZindabad1947-2026"
+# Prefer the AMS_WEBHOOK_TOKEN environment variable. The literal below is
+# only a fallback for existing deployments — a token committed to the
+# repository is public, so set the environment variable and rotate it.
+WEBHOOK_TOKEN = (
+    os.environ.get("AMS_WEBHOOK_TOKEN")
+    or "PakistanZindabad1947-2026"
+)
 
 
 # 2. ENTER YOUR PYTHONANYWHERE WSGI FILE PATH HERE
@@ -534,9 +540,14 @@ def git_auto_pull():
 
 if __name__ == "__main__":
 
+    # Werkzeug's debugger allows arbitrary code execution for anyone who can
+    # reach the port, and this server binds 0.0.0.0 (the whole LAN).  Keep it
+    # off unless AMS_DEBUG=1 is set explicitly.
+    debug_mode = (os.environ.get("AMS_DEBUG") or "").strip() == "1"
+
     app.run(
         host="0.0.0.0",
-        port=5000,
-        debug=True,
+        port=int(os.environ.get("PORT", "5000") or "5000"),
+        debug=debug_mode,
         use_reloader=False,
     )

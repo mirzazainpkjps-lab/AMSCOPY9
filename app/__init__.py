@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import secrets
 import logging
+import traceback
 from logging.handlers import RotatingFileHandler
 from datetime import timedelta
 from pathlib import Path
@@ -264,15 +265,39 @@ def create_app(test_config: dict | None = None) -> Flask:
                     _retire_stale_live_health_snapshot(instance_dir / "health_snapshot.json")
                 _guard_db_file_before_bootstrap()
                 if app.config.get("AMS_SCHEMA_VERSION") == "v44":
-                    initialize_v44_database(
-                        db_path,
-                        default_user=(os.environ.get("DEFAULT_ADMIN_USER") or "Admin").strip() or "Admin",
-                        default_password=(os.environ.get("DEFAULT_ADMIN_PASSWORD") or "Admin@fbm12345").strip() or "Admin@fbm12345",
-                    )
+                    # The optional v4.4 SQL bundle is a *nice to have*: it seeds
+                    # the new roles/permissions tables.  It must never be able to
+                    # abort the ORM bootstrap below, because that leaves the
+                    # database without the `user` table and every login POST
+                    # then dies with "no such table: user" (HTTP 500).
+                    try:
+                        initialize_v44_database(
+                            db_path,
+                            default_user=(os.environ.get("DEFAULT_ADMIN_USER") or "Admin").strip() or "Admin",
+                            default_password=(os.environ.get("DEFAULT_ADMIN_PASSWORD") or "Admin@fbm12345").strip() or "Admin@fbm12345",
+                        )
+                    except Exception:
+                        logging.getLogger(__name__).warning(
+                            "v4.4 schema bootstrap skipped; continuing with the "
+                            "ORM schema bootstrap.",
+                            exc_info=True,
+                        )
                 _bootstrap_database()
-                _db_health_check_after_bootstrap()
+                try:
+                    _db_health_check_after_bootstrap()
+                except Exception:
+                    # A health *report* failure must not leave the app running
+                    # against a half-bootstrapped database.
+                    logging.getLogger(__name__).warning(
+                        "Post-bootstrap DB health check failed", exc_info=True
+                    )
         except Exception:
-            logging.getLogger(__name__).exception("bootstrap skipped/failed")
+            logging.getLogger(__name__).critical(
+                "DATABASE BOOTSTRAP FAILED — the application will return HTTP 500 "
+                "on any page that touches the database.",
+                exc_info=True,
+            )
+            app.config["AMS_BOOTSTRAP_ERROR"] = traceback.format_exc()
 
     # Start once at application startup, never from a user request. The
     # cross-process filesystem lock prevents duplicate work under Gunicorn.

@@ -26,7 +26,23 @@ def login():
         username_norm = username.lower()
         password = str(request.form.get('password') or '')
         remember = (request.form.get('remember_me') or '').lower() in ('1', 'true', 'on', 'yes')
-        user = User.query.filter(func.lower(func.trim(User.username)) == username_norm).order_by(User.id.asc()).first()
+        user = None
+        try:
+            user = User.query.filter(func.lower(func.trim(User.username)) == username_norm).order_by(User.id.asc()).first()
+        except Exception:
+            # e.g. a database that failed to bootstrap ("no such table: user").
+            # Show an actionable message instead of a bare HTTP 500.
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            logging.getLogger('auth').exception("Login lookup failed")
+            flash(
+                'Login is temporarily unavailable because the database could not '
+                'be read. Please contact the administrator.',
+                'danger',
+            )
+            return render_template('login.html'), 503
 
         def _verify_and_upgrade_password(u, raw_password):
             raw_password = str(raw_password or '')
@@ -80,8 +96,19 @@ def login():
             login_user(user, remember=True)
             session.permanent = True
             session['role'] = user.role
-            from utils.sessions import open_login_session
-            open_login_session(user)
+            # Session bookkeeping is best-effort: a failure here must never
+            # turn a successful login into an HTTP 500.
+            try:
+                from utils.sessions import open_login_session
+                open_login_session(user)
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                logging.getLogger('auth').exception(
+                    "Could not record the login session for %s", user.username
+                )
             next_url = request.args.get('next') or ''
             if not next_url.startswith('/') or next_url.startswith('//'):
                 next_url = ''
