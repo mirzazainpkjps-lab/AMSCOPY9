@@ -110,7 +110,28 @@ def _can_manage_categories():
 
 
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    """Resolve the session user id to a User row.
+
+    Flask-Login calls this on every request, and any exception raised here
+    becomes an HTTP 500 on every page *after* login — with a stale cookie the
+    user cannot even reach the login page again.  A session id that is not a
+    valid integer (older cookie format, tampered cookie) or a transient DB
+    error must simply mean "not logged in".
+    """
+    try:
+        uid = int(str(user_id).strip())
+    except (TypeError, ValueError):
+        logging.getLogger("auth").warning("Ignoring malformed session user id %r", user_id)
+        return None
+    try:
+        return db.session.get(User, uid)
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        logging.getLogger("auth").exception("Could not load user id %s", uid)
+        return None
 
 
 def _permissions_from_request_form():

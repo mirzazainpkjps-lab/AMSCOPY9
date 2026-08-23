@@ -22,7 +22,9 @@ MODULE_CONFIG = {
     'name': 'Module Display Name',
     'description': 'Brief description of what this module does',
     'url_prefix': '/module_name',  # Change this to your URL prefix
-    'enabled': True,
+    # This file is a copy-me scaffold, not a real feature: its routes render
+    # templates that do not exist.  Keep it disabled so it is never mounted.
+    'enabled': False,
     'version': '1.0.0',
     'author': 'Your Name',
     'requires_login': True,

@@ -48,9 +48,16 @@ def load_modules(app, blueprint_dir="blueprints"):
         found = [obj for _, obj in inspect.getmembers(module) if isinstance(obj, Blueprint)]
         if not found:
             continue
+        module_config = getattr(module, "MODULE_CONFIG", None) or {}
+        # MODULE_CONFIG['enabled'] is documented in the module template but was
+        # ignored, so scaffolding/disabled modules were still mounted and their
+        # placeholder routes returned HTTP 500.
+        if module_config.get("enabled") is False:
+            logger.info("Skipping disabled module '%s'", module_name)
+            continue
         for blueprint in found:
             url_prefix = f"/{blueprint.name}"
-            config = getattr(module, "MODULE_CONFIG", None) or {}
+            config = module_config
             if "url_prefix" in config:
                 url_prefix = config["url_prefix"]
             if blueprint.name in app.blueprints:

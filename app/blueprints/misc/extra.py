@@ -1,5 +1,6 @@
 """extra — split from misc.py."""
 from ._common import *  # noqa
+from flask import current_app
 
 @bp.route('/toggle_bill_paid/<int:id>', methods=['POST'])
 @login_required
@@ -49,7 +50,16 @@ def fix_system_issues():
 @bp.route('/uploads/<path:filename>')
 @login_required
 def uploaded_file(filename):
-    upload_dir = os.path.join(basedir, 'static', 'uploads')
+    # ``basedir`` is not imported in this module; referencing it raised
+    # NameError -> HTTP 500 for every uploaded attachment.  Use the
+    # configured upload directory instead (same default path).
+    upload_dir = current_app.config.get('UPLOAD_DIR') or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))))),
+        'static', 'uploads',
+    )
+    if not os.path.isdir(upload_dir):
+        abort(404)
     return send_from_directory(upload_dir, filename)
 
 

@@ -280,14 +280,32 @@ def register_hooks(app):
                 not isinstance(cache_obj, dict)
                 or (now_ts - float(cache_obj.get('ts', 0) or 0)) > cache_ttl
             ):
-                cache_obj = {
-                    'ts': now_ts,
-                    'clients': Client.query.filter_by(is_active=True).order_by(Client.name.asc()).all(),
-                    'materials': Material.query.order_by(Material.name.asc()).all(),
-                    'delivery_persons': DeliveryPerson.query.filter_by(is_active=True).order_by(DeliveryPerson.name.asc()).all(),
-                    'settings': Settings.query.first(),
-                }
-                app._dropdown_cache = cache_obj
+                # This context processor feeds the shared layout, so it runs for
+                # EVERY authenticated page.  An unhandled DB error here turned
+                # every page after login into an HTTP 500 (the classic
+                # "login works, then 500" report).  Degrade to empty dropdowns
+                # instead and log the cause.
+                try:
+                    cache_obj = {
+                        'ts': now_ts,
+                        'clients': Client.query.filter_by(is_active=True).order_by(Client.name.asc()).all(),
+                        'materials': Material.query.order_by(Material.name.asc()).all(),
+                        'delivery_persons': DeliveryPerson.query.filter_by(is_active=True).order_by(DeliveryPerson.name.asc()).all(),
+                        'settings': Settings.query.first(),
+                    }
+                    app._dropdown_cache = cache_obj
+                except Exception:
+                    try:
+                        from models import db as _db
+                        _db.session.rollback()
+                    except Exception:
+                        pass
+                    logging.getLogger('app').exception(
+                        "Could not load shared dropdown data; rendering the page "
+                        "with empty dropdowns."
+                    )
+                    cache_obj = {'ts': 0, 'clients': [], 'materials': [],
+                                 'delivery_persons': [], 'settings': None}
             return dict(
                 clients=cache_obj.get('clients') or [],
                 materials=cache_obj.get('materials') or [],
