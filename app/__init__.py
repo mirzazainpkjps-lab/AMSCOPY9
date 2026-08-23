@@ -32,7 +32,15 @@ def create_app(test_config: dict | None = None) -> Flask:
     (tmp_dir / "import_uploads").mkdir(parents=True, exist_ok=True)
     (tmp_dir / "import_reports").mkdir(parents=True, exist_ok=True)
 
-    db_path = os.environ.get("APP_DB_PATH") or str(instance_dir / "ahmed_cement.db")
+    schema_version = (os.environ.get("AMS_SCHEMA_VERSION") or "v44").strip().lower()
+    if schema_version in {"legacy", "v3", "live"}:
+        default_db_name = "ahmed_cement.db"
+    else:
+        # v4.4 is the clean-install default.  The historical live database is
+        # never implicitly opened or migrated.
+        default_db_name = "ahmed_cement_v44_fresh.db"
+    db_path = os.environ.get("APP_DB_PATH") or str(instance_dir / default_db_name)
+    app_schema_version = schema_version
     # SQLite creates the database file on first connection, but it does not
     # create a missing custom parent directory.  Make a configured database
     # path just as safe as the default instance path on a fresh installation.
@@ -67,6 +75,9 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.config.update(
         SECRET_KEY=secret,
         SQLALCHEMY_DATABASE_URI=f"sqlite:///{db_path}",
+        AMS_SCHEMA_VERSION=app_schema_version,
+        APP_DB_PATH=db_path,
+        AMS_V44_SCHEMA_PATH=str(root / "v44" / "SCHEMA_v4_4.sql"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SQLITE_JOURNAL_MODE=journal_mode,
         MAX_CONTENT_LENGTH=max_upload_mb * 1024 * 1024,
@@ -218,6 +229,10 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     with app.app_context():
         try:
+            from app.services import health as health_service
+            # Health protection must follow the configured v4.4 file, not the
+            # historical live path retained by legacy service constants.
+            health_service.db_path = db_path
             from app.services.health import (
                 _guard_db_file_before_bootstrap,
                 _db_health_check_after_bootstrap,
@@ -234,6 +249,13 @@ def create_app(test_config: dict | None = None) -> Flask:
                 _ensure_default_admin()
             else:
                 _guard_db_file_before_bootstrap()
+                if app.config.get("AMS_SCHEMA_VERSION") == "v44":
+                    from app.services.v44_schema import initialize_v44_database
+                    initialize_v44_database(
+                        db_path,
+                        default_user=(os.environ.get("DEFAULT_ADMIN_USER") or "Admin").strip() or "Admin",
+                        default_password=(os.environ.get("DEFAULT_ADMIN_PASSWORD") or "Admin@fbm12345").strip() or "Admin@fbm12345",
+                    )
                 _bootstrap_database()
                 _db_health_check_after_bootstrap()
         except Exception:
