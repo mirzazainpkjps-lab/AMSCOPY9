@@ -1,6 +1,6 @@
 # v4.4 Bundle
 
-Everything from the v3 → v4.4 schema redesign, migrated database, and full design conversation. Nothing here is wired into the app yet — this folder is a staging area for you to review and decide when to switch over.
+The v4.4 schema is now the default clean-install schema for the Flask app. A new installation uses `instance/ahmed_cement_v44_fresh.db`, loads the schema and its safety seeds, and does not read or import the historical live database. The legacy app tables are also created as a compatibility surface while screens are being moved to the v4.4 names.
 
 ## Files
 
@@ -14,9 +14,17 @@ Everything from the v3 → v4.4 schema redesign, migrated database, and full des
 | `ahmed_cement_v44.db` | The migrated v4.4 database. 3.7 MB, 63 tables populated with your live data. |
 | `CHAT_LOG_FULL.md` | Full verbatim transcript of the v3 → v4.4 design conversation, all questions asked and decisions made. |
 
-## Live DB status
+## Fresh-install behavior
 
-`../instance/ahmed_cement.db` — **untouched.** The app is still running against it.
+- Default mode: `AMS_SCHEMA_VERSION=v44`
+- Default file: `instance/ahmed_cement_v44_fresh.db`
+- Override file: `APP_DB_PATH=/absolute/path/to/empty.db`
+- Legacy mode, for rollback only: `AMS_SCHEMA_VERSION=legacy`
+- Default login: `Admin` / `Admin@fbm12345` (override with `DEFAULT_ADMIN_USER` and `DEFAULT_ADMIN_PASSWORD`)
+
+Only the v4.4 catalog seeds are present: 4 roles, 68 permissions, 12 wipe scopes, and one administrator. Clients, suppliers, materials, purchases, sales, bookings, payments, and all other business data start at zero. Existing files are never overwritten; a non-v4.4 file supplied through `APP_DB_PATH` is rejected.
+
+The historical `../instance/ahmed_cement.db` and migrated `../instance/ahmed_cement_v44.db` are untouched and are not used by default.
 
 ## What the v4.4 DB contains (from live data)
 
