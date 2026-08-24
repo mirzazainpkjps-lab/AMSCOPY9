@@ -228,6 +228,7 @@ function submitCancelSelection{{ client.id }}() {
                     <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50 ledger-col-date">Date</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50 ledger-col-desc">Description</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50 ledger-col-bill">Bill #</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Notes</th>
                     <th class="fw-bold py-3 text-end border-bottom border-secondary text-white-50">Due Amount</th>
                     <th class="fw-bold py-3 text-end border-bottom border-secondary text-white-50">Paid Amount</th>
                     <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Pending Amount</th>
@@ -267,6 +268,7 @@ function submitCancelSelection{{ client.id }}() {
                         <span class="badge bg-dark border border-secondary text-white-50">---</span>
                         {% endif %}
                     </td>
+                    <td data-label="Notes"><span class="small text-white-50" title="{{ t.note or '' }}">{{ t.note or '—' }}</span></td>
                     <td class="text-end text-danger fw-bold" data-label="Due Amount">{{ "{:,.3f}".format(t.debit).rstrip('0').rstrip('.') if t.debit > 0 else '---' }}</td>
                     <td class="text-end text-success fw-bold" data-label="Paid Amount">{{ "{:,.3f}".format(t.credit).rstrip('0').rstrip('.') if t.credit > 0 else '---' }}</td>
                     <td class="text-end pe-4 fw-bold text-white" data-label="Pending">{{ "{:,.3f}".format(t.balance).rstrip('0').rstrip('.') }}</td>

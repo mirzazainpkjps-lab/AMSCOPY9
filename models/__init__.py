@@ -10,6 +10,7 @@ from .delivery import *  # noqa
 from .ops_meta import *  # noqa
 from .rentals import *  # noqa
 from .imports import *  # noqa
+from .migration import *  # noqa
 from .events import *  # noqa
 
 import sys as _sys

@@ -559,6 +559,9 @@
                 <a href="{{ url_for('import_export.import_export_page') }}" class="nav-link {{ 'active' if request.path.startswith('/import_export') }}" onclick="closeSidebar()">
                     <i class="bi bi-arrow-left-right"></i> Import & Export
                 </a>
+                <a href="{{ url_for('legacy_migration.dashboard') }}" class="nav-link {{ 'active' if request.path.startswith('/legacy-migration') }}" onclick="closeSidebar()">
+                    <i class="bi bi-database-gear"></i> Legacy Data Migration
+                </a>
                 {% endif %}
 
                 {% if current_user.can_manage_materials or current_user.can_manage_delivery_persons or current_user.role == 'admin' %}
