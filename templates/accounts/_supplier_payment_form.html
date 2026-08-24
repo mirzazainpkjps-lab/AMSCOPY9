@@ -2,6 +2,7 @@
   Shared Supplier Payment form — used for BOTH Create and Edit.
   - Create: payment_id empty.
   - Edit:   JS populates the fields from /accounts/payments/suppliers/<id>/data.
+  Field sizes made consistent with client payment form.
 #}
 {% from 'accounts/_entity_combobox.html' import entity_combobox %}
 <form id="supplierPaymentForm" class="modal-content border-secondary ui-helper-form" style="background: #1e293b;"
@@ -16,41 +17,52 @@
     </div>
     <div class="modal-body">
         <div class="row gy-3">
-            <div class="col-md-6">
+            <!-- Row 1: Supplier + Amount – same sizing as client (8+4) -->
+            <div class="col-md-8">
                 {{ entity_combobox('spSupplier', supplier_options, code_attr='id', name_attr='name',
                                    value_input_id='supplier_id', name_input_id='supplier_name',
                                    label='Supplier', placeholder='Search by name…', required=True) }}
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label class="form-label fw-semibold">Amount <span class="text-danger">*</span></label>
                 <input type="number" step="0.01" min="0" name="amount" id="spAmount"
-                       class="form-control bg-dark text-white border-secondary" required placeholder="0.00">
+                       class="form-control bg-dark text-white border-secondary fw-bold" required placeholder="0.00" style="min-height: 42px; font-size: 1.05rem;">
             </div>
-            <div class="col-md-6">
+
+            <!-- Row 2: Method + Account – identical to client -->
+            <div class="col-md-4">
                 <label class="form-label fw-semibold">Method <span class="text-danger">*</span></label>
-                <select name="method" id="spMethod" class="form-select bg-dark text-white border-secondary">
+                <select name="method" id="spMethod" class="form-select bg-dark text-white border-secondary" style="min-height: 42px;">
                     {% for m in ['Cash','Bank','Check','Card','Online'] %}
                     <option value="{{ m }}" {% if m == 'Cash' %}selected{% endif %}>{{ m }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-8">
                 {{ entity_combobox('spAccount', account_options, code_attr='id', name_attr='label',
                                    value_input_id='payment_account_id',
                                    label='Pay From Account', placeholder='Search by account, bank, or number…', required=True) }}
             </div>
-            <div class="col-md-6">
+
+            <!-- Row 3: References – same 4+4+4 layout as client -->
+            <div class="col-md-4">
                 <label class="form-label fw-semibold">Bill / Voucher Reference</label>
                 <input type="text" name="manual_bill_no" id="spManualBillNo"
-                       class="form-control bg-dark text-white border-secondary" placeholder="e.g. PV-1234">
+                       class="form-control bg-dark text-white border-secondary" placeholder="e.g. PV-1234" maxlength="50" style="min-height: 42px;">
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label class="form-label fw-semibold">Transaction Date</label>
-                <input type="date" name="date" id="spDate" class="form-control bg-dark text-white border-secondary">
+                <input type="date" name="date" id="spDate" class="form-control bg-dark text-white border-secondary" style="min-height: 42px;">
             </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Note Hint</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" value="Supplier payment" disabled style="min-height: 42px;">
+            </div>
+
+            <!-- Row 4: Note full width – same as client -->
             <div class="col-12">
                 <label class="form-label fw-semibold">Note</label>
-                <textarea name="note" id="spNote" rows="2" class="form-control bg-dark text-white border-secondary"></textarea>
+                <textarea name="note" id="spNote" rows="3" maxlength="500" class="form-control bg-dark text-white border-secondary" placeholder="Optional note…" style="min-height: 72px;"></textarea>
             </div>
         </div>
     </div>

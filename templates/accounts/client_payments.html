@@ -7,13 +7,24 @@
 {% from 'accounts/_entity_combobox.html' import entity_combobox %}
 <style>
 .acc-page-header{ background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(56,189,248,0.18)); }
+.filter-bar .form-control, .filter-bar .form-select{ min-height: 38px; font-size: 0.875rem; }
+.filter-bar .combo-wrap{ min-width: 220px; }
+.filter-bar .date-wrap{ min-width: 145px; max-width: 170px; }
+.filter-bar .method-wrap{ min-width: 115px; max-width: 135px; }
+.filter-bar .rows-wrap{ min-width: 80px; max-width: 90px; }
+.filter-bar .search-wrap{ min-width: 200px; flex: 1 1 220px; }
+@media (max-width: 768px){
+  .filter-bar .combo-wrap{ min-width: 100%; }
+  .filter-bar .date-wrap{ min-width: calc(50% - 5px); max-width: calc(50% - 5px); }
+  .filter-bar .search-wrap{ min-width: 100%; }
+}
 </style>
 
 <div class="container-fluid">
     <div class="acc-page-header">
         <div>
             <h2><i class="bi bi-people-fill me-2 text-success"></i>Client Payments</h2>
-            <div class="subtitle">Money received from clients.</div>
+            <div class="subtitle">Money received from clients. Filters work together – date, client, account, method, type & search.</div>
         </div>
         <div class="acc-toolbar">
             <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
@@ -31,28 +42,35 @@
     <div class="acc-section-card">
         <form class="filter-bar align-items-end" method="get">
             <input type="hidden" name="show" value="{{ show_mode }}">
-            <div><label>From</label><input type="date" name="from" class="form-control form-control-sm" value="{{ date_from.strftime('%Y-%m-%d') }}"></div>
-            <div><label>To</label><input type="date" name="to" class="form-control form-control-sm" value="{{ date_to.strftime('%Y-%m-%d') }}"></div>
-            <div style="min-width:210px">{{ entity_combobox('cpFilterClient', filter_party_options, code_attr='id', name_attr='label', value_input_id='party_id', label='Client', selected_code=party_id_f or '', selected_name=filter_party_name, placeholder='All clients…') }}</div>
-            <div style="min-width:240px">{{ entity_combobox('cpFilterAccount', filter_account_options, code_attr='id', name_attr='label', value_input_id='account_id', label='Account', selected_code=account_id_f or '', selected_name=filter_account_name, placeholder='All accounts…') }}</div>
-            <div><label>Method</label>
+            <div class="date-wrap"><label>From</label><input type="date" name="from" class="form-control form-control-sm" value="{{ date_from.strftime('%Y-%m-%d') }}"></div>
+            <div class="date-wrap"><label>To</label><input type="date" name="to" class="form-control form-control-sm" value="{{ date_to.strftime('%Y-%m-%d') }}"></div>
+            <div class="combo-wrap">{{ entity_combobox('cpFilterClient', filter_party_options, code_attr='id', name_attr='label', value_input_id='party_id', label='Client', selected_code=party_id_f or '', selected_name=filter_party_name, placeholder='All clients…') }}</div>
+            <div class="combo-wrap">{{ entity_combobox('cpFilterAccount', filter_account_options, code_attr='id', name_attr='label', value_input_id='account_id', label='Account', selected_code=account_id_f or '', selected_name=filter_account_name, placeholder='All accounts…') }}</div>
+            <div class="method-wrap"><label>Method</label>
                 <select name="method" class="form-select form-select-sm">
-                    <option value="">All</option>
+                    <option value="">All Methods</option>
                     {% for m in ['Cash','Bank','Check','Card','Online'] %}<option value="{{ m }}" {% if m==method_f %}selected{% endif %}>{{ m }}</option>{% endfor %}
                 </select>
             </div>
-            <div><label>Rows</label><select name="per_page" class="form-select form-select-sm">{% for n in [10,25,50,100] %}<option value="{{ n }}" {% if per_page==n %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
-            <div class="flex-grow-1"><label>Search</label><input type="search" name="q" class="form-control form-control-sm" placeholder="Name, bill, reference, account, note…" value="{{ search }}"></div>
-            <div><button class="btn btn-sm btn-success"><i class="bi bi-funnel me-1"></i>Apply</button></div>
-            <div><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('accounts.client_payments') }}">Reset</a></div>
+            <div class="method-wrap"><label>Type</label>
+                <select name="payment_type" class="form-select form-select-sm">
+                    <option value="">All Types</option>
+                    <option value="Receipt" {% if payment_type_f=='Receipt' %}selected{% endif %}>Receipt</option>
+                    <option value="Refund" {% if payment_type_f=='Refund' %}selected{% endif %}>Refund</option>
+                    <option value="Waive-Off" {% if payment_type_f=='Waive-Off' %}selected{% endif %}>Waive-Off</option>
+                </select>
+            </div>
+            <div class="rows-wrap"><label>Rows</label><select name="per_page" class="form-select form-select-sm">{% for n in [10,25,50,100] %}<option value="{{ n }}" {% if per_page==n %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+            <div class="search-wrap"><label>Search</label><input type="search" name="q" class="form-control form-control-sm" placeholder="Name, code, bill, account, note…" value="{{ search }}"></div>
+            <div class="d-flex gap-1 align-items-end"><button class="btn btn-sm btn-success"><i class="bi bi-funnel me-1"></i>Apply</button><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('accounts.client_payments') }}">Reset</a></div>
         </form>
 
-        <div class="filter-bar">
+        <div class="filter-bar py-2">
             <div><label>Status</label>
                 <div class="btn-group" role="group">
-                    <a href="{{ url_for('accounts.client_payments', show='active', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'active' %}btn-success text-dark{% else %}btn-outline-success{% endif %}">Active</a>
-                    <a href="{{ url_for('accounts.client_payments', show='voided', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'voided' %}btn-danger{% else %}btn-outline-danger{% endif %}">Deleted</a>
-                    <a href="{{ url_for('accounts.client_payments', show='all', from=date_from.strftime('%Y-%m-%d'), to=date_to.strftime('%Y-%m-%d'), q=search, method=method_f, party_id=party_id_f or '', account_id=account_id_f or '', per_page=per_page) }}" class="btn btn-sm {% if show_mode == 'all' %}btn-info text-dark{% else %}btn-outline-info{% endif %}">All</a>
+                    <a href="{{ url_for('accounts.client_payments', show='active', **{'from': date_from.strftime('%Y-%m-%d'), 'to': date_to.strftime('%Y-%m-%d'), 'q': search, 'method': method_f, 'payment_type': payment_type_f, 'party_id': party_id_f or '', 'account_id': account_id_f or '', 'per_page': per_page}) }}" class="btn btn-sm {% if show_mode == 'active' %}btn-success text-dark{% else %}btn-outline-success{% endif %}">Active</a>
+                    <a href="{{ url_for('accounts.client_payments', show='voided', **{'from': date_from.strftime('%Y-%m-%d'), 'to': date_to.strftime('%Y-%m-%d'), 'q': search, 'method': method_f, 'payment_type': payment_type_f, 'party_id': party_id_f or '', 'account_id': account_id_f or '', 'per_page': per_page}) }}" class="btn btn-sm {% if show_mode == 'voided' %}btn-danger{% else %}btn-outline-danger{% endif %}">Deleted</a>
+                    <a href="{{ url_for('accounts.client_payments', show='all', **{'from': date_from.strftime('%Y-%m-%d'), 'to': date_to.strftime('%Y-%m-%d'), 'q': search, 'method': method_f, 'payment_type': payment_type_f, 'party_id': party_id_f or '', 'account_id': account_id_f or '', 'per_page': per_page}) }}" class="btn btn-sm {% if show_mode == 'all' %}btn-info text-dark{% else %}btn-outline-info{% endif %}">All</a>
                 </div>
             </div>
             {% if payments_readonly %}
@@ -63,29 +81,29 @@
         <div class="table-responsive">
             <table class="table acc-table align-middle mb-0">
                 <thead><tr>
-                    <th style="width:140px">Date</th><th>Client</th><th>Type</th><th>Account</th>
-                    <th class="text-end">Amount</th><th>Method</th><th>Bill #</th><th>Note</th><th class="text-end">Actions</th>
+                    <th style="width:135px">Date</th><th style="min-width:160px">Client</th><th style="width:110px">Type</th><th style="min-width:160px">Account</th>
+                    <th class="text-end" style="width:125px">Amount</th><th style="width:90px">Method</th><th style="width:110px">Bill #</th><th>Note</th><th class="text-end" style="width:140px">Actions</th>
                 </tr></thead>
                 <tbody>
                 {% for p in payments.items %}
                 <tr class="{% if p.is_void %}table-danger{% endif %}">
                     <td class="small">{{ p.date_posted.strftime('%Y-%m-%d %H:%M') }}</td>
-                    <td><strong>{{ p.client_name }}</strong>{% if p.is_void %} <span class="badge bg-danger ms-1">VOIDED</span>{% endif %}</td>
+                    <td><strong class="d-block text-truncate" style="max-width:180px;" title="{{ p.client_name }}">{{ p.client_name }}</strong>{% if p.is_void %} <span class="badge bg-danger ms-1">VOIDED</span>{% endif %}</td>
                     {% set meta = payment_meta.get(p.id, {}) %}
                     <td><span class="tiny-pill {% if meta.kind == 'Refund' %}badge-soft-rose{% elif meta.kind == 'Material Return' %}badge-soft-amber{% else %}badge-soft-emerald{% endif %}">{{ meta.kind or 'Receipt' }}</span>{% if meta.source_type %}<div class="small text-muted">{{ meta.source_type }} #{{ meta.source_id }}</div>{% endif %}</td>
-                    <td>{{ p.payment_account.name if p.payment_account else (p.account_name or '—') }}</td>
+                    <td><span class="small text-truncate d-block" style="max-width:180px;" title="{{ p.payment_account.name if p.payment_account else (p.account_name or '') }}">{{ p.payment_account.name if p.payment_account else (p.account_name or '—') }}</span></td>
                     <td class="text-end fw-bold {% if p.amount < 0 or p.is_void %}text-danger{% else %}text-success{% endif %}">Rs. {{ "%+.2f"|format(p.amount) }}</td>
                     <td><span class="badge bg-secondary">{{ p.method }}</span></td>
                     <td class="small">{{ p.manual_bill_no or p.auto_bill_no or '' }}</td>
-                    <td class="small text-muted">{{ p.note or '' }}</td>
+                    <td class="small text-muted"><span class="d-block text-truncate" style="max-width:220px;" title="{{ p.note or '' }}">{{ p.note or '' }}</span></td>
                     <td class="text-end text-nowrap">
                         <a href="{{ url_for('view_bill_detail', type='Payment', id=p.id) }}" class="btn btn-outline-info btn-sm me-1" title="View"><i class="bi bi-eye"></i></a>
                         {% if meta.source_type == 'MaterialReturn' %}
                             <a href="{{ url_for('material_returns_page', edit_id=meta.source_id) }}" class="btn btn-outline-warning btn-sm" title="Open the controlling material return"><i class="bi bi-box-arrow-up-right"></i></a>
                         {% elif not payments_readonly and not p.is_void %}
-                            <button type="button" class="btn btn-outline-warning btn-sm me-1" title="Edit in the shared payment form" onclick="openClientPaymentModal({{ p.id }})"><i class="bi bi-pencil-square"></i></button>
+                            <button type="button" class="btn btn-outline-warning btn-sm me-1" title="Edit" onclick="openClientPaymentModal({{ p.id }})"><i class="bi bi-pencil-square"></i></button>
                             <form id="voidPaymentForm{{ p.id }}" action="{{ url_for('accounts.client_payment_void', id=p.id) }}" method="POST" class="d-inline"></form>
-                            <button type="button" class="btn btn-outline-danger btn-sm me-1" title="Delete / reverse" onclick="if(confirm('Delete this payment? Its accounting effects will be reversed and its audit history retained.')) { document.getElementById('voidPaymentForm{{ p.id }}').submit(); }"><i class="bi bi-trash"></i></button>
+                            <button type="button" class="btn btn-outline-danger btn-sm me-1" title="Delete" onclick="if(confirm('Delete this payment? Its accounting effects will be reversed and its audit history retained.')) { document.getElementById('voidPaymentForm{{ p.id }}').submit(); }"><i class="bi bi-trash"></i></button>
                         {% elif not payments_readonly and p.is_void %}
                             <form action="{{ url_for('accounts.client_payment_restore', id=p.id) }}" method="POST" class="d-inline">
                                 <button class="btn btn-outline-success btn-sm me-1" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
@@ -94,14 +112,14 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="9" class="empty-state"><i class="bi bi-inbox"></i><div class="mt-2">No payments in this range.</div></td></tr>
+                <tr><td colspan="9" class="empty-state"><i class="bi bi-inbox"></i><div class="mt-2">No payments in this range. Try widening dates or clearing filters.</div></td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
 
         {% if payments.pages > 1 %}
-        {% set page_args = {'show':show_mode,'from':date_from.strftime('%Y-%m-%d'),'to':date_to.strftime('%Y-%m-%d'),'q':search,'method':method_f,'party_id':party_id_f or '','account_id':account_id_f or '','per_page':per_page} %}
+        {% set page_args = {'show':show_mode,'from':date_from.strftime('%Y-%m-%d'),'to':date_to.strftime('%Y-%m-%d'),'q':search,'method':method_f,'payment_type':payment_type_f,'party_id':party_id_f or '','account_id':account_id_f or '','per_page':per_page} %}
         <nav class="p-3" aria-label="Client payment pages"><ul class="pagination pagination-sm justify-content-center mb-0">
             <li class="page-item {% if not payments.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.client_payments', page=1, **page_args) }}" aria-label="First">«</a></li>
             <li class="page-item {% if not payments.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('accounts.client_payments', page=payments.prev_num or 1, **page_args) }}">Previous</a></li>
