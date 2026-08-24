@@ -1,6 +1,10 @@
 """pages — split from import_export.py."""
 from ._common import *  # noqa
 
+# Shared PDF exporter (WeasyPrint -> ReportLab fallback).  Not re-exported by
+# this package's wiring, so import it explicitly.
+from app.services.files_pdf import _try_render_weasy_pdf
+
 @import_export_bp.route('/export', methods=['GET'])
 @login_required
 def export_data():
@@ -195,11 +199,14 @@ def export_data():
         {df.to_html(index=False)}
         </body></html>
         """
-        try:
-            from flask_weasyprint import HTML, render_pdf
-            return render_pdf(HTML(string=html), download_name=_download_filename(section, 'pdf'))
-        except:
-            return "PDF generation not available", 500
+        # Shared exporter: WeasyPrint when usable, otherwise the ReportLab
+        # fallback.  Either way the user receives a real PDF instead of a 500.
+        pdf_response = _try_render_weasy_pdf(
+            html, _download_filename(section, 'pdf'), disposition='attachment'
+        )
+        if pdf_response is not None:
+            return pdf_response
+        return "PDF generation not available", 500
     else:
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:

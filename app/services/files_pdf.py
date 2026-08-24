@@ -115,8 +115,14 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
     """
     Render PDF with WeasyPrint only when available.
     On first failure, disable future attempts to avoid repeated noisy warnings.
+
+    When WeasyPrint cannot be used (missing module, or missing system libraries
+    such as pango on shared hosts) the request is NOT downgraded to HTML: a
+    genuine PDF is produced by the ReportLab fallback instead, so a download
+    that asked for a PDF always receives one.
     """
 
+    safe_name = _safe_download_name(download_name, default='document.pdf')
     try:
         if state.WEASYPRINT_MODULE is None:
             # WeasyPrint prints dependency warnings to stderr on import; silence them here.
@@ -124,7 +130,7 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
                 state.WEASYPRINT_MODULE = importlib.import_module('flask_weasyprint')
         # If a previous attempt already confirmed WeasyPrint is unavailable, bail early.
         if state.WEASYPRINT_MODULE is False:
-            return None
+            return _render_reportlab_pdf(rendered_html, safe_name, disposition)
         # Enforce consistent PDF paper format across all exports.
         # Required layout: width 14.8cm, height 21cm with 1cm margins on all sides.
         forced_page_css = (
@@ -133,9 +139,19 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
             "</style>"
         )
         html_for_pdf = f"{forced_page_css}{rendered_html}"
-        safe_name = _safe_download_name(download_name, default='document.pdf')
+        # Render with the *print* media type so the app's own ``@media print``
+        # rules apply.  Those rules hide the sidebar, modals, loading overlay
+        # and anything marked ``d-print-none``; without this the exported
+        # document carries the whole application chrome.
+        try:
+            html_doc = state.WEASYPRINT_MODULE.HTML(
+                string=html_for_pdf, media_type='print'
+            )
+        except TypeError:
+            # Older flask_weasyprint builds without media_type support.
+            html_doc = state.WEASYPRINT_MODULE.HTML(string=html_for_pdf)
         response = state.WEASYPRINT_MODULE.render_pdf(
-            state.WEASYPRINT_MODULE.HTML(string=html_for_pdf),
+            html_doc,
             download_name=safe_name
         )
         response.headers['Content-Disposition'] = f'{disposition}; filename={safe_name}'
@@ -144,14 +160,45 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
     except ModuleNotFoundError:
         state.WEASYPRINT_MODULE = False
         logging.getLogger(__name__).warning(
-            'flask_weasyprint is not installed; PDF download will fallback to HTML.'
+            'flask_weasyprint is not installed; using the ReportLab PDF fallback.'
         )
-    except Exception:
+    except Exception as exc:
         state.WEASYPRINT_MODULE = False
-        logging.getLogger(__name__).exception(
-            'WeasyPrint PDF generation failed; falling back to HTML.'
-        )
-    return None
+        # A missing native library (pango/cairo) is an expected condition on
+        # shared hosts, not an application fault - report it once, briefly, and
+        # carry on with the ReportLab path instead of dumping a traceback.
+        message = str(exc).lower()
+        if 'cannot load library' in message or 'shared object' in message:
+            logging.getLogger(__name__).warning(
+                'WeasyPrint native libraries unavailable (%s); '
+                'using the ReportLab PDF fallback.', type(exc).__name__
+            )
+        else:
+            logging.getLogger(__name__).exception(
+                'WeasyPrint PDF generation failed; using the ReportLab PDF fallback.'
+            )
+    return _render_reportlab_pdf(rendered_html, safe_name, disposition)
+
+
+def _render_reportlab_pdf(rendered_html, safe_name, disposition):
+    """Build a real PDF with ReportLab; return a response, or None if impossible."""
+    try:
+        from app.services.pdf_fallback import render_html_to_pdf
+    except Exception:
+        logging.getLogger(__name__).exception('PDF fallback module is not importable.')
+        return None
+
+    data = render_html_to_pdf(rendered_html, download_name=safe_name, title=safe_name)
+    if not data:
+        return None
+
+    response = make_response(data)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Length'] = str(len(data))
+    response.headers['Content-Disposition'] = f'{disposition}; filename={safe_name}'
+    _disable_response_cache(response)
+    return response
+
 
 
 def _disable_response_cache(response):
