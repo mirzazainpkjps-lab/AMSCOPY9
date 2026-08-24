@@ -80,6 +80,12 @@ def dashboard():
     
     # Account balances + due clients + company liquidity KPI
     accounts = _active_accounts().order_by(Account.name.asc()).all()
+    from app.services.payments_crud import ledger_balance
+    today_date = pk_today()
+    opening_cutoff = datetime.combine(today_date, datetime.min.time()) - timedelta(microseconds=1)
+    for account in accounts:
+        account.today_opening_balance = ledger_balance(account.id, as_of=opening_cutoff)
+    
     due_clients = _client_due_summary()
     supplier_payables = _supplier_payable_summary()
     company_accounts = _company_accounts()

@@ -1,0 +1,233 @@
+{% extends "layout.html" %}
+
+{% block title %}Manage Accounts Categories{% endblock %}
+
+{% block content %}
+<style>
+    .acc-page-header{
+        background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(236,72,153,0.18));
+        border: 1px solid rgba(148,163,184,0.18);
+        border-radius: 16px;
+        padding: 20px 24px;
+        margin-bottom: 24px;
+        display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    }
+    .acc-page-header h2{ margin:0; font-weight:700; letter-spacing:.3px; }
+    .acc-page-header .subtitle{ color: var(--text-muted); font-size: .9rem; margin-top: 4px; }
+    .acc-page-header .acc-toolbar{ display:flex; gap:8px; flex-wrap:wrap; }
+
+    .acc-section-card{
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        background: var(--surface-1);
+        overflow: hidden;
+    }
+    .acc-section-card > .card-header{
+        background: linear-gradient(180deg, rgba(99,102,241,.08), transparent);
+        border-bottom: 1px solid var(--border-color);
+        padding: 14px 18px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .acc-section-card > .card-header h5{ margin: 0; font-weight: 700; }
+
+    .acc-table thead th{
+        text-transform: uppercase; font-size: .7rem; letter-spacing: .7px;
+        color: var(--text-muted); background: transparent;
+    }
+    .acc-table tbody td{ vertical-align: middle; }
+
+    .badge-soft-info     { background: rgba(56,189,248,.16); color:#7dd3fc; border:1px solid rgba(56,189,248,.3); }
+    .badge-soft-violet   { background: rgba(139,92,246,.16); color:#c4b5fd; border:1px solid rgba(139,92,246,.3); }
+    .badge-soft-amber    { background: rgba(245,158,11,.16); color:#fcd34d; border:1px solid rgba(245,158,11,.3); }
+    .badge-soft-emerald  { background: rgba(16,185,129,.16); color:#6ee7b7; border:1px solid rgba(16,185,129,.3); }
+    .badge-soft-rose     { background: rgba(244,63,94,.16); color:#fda4af; border:1px solid rgba(244,63,94,.3); }
+    html[data-theme="light"] .badge-soft-info{ color:#0369a1; }
+    html[data-theme="light"] .badge-soft-violet{ color:#5b21b6; }
+    html[data-theme="light"] .badge-soft-amber{ color:#92400e; }
+    html[data-theme="light"] .badge-soft-emerald{ color:#065f46; }
+    html[data-theme="light"] .badge-soft-rose{ color:#9f1239; }
+
+    .empty-state{ padding: 40px 16px; text-align:center; color: var(--text-muted); }
+    .empty-state i{ font-size: 2.5rem; opacity:.5; }
+</style>
+
+<div class="container-fluid">
+    <div class="acc-page-header">
+        <div>
+            <h2><i class="bi bi-sliders me-2"></i>Accounts Categories (Master Data)</h2>
+            <div class="subtitle">Manage account categories and transaction groups. Renaming an active category updates all associated accounts automatically.</div>
+        </div>
+        <div class="acc-toolbar">
+            <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Dashboard
+            </a>
+            <a href="{{ url_for('accounts.manage_accounts') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-gear me-1"></i> Manage Accounts
+            </a>
+            {% if can_manage_master %}
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                <i class="bi bi-plus-lg me-1"></i> Add Category
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card acc-section-card">
+                <div class="card-header">
+                    <h5><i class="bi bi-tags-fill me-2 text-info"></i>All Account Categories</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle acc-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">ID</th>
+                                    <th>Category / Group Name</th>
+                                    <th>Note</th>
+                                    <th>Accounts Count</th>
+                                    <th>Status</th>
+                                    <th class="text-end" style="width: 200px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td class="text-muted">#{{ item.id }}</td>
+                                    <td><strong>{{ item.name }}</strong></td>
+                                    <td class="text-muted">{{ item.note or '—' }}</td>
+                                    <td>
+                                        <span class="badge {% if item.accounts_count > 0 %}badge-soft-info{% else %}badge-soft-violet{% endif %}">
+                                            {{ item.accounts_count }} account{{ 's' if item.accounts_count != 1 else '' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if item.is_active %}
+                                        <span class="badge badge-soft-emerald"><i class="bi bi-check-circle-fill me-1"></i>Active</span>
+                                        {% else %}
+                                        <span class="badge badge-soft-rose"><i class="bi bi-pause-circle-fill me-1"></i>Inactive / Disabled</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex gap-1 justify-content-end">
+                                            {% if can_manage_master %}
+                                            <button class="btn btn-sm btn-outline-warning" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#editCategoryModal"
+                                                    data-id="{{ item.id }}"
+                                                    data-name="{{ item.name }}"
+                                                    data-note="{{ item.note }}"
+                                                    title="Edit Category">
+                                                <i class="bi bi-pencil-square"></i> Edit
+                                            </button>
+                                            
+                                            <form method="POST" action="{{ url_for('accounts.toggle_account_category_route', category_id=item.id) }}" style="display:inline">
+                                                <button type="submit" class="btn btn-sm {% if item.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}" title="{% if item.is_active %}Disable{% else %}Enable{% endif %} Category">
+                                                    <i class="bi {% if item.is_active %}bi-power{% else %}bi-arrow-clockwise{% endif %}"></i>
+                                                </button>
+                                            </form>
+
+                                            {% if item.is_used %}
+                                            <button class="btn btn-sm btn-outline-secondary" disabled title="Used by active accounts. Cannot be deleted. Only edit/rename is available.">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            {% else %}
+                                            <form method="POST" action="{{ url_for('accounts.delete_account_category_route', category_id=item.id) }}" style="display:inline" onsubmit="return confirm('Permanently delete this category?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Category">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="empty-state">
+                                        <i class="bi bi-tags"></i>
+                                        <div class="mt-2">No categories found. Click Add Category to get started.</div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('accounts.manage_categories') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-tag-fill me-2 text-success"></i>Add Account Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="cat_name">Category Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="cat_name" name="name" placeholder="e.g. Clients, External, Company" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="cat_note">Note <span class="text-muted small">(optional)</span></label>
+                    <textarea class="form-control" id="cat_note" name="note" rows="3" placeholder="Description of what accounts go into this category..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i> Create Category</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Category Modal -->
+<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" id="editCategoryForm" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-warning"></i>Edit Account Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="edit_cat_name">Category Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="edit_cat_name" name="name" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="edit_cat_note">Note <span class="text-muted small">(optional)</span></label>
+                    <textarea class="form-control" id="edit_cat_note" name="note" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold"><i class="bi bi-check-lg me-1"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editModal = document.getElementById('editCategoryModal');
+    if (editModal) {
+        editModal.addEventListener('show.bs.modal', function(event) {
+            const btn = event.relatedTarget;
+            const id = btn.getAttribute('data-id');
+            const name = btn.getAttribute('data-name');
+            const note = btn.getAttribute('data-note') || '';
+
+            const form = document.getElementById('editCategoryForm');
+            form.action = `/accounts/categories/${id}/edit`;
+
+            document.getElementById('edit_cat_name').value = name;
+            document.getElementById('edit_cat_note').value = note;
+        });
+    }
+});
+</script>
+{% endblock %}

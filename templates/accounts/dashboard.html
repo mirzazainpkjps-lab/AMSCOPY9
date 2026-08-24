@@ -122,6 +122,9 @@
             <a href="{{ url_for('cash_flow') }}" class="btn btn-warning text-dark fw-bold">
                 <i class="bi bi-water me-1"></i> Cash Flow
             </a>
+            <a href="{{ url_for('accounts.manage_categories') }}" class="btn btn-outline-info">
+                <i class="bi bi-sliders me-1"></i> Accounts Categories
+            </a>
             <a href="{{ url_for('accounts.manage_accounts') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-gear me-1"></i> Manage Accounts
             </a>
@@ -227,7 +230,8 @@
                                     <th>Account Name</th>
                                     <th>Type</th>
                                     <th>Channel</th>
-                                    <th class="text-end">Balance</th>
+                                    <th class="text-end">Today's Opening Balance</th>
+                                    <th class="text-end">Total Balance</th>
                                     <th class="text-end">Actions</th>
                                 </tr>
                             </thead>
@@ -249,6 +253,11 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
+                                        <span class="acc-balance {% if (account.today_opening_balance or 0) < 0 %}neg{% endif %}">
+                                            Rs. {{ "%.2f"|format(account.today_opening_balance or 0) }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
                                         <span class="acc-balance {% if (account.balance or 0) < 0 %}neg{% endif %}">
                                             Rs. {{ "%.2f"|format(account.balance or 0) }}
                                         </span>
@@ -260,7 +269,7 @@
                                     </td>
                                 </tr>
                                 {% else %}
-                                <tr><td colspan="5" class="text-center text-muted py-4">No accounts yet. <a href="{{ url_for('accounts.add_account') }}">Add your first account</a>.</td></tr>
+                                <tr><td colspan="6" class="text-center text-muted py-4">No accounts yet. <a href="{{ url_for('accounts.add_account') }}">Add your first account</a>.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>

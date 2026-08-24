@@ -169,9 +169,16 @@
     <div class="card acc-section-card mb-4">
         <div class="card-header">
             <h5><i class="bi bi-tags-fill me-2 text-info"></i>Transaction Groups</h5>
-            {% if can_manage_master %}<button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
-                <i class="bi bi-plus-lg me-1"></i> New Group
-            </button>{% endif %}
+            {% if can_manage_master %}
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('accounts.manage_categories') }}" class="btn btn-sm btn-outline-info">
+                    <i class="bi bi-sliders me-1"></i> Manage Categories
+                </a>
+                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
+                    <i class="bi bi-plus-lg me-1"></i> New Group
+                </button>
+            </div>
+            {% endif %}
         </div>
         <div class="card-body">
             <p class="small text-muted mb-3">

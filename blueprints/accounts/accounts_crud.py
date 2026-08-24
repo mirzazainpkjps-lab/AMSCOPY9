@@ -745,3 +745,157 @@ def reconcile_account(account_id):
     return render_template('accounts/reconcile_account.html', account=account,
                            expected=expected, recent=recent,
                            today=pk_today().strftime('%Y-%m-%d'))
+
+
+@accounts_bp.route('/categories', methods=['GET', 'POST'])
+@login_required
+def manage_categories():
+    _deny_account_master_mutation()
+    
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        note = (request.form.get('note') or '').strip()
+
+        if not name:
+            flash('Category name is required.', 'danger')
+            return redirect(url_for('accounts.manage_categories'))
+
+        existing = AccountCategory.query.filter(
+            func.lower(func.trim(AccountCategory.name)) == name.lower()
+        ).first()
+        if existing:
+            if not existing.is_active:
+                existing.is_active = True
+                db.session.commit()
+                flash('Account category restored successfully.', 'success')
+            else:
+                flash('This account category already exists.', 'warning')
+            return redirect(url_for('accounts.manage_categories'))
+
+        db.session.add(AccountCategory(name=name, note=note or None))
+        db.session.commit()
+        audit_log(current_user, 'account.category.create', f'name={name}')
+        flash('Account category created successfully.', 'success')
+        return redirect(url_for('accounts.manage_categories'))
+
+    categories = AccountCategory.query.order_by(AccountCategory.name.asc()).all()
+    
+    category_counts = {}
+    for group_name, count in db.session.query(Account.source_category, func.count(Account.id)).group_by(Account.source_category).all():
+        if group_name:
+            category_counts[group_name.strip().lower()] = count
+
+    items = []
+    for cat in categories:
+        cnt = category_counts.get(cat.name.strip().lower(), 0)
+        items.append({
+            'id': cat.id,
+            'name': cat.name,
+            'note': cat.note or '',
+            'is_active': cat.is_active,
+            'accounts_count': cnt,
+            'is_used': cnt > 0
+        })
+
+    return render_template(
+        'accounts/manage_categories.html',
+        items=items,
+        can_manage_master=_account_master_permission_ok()
+    )
+
+
+@accounts_bp.route('/categories/<int:category_id>/edit', methods=['POST'])
+@login_required
+def edit_account_category_route(category_id):
+    _deny_account_master_mutation()
+    cat = AccountCategory.query.get_or_404(category_id)
+    name = (request.form.get('name') or '').strip()
+    note = (request.form.get('note') or '').strip()
+
+    if not name:
+        flash('Category name cannot be empty.', 'danger')
+        return redirect(url_for('accounts.manage_categories'))
+
+    existing = AccountCategory.query.filter(
+        func.lower(func.trim(AccountCategory.name)) == name.lower(),
+        AccountCategory.id != cat.id
+    ).first()
+    if existing:
+        flash('Another category with this name already exists.', 'warning')
+        return redirect(url_for('accounts.manage_categories'))
+
+    old_name = cat.name
+    cat.name = name
+    cat.note = note or None
+    
+    if old_name.lower() != name.lower():
+        Account.query.filter(
+            func.lower(func.trim(Account.source_category)) == old_name.lower()
+        ).update({Account.source_category: name}, synchronize_session=False)
+
+    db.session.commit()
+    audit_log(current_user, 'account.category.update', f'id={category_id}, name={name}')
+    flash('Account category updated successfully.', 'success')
+    return redirect(url_for('accounts.manage_categories'))
+
+
+@accounts_bp.route('/categories/<int:category_id>/toggle', methods=['POST'])
+@login_required
+def toggle_account_category_route(category_id):
+    _deny_account_master_mutation()
+    cat = AccountCategory.query.get_or_404(category_id)
+    cat.is_active = not cat.is_active
+    db.session.commit()
+    status_str = 'activated' if cat.is_active else 'disabled'
+    audit_log(current_user, 'account.category.toggle', f'id={category_id}, active={cat.is_active}')
+    flash(f'Account category {status_str} successfully.', 'success')
+    return redirect(url_for('accounts.manage_categories'))
+
+
+@accounts_bp.route('/categories/<int:category_id>/delete', methods=['POST'])
+@login_required
+def delete_account_category_route(category_id):
+    _deny_account_master_mutation()
+    cat = AccountCategory.query.get_or_404(category_id)
+    
+    used = Account.query.filter(
+        func.lower(func.trim(Account.source_category)) == cat.name.lower()
+    ).first() is not None
+
+    if used:
+        flash('This category is currently used by one or more accounts and cannot be deleted.', 'danger')
+        return redirect(url_for('accounts.manage_categories'))
+
+    db.session.delete(cat)
+    db.session.commit()
+    audit_log(current_user, 'account.category.delete', f'id={category_id}, name={cat.name}')
+    flash('Account category deleted successfully.', 'success')
+    return redirect(url_for('accounts.manage_categories'))
+
+
+@accounts_bp.route('/api/categories/add', methods=['POST'])
+@login_required
+def api_add_account_category():
+    _deny_account_master_mutation()
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    note = (data.get('note') or '').strip()
+
+    if not name:
+        return jsonify({'ok': False, 'error': 'Category name is required.'}), 400
+
+    existing = AccountCategory.query.filter(
+        func.lower(func.trim(AccountCategory.name)) == name.lower()
+    ).first()
+    if existing:
+        if not existing.is_active:
+            existing.is_active = True
+            db.session.commit()
+            return jsonify({'ok': True, 'category': {'id': existing.id, 'name': existing.name}})
+        return jsonify({'ok': False, 'error': 'This category already exists.'}), 400
+
+    new_cat = AccountCategory(name=name, note=note or None)
+    db.session.add(new_cat)
+    db.session.commit()
+    audit_log(current_user, 'account.category.create', f'name={name}')
+    return jsonify({'ok': True, 'category': {'id': new_cat.id, 'name': new_cat.name}})
