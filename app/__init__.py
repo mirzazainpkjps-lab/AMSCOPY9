@@ -199,6 +199,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     from app.blueprints.api import bp as api_bp
     from app.blueprints.system import bp as system_bp
     from app.blueprints.misc import bp as misc_bp
+    from app.blueprints.migration import bp as migration_bp
 
     for bp in (
         core_bp,
@@ -211,6 +212,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         api_bp,
         system_bp,
         misc_bp,
+        migration_bp,
     ):
         if bp.name not in app.blueprints:
             app.register_blueprint(bp)
