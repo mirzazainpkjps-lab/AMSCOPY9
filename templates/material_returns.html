@@ -100,6 +100,7 @@
                     <th>Type</th>
                     <th>Items</th>
                     <th class="text-end">Amount</th>
+                    <th>Notes</th>
                     <th class="text-end">Action</th>
                 </tr>
             </thead>
@@ -126,6 +127,7 @@
                         {% endif %}
                     </td>
                     <td class="text-end fw-bold">{{ '%.2f'|format(r.amount or 0) }}</td>
+                    <td><span class="small text-white-50" title="{{ r.note or '' }}">{{ r.note or '—' }}</span></td>
                     <td class="text-end">
                         {% if not r.is_void %}
                         <a class="btn btn-sm btn-outline-info"
@@ -139,7 +141,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="text-center text-muted py-4">No material return records found.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-4">No material return records found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

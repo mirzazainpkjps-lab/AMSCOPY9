@@ -151,6 +151,7 @@
                     <th class="num">Qty</th>
                     <th>Bill No</th>
                     <th>Nimbus No</th>
+                    <th>Notes</th>
                     <th>By</th>
                     <th class="num">Action</th>
                 </tr>
@@ -198,6 +199,7 @@
                         {% endif %}
                     </td>
                     <td class="text-muted">{{ e.nimbus_no or '---' }}</td>
+                    <td><span class="small text-muted" title="{{ e.note or '' }}">{{ e.note or '—' }}</span></td>
                     <td class="text-muted small fw-bold">{{ e.created_by or 'System' }}</td>
                     <td class="num">
                         {% if not e.is_void %}

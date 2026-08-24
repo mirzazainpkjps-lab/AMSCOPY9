@@ -78,6 +78,7 @@
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Qty</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Total Amount</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Actually Paid</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Notes</th>
                     <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
                 </tr>
             </thead>
@@ -115,6 +116,7 @@
                     </td>
                     <td class="text-danger fw-bold">{{ currency_symbol }}{{ "%.2f"|format(booking.amount) }}</td>
                     <td class="text-success fw-bold">{{ currency_symbol }}{{ "%.2f"|format(booking.paid_amount) }}</td>
+                    <td><span class="small text-white-50" title="{{ booking.note or '' }}">{{ booking.note or '—' }}</span></td>
                     <td class="text-end pe-4">
                         {% set booking_bill_ref = (booking.manual_bill_no or booking.auto_bill_no or ('BK-' ~ booking.id)) %}
                         <a href="{{ url_for('view_bill', bill_no=booking_bill_ref|replace('#', '%23'), src='booking', src_id=booking.id, client_name=booking.client_name) }}" class="btn btn-outline-info btn-sm border-2 rounded-pill shadow-sm me-1" title="View"><i class="bi bi-eye"></i></a>
