@@ -26,25 +26,59 @@ def clients():
     inactive_pagination = inactive_query.order_by(Client.name.asc()).paginate(page=page_inactive, per_page=10)
 
     all_visible_clients = active_pagination.items + inactive_pagination.items
-    # Two grouped queries replace two queries per visible client while keeping
-    # the exact counters shown by the template.
-    visible_codes = [c.code for c in all_visible_clients if c.code]
-    visible_names = [c.name for c in all_visible_clients if c.name]
-    bill_counts = dict(
-        db.session.query(PendingBill.client_code, func.count(PendingBill.id))
-        .filter(PendingBill.client_code.in_(visible_codes))
-        .group_by(PendingBill.client_code)
-        .all()
-    ) if visible_codes else {}
-    delivery_totals = dict(
-        db.session.query(Entry.client, func.sum(Entry.qty))
-        .filter(Entry.type == 'OUT', Entry.client.in_(visible_names))
-        .group_by(Entry.client)
-        .all()
-    ) if visible_names else {}
+
+    # Build authoritative financial snapshot once, then project useful
+    # payable/balance data for each visible client. This replaces the old
+    # bill-count / delivery-qty columns with real accounting data.
+    snapshot = None
+    try:
+        from app.services.financial_ledgers import _client_snapshot, build_client_financial_ledger
+        snapshot = _client_snapshot()
+    except Exception:
+        snapshot = None
+        from app.services.financial_ledgers import build_client_financial_ledger  # noqa: F811
+
+    # aggregates for summary cards (only visible page, but useful)
+    total_payable_visible = 0.0
+    total_advance_visible = 0.0
+    total_billed_visible = 0.0
+    total_received_visible = 0.0
+
     for c in all_visible_clients:
-        c.total_bills = bill_counts.get(c.code, 0) or 0
-        c.total_deliveries = delivery_totals.get(c.name, 0) or 0
+        try:
+            if snapshot is not None:
+                ledger = build_client_financial_ledger(c, snapshot=snapshot)
+            else:
+                ledger = build_client_financial_ledger(c)
+            current_balance = float(ledger.get('closing_balance') or 0)
+            total_debit = float(ledger.get('total_debit') or 0)
+            total_credit = float(ledger.get('total_credit') or 0)
+        except Exception:
+            # Fallback to opening balance only if ledger projection fails
+            current_balance = float(getattr(c, 'opening_balance', 0) or 0)
+            total_debit = float(current_balance) if current_balance > 0 else 0.0
+            total_credit = float(-current_balance) if current_balance < 0 else 0.0
+            ledger = {'status': 'Unknown', 'last_transaction_date': None, 'last_payment_date': None, 'obligations': []}
+
+        c.current_balance = current_balance
+        c.total_debit = total_debit
+        c.total_credit = total_credit
+        c.payable_amount = current_balance
+        c.outstanding = max(0.0, current_balance)
+        c.advance_amount = max(0.0, -current_balance)
+        c.status_label = ledger.get('status') or ('Outstanding' if current_balance > 0.5 else ('Credit' if current_balance < -0.5 else 'Settled'))
+        c.last_txn_date = ledger.get('last_transaction_date')
+        c.last_payment_date = ledger.get('last_payment_date')
+        c.obligations_count = len(ledger.get('obligations', []) or [])
+
+        # keep old attrs for backward compat if template still references them
+        c.total_bills = c.obligations_count
+        c.total_deliveries = 0
+
+        total_payable_visible += c.outstanding
+        total_advance_visible += c.advance_amount
+        total_billed_visible += total_debit
+        total_received_visible += total_credit
 
     all_clients_list = Client.query.order_by(Client.name.asc()).all()
     categories = [
@@ -64,7 +98,11 @@ def clients():
                            search=search,
                            category=category,
                            all_clients=all_clients_list,
-                           categories=categories)
+                           categories=categories,
+                           total_payable_visible=total_payable_visible,
+                           total_advance_visible=total_advance_visible,
+                           total_billed_visible=total_billed_visible,
+                           total_received_visible=total_received_visible)
 
 
 @bp.route('/clients/<int:client_id>/modals')

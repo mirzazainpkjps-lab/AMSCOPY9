@@ -93,6 +93,47 @@ function addPageInput(containerId, value = '') {
 }
 </script>
 
+{% if total_payable_visible is defined %}
+<div class="row g-2 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm" style="background:#1e293b;border:1px solid #334155 !important;border-radius:12px;">
+            <div class="card-body py-2 px-3">
+                <div class="small text-white-50 fw-bold text-uppercase">Payable (This Page)</div>
+                <div class="fw-bold fs-5 text-danger">{{ "{:,.2f}".format(total_payable_visible or 0) }}</div>
+                <div class="small text-white-50">Clients owe you</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm" style="background:#1e293b;border:1px solid #334155 !important;border-radius:12px;">
+            <div class="card-body py-2 px-3">
+                <div class="small text-white-50 fw-bold text-uppercase">Advance (This Page)</div>
+                <div class="fw-bold fs-5 text-success">{{ "{:,.2f}".format(total_advance_visible or 0) }}</div>
+                <div class="small text-white-50">You owe clients</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm" style="background:#1e293b;border:1px solid #334155 !important;border-radius:12px;">
+            <div class="card-body py-2 px-3">
+                <div class="small text-white-50 fw-bold text-uppercase">Billed</div>
+                <div class="fw-bold fs-5 text-info">{{ "{:,.2f}".format(total_billed_visible or 0) }}</div>
+                <div class="small text-white-50">Total debit</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm" style="background:#1e293b;border:1px solid #334155 !important;border-radius:12px;">
+            <div class="card-body py-2 px-3">
+                <div class="small text-white-50 fw-bold text-uppercase">Received</div>
+                <div class="fw-bold fs-5 text-warning">{{ "{:,.2f}".format(total_received_visible or 0) }}</div>
+                <div class="small text-white-50">Total credit</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Active Clients Section -->
 <div class="mb-5">
     <h4 class="text-info fw-bold mb-3 d-flex align-items-center gap-2">
@@ -104,46 +145,86 @@ function addPageInput(containerId, value = '') {
             <table class="table table-dark table-hover align-middle mb-0">
                 <thead style="background: #0f172a;">
                     <tr>
-                        <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50">Client Name</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Code</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Pages</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50 text-end">Opening Balance</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Bills</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Deliveries</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Phone</th>
-                        <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
+                        <th class="fw-bold py-2 ps-4 border-bottom border-secondary text-white-50" style="min-width:210px;">Client Name</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50">Code</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50">Pages</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50 text-end">Opening</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50 text-end">Billed</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50 text-end">Received</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50 text-end" style="min-width:160px;">Payable / Balance</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50" style="min-width:130px;">Last Activity</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50">Phone</th>
+                        <th class="fw-bold py-2 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
                     </tr>
                 </thead>
                 <tbody style="background: #1e293b;">
                     {% for c in active_pagination.items %}
                     <tr style="border-bottom: 1px solid #334155; background: #1e293b;">
                         <td class="ps-4 py-3">
-                            <a href="/ledger/{{ c.id }}" class="text-decoration-none fw-bold text-info fs-5 d-block">{{ c.name }}</a>
-                            <span class="badge {% if c.category == 'General' %}bg-primary{% elif c.category == 'Walking-Customer' %}bg-success{% elif c.category == 'Open Khata' %}bg-warning text-dark{% else %}bg-secondary{% endif %} small" style="font-size: 0.65rem;">{{ c.category }}</span>
+                            <a href="/ledger/{{ c.id }}" class="text-decoration-none fw-bold text-info d-block" style="font-size:1.05rem;">{{ c.name }}</a>
+                            <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                <span class="badge {% if c.category == 'General' %}bg-primary{% elif c.category == 'Walking-Customer' %}bg-success{% elif c.category == 'Open Khata' %}bg-warning text-dark{% else %}bg-secondary{% endif %}" style="font-size:0.60rem;">{{ c.category }}</span>
+                                {% if c.status_label %}
+                                <span class="badge {% if c.current_balance > 0.5 %}bg-danger{% elif c.current_balance < -0.5 %}bg-success{% else %}bg-secondary{% endif %}" style="font-size:0.60rem;">{{ c.status_label }}</span>
+                                {% endif %}
+                                {% if c.obligations_count %}
+                                <span class="badge bg-dark border border-secondary text-white-50" style="font-size:0.60rem;" title="Active bills">{{ c.obligations_count }} bills</span>
+                                {% endif %}
+                            </div>
                         </td>
                         <td><span class="badge bg-dark border border-secondary text-warning">{{ c.code or '---' }}</span></td>
-                        <td><span class="small text-white-50">{{ c.page_notes or c.steel_page or c.cement_page or c.financial_page or '-' }}</span></td>
-                        <td class="text-end fw-bold {{ 'text-danger' if (c.opening_balance or 0) > 0 else ('text-success' if (c.opening_balance or 0) < 0 else 'text-white-50') }}">
+                        <td><span class="small text-white-50" title="{{ c.page_notes or '' }}">{{ c.page_notes or c.steel_page or c.cement_page or c.financial_page or '-' }}</span></td>
+                        <td class="text-end fw-bold {{ 'text-danger' if (c.opening_balance or 0) > 0 else ('text-success' if (c.opening_balance or 0) < 0 else 'text-white-50') }}" style="font-size:0.9rem;">
                             {{ "{:,.2f}".format(c.opening_balance or 0) }}
                         </td>
-                        <td class="text-info fw-bold">{{ c.total_bills }}</td>
-                        <td class="text-warning fw-bold">{{ c.total_deliveries }}</td>
-                        <td class="text-white-50">{{ c.phone or '---' }}</td>
+                        <td class="text-end text-info fw-bold" style="font-size:0.9rem;" title="Total debit from ledger">
+                            {{ "{:,.2f}".format(c.total_debit or 0) }}
+                        </td>
+                        <td class="text-end text-success fw-bold" style="font-size:0.9rem;" title="Total credit / payments">
+                            {{ "{:,.2f}".format(c.total_credit or 0) }}
+                        </td>
+                        <td class="text-end">
+                            <div class="fw-bold fs-6 {{ 'text-danger' if (c.current_balance or 0) > 0.5 else ('text-success' if (c.current_balance or 0) < -0.5 else 'text-white-50') }}">
+                                {{ "{:,.2f}".format(c.current_balance or 0) }}
+                            </div>
+                            {% if (c.current_balance or 0) > 0.5 %}
+                            <small class="text-danger d-block">Receivable</small>
+                            <small class="badge bg-danger" style="font-size:0.60rem;">{{ "{:,.0f}".format(c.outstanding or 0) }} Due</small>
+                            {% elif (c.current_balance or 0) < -0.5 %}
+                            <small class="text-success d-block">Advance</small>
+                            <small class="badge bg-success" style="font-size:0.60rem;">{{ "{:,.0f}".format(c.advance_amount or 0) }} Adv</small>
+                            {% else %}
+                            <small class="text-white-50">Settled</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="small">
+                                {% if c.last_txn_date %}
+                                <span class="text-white-50 d-block" title="Last transaction"><i class="bi bi-clock me-1"></i>{{ c.last_txn_date.strftime('%Y-%m-%d') if c.last_txn_date.strftime is defined else c.last_txn_date }}</span>
+                                {% else %}
+                                <span class="text-white-50 d-block">No txn</span>
+                                {% endif %}
+                                {% if c.last_payment_date %}
+                                <span class="text-success d-block small" title="Last payment"><i class="bi bi-cash me-1"></i>{{ c.last_payment_date.strftime('%Y-%m-%d') if c.last_payment_date.strftime is defined else c.last_payment_date }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="text-white-50 small">{{ c.phone or '---' }}</td>
                         <td class="text-end pe-4">
-                            <button class="btn btn-outline-info btn-sm border-2 rounded-pill shadow-sm me-1" data-client-modal-url="{{ url_for('client_modals', client_id=c.id) }}" data-client-modal="transfer" title="Transfer Data">
-                                <i class="bi bi-arrow-right-circle"></i>
-                            </button>
-                            <button class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" data-client-modal-url="{{ url_for('client_modals', client_id=c.id) }}" data-client-modal="edit">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <form action="/delete_client/{{ c.id }}" method="POST" class="d-inline" onsubmit="return confirm('Suspend client {{ c.name }}?')">
-                                <button type="submit" class="btn btn-outline-danger btn-sm border-2 rounded-pill shadow-sm">
-                                    <i class="bi bi-pause-circle"></i>
-                                </button>
-                            </form>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/ledger/{{ c.id }}" class="btn btn-outline-info border-2 rounded-start-pill" title="View Ledger"><i class="bi bi-journal-text"></i></a>
+                                <button class="btn btn-outline-warning border-2" data-client-modal-url="{{ url_for('client_modals', client_id=c.id) }}" data-client-modal="edit" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-light border-2" data-client-modal-url="{{ url_for('client_modals', client_id=c.id) }}" data-client-modal="transfer" title="Transfer Data"><i class="bi bi-arrow-right-circle"></i></button>
+                                <form action="/delete_client/{{ c.id }}" method="POST" class="d-inline" onsubmit="return confirm('Suspend client {{ c.name }}?')">
+                                    <button type="submit" class="btn btn-outline-danger border-2 rounded-end-pill" title="Suspend"><i class="bi bi-pause-circle"></i></button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
+                    {% if not active_pagination.items %}
+                    <tr><td colspan="10" class="text-center text-white-50 py-4">No active clients found</td></tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
@@ -154,7 +235,7 @@ function addPageInput(containerId, value = '') {
                     {% if active_pagination.has_prev %}
                     <li class="page-item"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('clients', page_active=active_pagination.prev_num, page_inactive=inactive_pagination.page, search=search, category=category) }}">Previous</a></li>
                     {% endif %}
-                    <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ active_pagination.page }}</span></li>
+                    <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ active_pagination.page }} / {{ active_pagination.pages }}</span></li>
                     {% if active_pagination.has_next %}
                     <li class="page-item"><a class="page-link bg-dark border-secondary text-warning" href="{{ url_for('clients', page_active=active_pagination.next_num, page_inactive=inactive_pagination.page, search=search, category=category) }}">Next</a></li>
                     {% endif %}
@@ -171,39 +252,52 @@ function addPageInput(containerId, value = '') {
         <span><i class="bi bi-person-x me-2"></i>Inactive Clients</span>
         <span class="badge bg-secondary text-white">Filtered: {{ inactive_pagination.total }}</span>
     </h4>
-    <div class="card border-0 shadow-sm" style="background: #0f172a; border: 2px solid #334155 !important; border-radius: 15px; overflow: hidden; opacity: 0.8;">
+    <div class="card border-0 shadow-sm" style="background: #0f172a; border: 2px solid #334155 !important; border-radius: 15px; overflow: hidden; opacity: 0.85;">
         <div class="table-responsive">
             <table class="table table-dark table-hover align-middle mb-0">
                 <thead style="background: #020617;">
                     <tr>
-                        <th class="fw-bold py-3 ps-4 border-bottom border-secondary text-white-50">Client Name</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Code</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Pages</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50 text-end">Opening Balance</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Bills</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Deliveries</th>
-                        <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Phone</th>
-                        <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
+                        <th class="fw-bold py-2 ps-4 border-bottom border-secondary text-white-50">Client Name</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50">Code</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50">Pages</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50 text-end">Opening</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50 text-end">Billed</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50 text-end">Received</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50 text-end">Payable / Balance</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50">Last Activity</th>
+                        <th class="fw-bold py-2 border-bottom border-secondary text-white-50">Phone</th>
+                        <th class="fw-bold py-2 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for c in inactive_pagination.items %}
                     <tr style="border-bottom: 1px solid #1e293b;">
                         <td class="ps-4 py-3">
-                            <span class="fw-bold text-secondary fs-5 d-block text-decoration-line-through">{{ c.name }}</span>
+                            <span class="fw-bold text-secondary d-block text-decoration-line-through">{{ c.name }}</span>
+                            <div class="d-flex gap-1 mt-1 flex-wrap">
+                                {% if c.status_label %}
+                                <span class="badge bg-dark border border-secondary text-secondary" style="font-size:0.60rem;">{{ c.status_label }}</span>
+                                {% endif %}
+                                <span class="badge bg-dark border border-secondary text-white-50" style="font-size:0.60rem;">Bal: {{ "{:,.0f}".format(c.current_balance or 0) }}</span>
+                            </div>
                         </td>
                         <td><span class="badge bg-dark border border-secondary text-secondary">{{ c.code or '---' }}</span></td>
                         <td><span class="small text-white-50">{{ c.page_notes or c.steel_page or c.cement_page or c.financial_page or '-' }}</span></td>
-                        <td class="text-end fw-bold {{ 'text-danger' if (c.opening_balance or 0) > 0 else ('text-success' if (c.opening_balance or 0) < 0 else 'text-white-50') }}">
+                        <td class="text-end fw-bold {{ 'text-danger' if (c.opening_balance or 0) > 0 else ('text-success' if (c.opening_balance or 0) < 0 else 'text-white-50') }}" style="font-size:0.85rem;">
                             {{ "{:,.2f}".format(c.opening_balance or 0) }}
                         </td>
-                        <td>
-                            <div class="small">
-                                <span class="text-secondary d-block">Bills: <strong>{{ c.total_bills }}</strong></span>
-                                <span class="text-secondary d-block">Deliveries: <strong>{{ c.total_deliveries }}</strong></span>
+                        <td class="text-end text-secondary small">{{ "{:,.2f}".format(c.total_debit or 0) }}</td>
+                        <td class="text-end text-secondary small">{{ "{:,.2f}".format(c.total_credit or 0) }}</td>
+                        <td class="text-end">
+                            <div class="fw-bold small {{ 'text-danger' if (c.current_balance or 0) > 0.5 else ('text-success' if (c.current_balance or 0) < -0.5 else 'text-white-50') }}">
+                                {{ "{:,.2f}".format(c.current_balance or 0) }}
                             </div>
+                            <small class="text-white-50">{{ c.status_label }}</small>
                         </td>
-                        <td class="text-white-50">{{ c.phone or '---' }}</td>
+                        <td class="small text-white-50">
+                            {% if c.last_txn_date %}{{ c.last_txn_date.strftime('%Y-%m-%d') if c.last_txn_date.strftime is defined else c.last_txn_date }}{% else %}-{% endif %}
+                        </td>
+                        <td class="text-white-50 small">{{ c.phone or '---' }}</td>
                         <td class="text-end pe-4">
                             {% if c.transferred_to_id %}
                             <form action="/reclaim_client/{{ c.id }}" method="POST" class="d-inline">
@@ -220,6 +314,9 @@ function addPageInput(containerId, value = '') {
                         </td>
                     </tr>
                     {% endfor %}
+                    {% if not inactive_pagination.items %}
+                    <tr><td colspan="10" class="text-center text-white-50 py-3">No inactive clients</td></tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
@@ -230,7 +327,7 @@ function addPageInput(containerId, value = '') {
                     {% if inactive_pagination.has_prev %}
                     <li class="page-item"><a class="page-link bg-dark border-secondary text-secondary" href="{{ url_for('clients', page_active=active_pagination.page, page_inactive=inactive_pagination.prev_num, search=search, category=category) }}">Previous</a></li>
                     {% endif %}
-                    <li class="page-item active"><span class="page-link bg-secondary border-secondary text-white">{{ inactive_pagination.page }}</span></li>
+                    <li class="page-item active"><span class="page-link bg-secondary border-secondary text-white">{{ inactive_pagination.page }} / {{ inactive_pagination.pages }}</span></li>
                     {% if inactive_pagination.has_next %}
                     <li class="page-item"><a class="page-link bg-dark border-secondary text-secondary" href="{{ url_for('clients', page_active=active_pagination.page, page_inactive=inactive_pagination.next_num, search=search, category=category) }}">Next</a></li>
                     {% endif %}
@@ -326,7 +423,6 @@ function loadClientModal(url, mode) {
         selector: `[id^="${isTransfer ? 'transferCModal' : 'editCModal'}"]`,
         label: isTransfer ? 'Loading transfer form…' : 'Loading client form…',
         onReady: function (modalEl) {
-            // Show global loading overlay on save for lazy-loaded forms
             const editForm = modalEl.querySelector('form');
             if (editForm) {
                 editForm.addEventListener('submit', function () {

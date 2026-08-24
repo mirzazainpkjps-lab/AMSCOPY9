@@ -2,16 +2,56 @@
 from ._common import *  # noqa
 
 def _payment_page_size():
-    return min(max(request.args.get('per_page', 50, type=int) or 50, 10), 100)
+    try:
+        raw = request.args.get('per_page', 50, type=int)
+        if raw is None:
+            raw = 50
+        return min(max(int(raw), 10), 100)
+    except Exception:
+        return 50
+
+
+def _normalize_method_filter(method_raw):
+    if not method_raw:
+        return []
+    m = method_raw.strip().lower()
+    if not m:
+        return []
+    if m == 'bank':
+        return ['bank', 'bank transfer']
+    if m in ('check', 'cheque'):
+        return ['check', 'cheque']
+    return [m]
 
 
 def _payment_filter_state():
+    q = (request.args.get('q') or '').strip()
+    method = (request.args.get('method') or '').strip()
+    show = (request.args.get('show') or 'active').strip().lower()
+    payment_type = (request.args.get('payment_type') or '').strip()
+    try:
+        party_raw = request.args.get('party_id')
+        party_id = int(party_raw) if party_raw not in (None, '', '0') else None
+        if party_id == 0:
+            party_id = None
+    except Exception:
+        party_id = None
+    try:
+        acc_raw = request.args.get('account_id')
+        account_id = int(acc_raw) if acc_raw not in (None, '', '0') else None
+        if account_id == 0:
+            account_id = None
+    except Exception:
+        account_id = None
+
     return {
-        'q': (request.args.get('q') or '').strip(),
-        'method': (request.args.get('method') or '').strip(),
-        'show': (request.args.get('show') or 'active').strip().lower(),
-        'party_id': request.args.get('party_id', type=int),
-        'account_id': request.args.get('account_id', type=int),
+        'q': q,
+        'method': method,
+        'method_values': _normalize_method_filter(method),
+        'payment_type': payment_type,
+        'show': show,
+        'party_id': party_id,
+        'account_id': account_id,
         'per_page': _payment_page_size(),
     }
 
@@ -30,34 +70,59 @@ def client_payments():
         q = q.filter(Payment.is_void == False)
     elif show_mode == 'voided':
         q = q.filter(Payment.is_void == True)
+
     if state['q']:
         like = f"%{state['q']}%"
-        q = q.filter(or_(
-            Payment.client_name.ilike(like), Payment.note.ilike(like),
-            Payment.account_name.ilike(like), Payment.bank_name.ilike(like),
-            Payment.account_no.ilike(like), Payment.manual_bill_no.ilike(like),
-            Payment.auto_bill_no.ilike(like), Payment.method.ilike(like),
+        q = q.outerjoin(Client, Payment.client_id == Client.id).filter(or_(
+            Payment.client_name.ilike(like),
+            Client.code.ilike(like),
+            Client.name.ilike(like),
+            Payment.note.ilike(like),
+            Payment.account_name.ilike(like),
+            Payment.bank_name.ilike(like),
+            Payment.account_no.ilike(like),
+            Payment.manual_bill_no.ilike(like),
+            Payment.auto_bill_no.ilike(like),
+            Payment.method.ilike(like),
+            Payment.discount_reason.ilike(like),
         ))
-    if state['method']:
-        method_norm = state['method'].lower()
-        method_values = ['bank', 'bank transfer'] if method_norm == 'bank' else (['check', 'cheque'] if method_norm == 'check' else [method_norm])
-        q = q.filter(func.lower(Payment.method).in_(method_values))
+
+    if state['method_values']:
+        q = q.filter(func.lower(Payment.method).in_(state['method_values']))
+
+    if state['payment_type']:
+        pt = state['payment_type'].strip().lower()
+        if pt in ('receipt', 'payment received'):
+            q = q.filter(Payment.amount >= 0, func.lower(func.coalesce(Payment.payment_type, '')) != 'refund')
+        elif pt == 'refund':
+            q = q.filter(or_(func.lower(Payment.payment_type) == 'refund', Payment.amount < 0))
+        elif pt in ('waive-off', 'waive off', 'waive'):
+            q = q.filter(or_(func.lower(Payment.payment_type).like('%waive%'), Payment.discount > 0))
+
     if state['party_id']:
         selected_client = db.session.get(Client, state['party_id'])
         if selected_client:
-            q = q.filter(or_(Payment.client_id == selected_client.id,
-                             and_(Payment.client_id.is_(None), func.lower(func.trim(Payment.client_name)) == selected_client.name.strip().lower())))
+            q = q.filter(or_(
+                Payment.client_id == selected_client.id,
+                and_(
+                    Payment.client_id.is_(None),
+                    func.lower(func.trim(Payment.client_name)) == selected_client.name.strip().lower()
+                )
+            ))
         else:
             q = q.filter(False)
+
     if state['account_id']:
         q = q.filter(Payment.payment_account_id == state['account_id'])
 
     total_amount = q.with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar() or 0
-    total_count = q.count()
+    total_count = q.with_entities(func.count(func.distinct(Payment.id))).scalar() or 0
+
     ordered_q = q.order_by(Payment.date_posted.desc(), Payment.id.desc())
     payments = ordered_q.paginate(page=page, per_page=state['per_page'], error_out=False)
     if payments.pages and page > payments.pages:
         payments = ordered_q.paginate(page=payments.pages, per_page=state['per_page'], error_out=False)
+
     accounts = _active_accounts().filter(func.lower(func.trim(Account.category)).in_(['cash', 'bank'])).order_by(Account.name.asc(), Account.id.asc()).all()
     clients = _active_clients()
     all_clients = Client.query.order_by(Client.name.asc(), Client.id.asc()).all()
@@ -74,7 +139,7 @@ def client_payments():
     return render_template(
         'accounts/client_payments.html', payments=payments,
         date_from=date_from, date_to=date_to_excl - timedelta(days=1),
-        search=state['q'], method_f=state['method'], show_mode=show_mode,
+        search=state['q'], method_f=state['method'], payment_type_f=state['payment_type'], show_mode=show_mode,
         party_id_f=state['party_id'], account_id_f=state['account_id'], per_page=state['per_page'],
         total_amount=total_amount, total_count=total_count,
         payments_readonly=payments_readonly, accounts=accounts, clients=clients,
@@ -102,29 +167,37 @@ def supplier_payments():
         q = q.filter(SupplierPayment.is_void == False)
     elif show_mode == 'voided':
         q = q.filter(SupplierPayment.is_void == True)
+
     if state['q']:
         like = f"%{state['q']}%"
         q = q.outerjoin(Supplier).filter(or_(
-            Supplier.name.ilike(like), SupplierPayment.note.ilike(like),
-            SupplierPayment.account_name.ilike(like), SupplierPayment.bank_name.ilike(like),
-            SupplierPayment.account_no.ilike(like), SupplierPayment.manual_bill_no.ilike(like),
-            SupplierPayment.auto_bill_no.ilike(like), SupplierPayment.method.ilike(like),
+            Supplier.name.ilike(like),
+            SupplierPayment.note.ilike(like),
+            SupplierPayment.account_name.ilike(like),
+            SupplierPayment.bank_name.ilike(like),
+            SupplierPayment.account_no.ilike(like),
+            SupplierPayment.manual_bill_no.ilike(like),
+            SupplierPayment.auto_bill_no.ilike(like),
+            SupplierPayment.method.ilike(like),
         ))
-    if state['method']:
-        method_norm = state['method'].lower()
-        method_values = ['bank', 'bank transfer'] if method_norm == 'bank' else (['check', 'cheque'] if method_norm == 'check' else [method_norm])
-        q = q.filter(func.lower(SupplierPayment.method).in_(method_values))
+
+    if state['method_values']:
+        q = q.filter(func.lower(SupplierPayment.method).in_(state['method_values']))
+
     if state['party_id']:
         q = q.filter(SupplierPayment.supplier_id == state['party_id'])
+
     if state['account_id']:
         q = q.filter(SupplierPayment.payment_account_id == state['account_id'])
 
     total_amount = q.with_entities(func.coalesce(func.sum(SupplierPayment.amount), 0)).scalar() or 0
-    total_count = q.count()
+    total_count = q.with_entities(func.count(func.distinct(SupplierPayment.id))).scalar() or 0
+
     ordered_q = q.order_by(SupplierPayment.date_posted.desc(), SupplierPayment.id.desc())
     payments = ordered_q.paginate(page=page, per_page=state['per_page'], error_out=False)
     if payments.pages and page > payments.pages:
         payments = ordered_q.paginate(page=payments.pages, per_page=state['per_page'], error_out=False)
+
     suppliers = _active_suppliers()
     accounts = _active_accounts().filter(func.lower(func.trim(Account.category)).in_(['cash', 'bank'])).order_by(Account.name.asc(), Account.id.asc()).all()
     all_suppliers = Supplier.query.order_by(Supplier.name.asc(), Supplier.id.asc()).all()
@@ -214,11 +287,10 @@ def expenditures():
     page = request.args.get('page', 1, type=int)
     per_page = 50
     search = (request.args.get('q') or '').strip()
-    category_f = (request.args.get('category') or '').strip() # Filter for category/description
-    method_f = (request.args.get('method') or '').strip() # Filter for payment method/account category
+    category_f = (request.args.get('category') or '').strip()
+    method_f = (request.args.get('method') or '').strip()
     date_from, date_to_excl = _parse_date_range()
 
-    # Fetch FbmCashDrawerEntry expenditures
     fbm_q = FbmCashDrawerEntry.query.filter(
         FbmCashDrawerEntry.entry_type == 'out',
         FbmCashDrawerEntry.is_void == False,
@@ -234,7 +306,6 @@ def expenditures():
         fbm_q = fbm_q.filter(func.lower(FbmCashDrawerEntry.method) == method_f.lower())
     fbm_expenditures = fbm_q.all()
 
-    # Fetch AccountTransaction expenditures (Expenses and Payments)
     tx_q = AccountTransaction.query.filter(
         AccountTransaction.date_posted >= date_from,
         AccountTransaction.date_posted < date_to_excl,
@@ -248,7 +319,6 @@ def expenditures():
     if category_f:
         tx_q = tx_q.filter(AccountTransaction.description == category_f)
     if method_f:
-        # Filter AccountTransactions by the category of their 'from' account
         tx_q = tx_q.join(Account, AccountTransaction.from_account_id == Account.id).filter(func.lower(Account.category) == method_f.lower())
     tx_expenditures = tx_q.all()
 
@@ -269,7 +339,7 @@ def expenditures():
             'category': ('Driver / Delivery Services' if tx.transaction_type == 'Driver Payment'
                          else (tx.description or 'Expense')),
             'amount': float(tx.amount or 0),
-            'method': (acc.category.capitalize() if acc else 'Other'), # Use account category as method
+            'method': (acc.category.capitalize() if acc else 'Other'),
             'note': tx.note or '',
             'type': 'Account Transaction'
         })
@@ -279,12 +349,10 @@ def expenditures():
     total_amount = sum(item['amount'] for item in all_expenditures)
     total_count = len(all_expenditures)
 
-    # Manual pagination
     start = (page - 1) * per_page
     end = start + per_page
     paginated_expenditures = all_expenditures[start:end]
     
-    # Wrap in a SimpleNamespace to mimic a Pagination object for the template
     pagination_wrapper = SimpleNamespace(
         items=paginated_expenditures,
         page=page,
@@ -297,7 +365,6 @@ def expenditures():
         next_num=page + 1
     )
 
-    # Collect categories for filter dropdown from both sources
     all_categories = set()
     for r in db.session.query(FbmCashDrawerEntry.category).filter(
         FbmCashDrawerEntry.entry_type == 'out',
@@ -315,7 +382,6 @@ def expenditures():
         all_categories.add(r[0])
     categories = sorted(list(all_categories))
 
-    # Collect methods for filter dropdown from both sources
     all_methods = set()
     for r in db.session.query(FbmCashDrawerEntry.method).filter(
         FbmCashDrawerEntry.entry_type == 'out',
@@ -329,7 +395,7 @@ def expenditures():
         Account.category.isnot(None),
         Account.category != ''
     ).distinct(Account.category).all():
-        all_methods.add(r[0].capitalize()) # Capitalize to match 'Cash', 'Bank' etc.
+        all_methods.add(r[0].capitalize())
     methods = sorted(list(all_methods))
 
     return render_template('accounts/expenditures.html', expenditures=pagination_wrapper,
