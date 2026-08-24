@@ -187,6 +187,34 @@ function submitCancelSelection{{ client.id }}() {
 }
 </script>
 
+<!-- Ledger totals: same three figures the print/PDF summary carries, so the
+     on-screen view and the exported document can never disagree. -->
+<div class="row g-3 mb-4 ledger-totals-row">
+    <div class="col-md-4">
+        <div class="p-3 rounded border border-secondary h-100" style="background: #1e293b;">
+            <div class="text-white-50 small"><i class="bi bi-arrow-up-right-circle me-1"></i>Total Due (Debit)</div>
+            <div class="text-danger fw-bold fs-5">{{ "{:,.2f}".format(total_debit or 0) }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 rounded border border-secondary h-100" style="background: #1e293b;">
+            <div class="text-white-50 small"><i class="bi bi-arrow-down-left-circle me-1"></i>Total Paid / Credit</div>
+            <div class="text-success fw-bold fs-5">{{ "{:,.2f}".format(total_credit or 0) }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 rounded border border-secondary h-100" style="background: #1e293b;">
+            <div class="text-white-50 small"><i class="bi bi-wallet2 me-1"></i>Net Balance</div>
+            <div class="fw-bold fs-5 {% if (total_balance or 0) < 0 %}text-success{% elif (total_balance or 0) > 0 %}text-danger{% else %}text-info{% endif %}">
+                {{ "{:,.2f}".format(total_balance or 0) }}
+            </div>
+            <div class="text-white-50 small mt-1">
+                {% if (total_balance or 0) > 0 %}Client owes company{% elif (total_balance or 0) < 0 %}Company owes client{% else %}Settled{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Financial Ledger Section -->
 <div class="card border-0 shadow-sm mb-4 financial-ledger-card" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
     <div class="card-header border-bottom border-secondary py-3 d-flex justify-content-between align-items-center" style="background: #0f172a;">
