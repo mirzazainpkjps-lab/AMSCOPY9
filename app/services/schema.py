@@ -584,6 +584,101 @@ def _ensure_performance_indexes():
         db.session.rollback()
 
 
+def _ensure_account_classification_columns():
+    """Additive Account Create/Edit classification upgrade.
+
+    Adds the controlled-hierarchy columns (Category/Subcategory/Account Type +
+    Channel + channel-specific details + linked entity + status) and the
+    adjustment traceability columns (reason + idempotency_key) on
+    AccountTransaction.  All new columns are nullable so existing rows and the
+    legacy ``category`` / ``source_category`` / ``account_type`` columns stay
+    valid.  Existing accounts are backfilled with a confident legacy→new
+    mapping; unmappable rows fall back to a valid generic classification.
+
+    Nothing here changes a balance or deletes/renames a column.
+    """
+    from blueprints.accounts import classification as cls
+
+    try:
+        rows = db.session.execute(text("PRAGMA table_info('account')")).fetchall()
+        existing = {r[1] for r in rows}
+        if existing:
+            additive = {
+                "class_category": "VARCHAR(50)",
+                "class_subcategory": "VARCHAR(80)",
+                "class_account_type": "VARCHAR(100)",
+                "channel": "VARCHAR(30)",
+                "cash_location": "VARCHAR(120)",
+                "cash_responsible": "VARCHAR(120)",
+                "wallet_provider": "VARCHAR(100)",
+                "wallet_number": "VARCHAR(80)",
+                "wallet_holder": "VARCHAR(120)",
+                "linked_entity_type": "VARCHAR(30)",
+                "linked_client_id": "INTEGER",
+                "linked_supplier_id": "INTEGER",
+                "linked_party_name": "VARCHAR(160)",
+                "account_status": "VARCHAR(20) DEFAULT 'active'",
+            }
+            for column, sqltype in additive.items():
+                if column in existing:
+                    continue
+                try:
+                    db.session.execute(text(
+                        f"ALTER TABLE account ADD COLUMN {column} {sqltype}"
+                    ))
+                except Exception:
+                    db.session.rollback()
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        rows = db.session.execute(text("PRAGMA table_info('account_transaction')")).fetchall()
+        existing = {r[1] for r in rows}
+        if existing:
+            for column, sqltype in (("reason", "VARCHAR(300)",), ("idempotency_key", "VARCHAR(64)",)):
+                if column in existing:
+                    continue
+                try:
+                    db.session.execute(text(
+                        f"ALTER TABLE account_transaction ADD COLUMN {column} {sqltype}"
+                    ))
+                except Exception:
+                    db.session.rollback()
+            # Partial unique index makes retried/double-clicked adjustments
+            # race-safe while leaving legacy NULL keys exempt.
+            db.session.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_account_transaction_idempotency_key "
+                "ON account_transaction(idempotency_key) WHERE idempotency_key IS NOT NULL"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # Backfill new classification for any existing account that has none.  The
+    # original columns are preserved untouched; only the empty new columns are
+    # filled with a confident mapping (or a valid fallback).
+    try:
+        unmapped = Account.query.filter(
+            or_(Account.class_category.is_(None), func.trim(Account.class_category) == "")
+        ).all()
+        for account in unmapped:
+            cat, sub, atype = cls.legacy_to_classification(
+                account.source_category, account.account_type, account.category
+            )
+            node = cls.resolve_node(cat, sub, atype) or cls.resolve_node(*cls.LEGACY_FALLBACK)
+            account.class_category = cat
+            account.class_subcategory = sub
+            account.class_account_type = atype
+            account.channel = node["default_channel"]
+            if not account.account_status:
+                account.account_status = "active" if account.is_active is not False else "inactive"
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logging.getLogger(__name__).exception('Account classification backfill failed')
+
+
 def _ensure_default_admin():
     """Create a first admin if the user table is empty (fresh / empty DB)."""
     if User.query.count() > 0:
@@ -631,6 +726,10 @@ def _bootstrap_database():
         pass
     try:
         _backfill_accounting_integrity_columns()
+    except Exception:
+        pass
+    try:
+        _ensure_account_classification_columns()
     except Exception:
         pass
     try:

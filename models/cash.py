@@ -51,6 +51,28 @@ class Account(db.Model):
     updated_at = db.Column(db.DateTime, default=pk_model_now, onupdate=pk_model_now, index=True)
     updated_by = db.Column(db.String(80))
     note = db.Column(db.String(500))
+    # --- Controlled classification hierarchy (additive; legacy columns above
+    # remain the compatibility surface for existing payment/KPI/transfer code).
+    # See blueprints/accounts/classification.py for the authoritative registry. ---
+    class_category = db.Column(db.String(50), index=True)        # Assets, Liabilities, ...
+    class_subcategory = db.Column(db.String(80), index=True)     # Cash, Bank, Client Receivables, ...
+    class_account_type = db.Column(db.String(100), index=True)   # Main Cash, Operating Bank, ...
+    channel = db.Column(db.String(30), index=True)               # cash/bank/digital_wallet/ledger_only/other
+    # Channel-specific details (only the subset relevant to ``channel`` is used).
+    cash_location = db.Column(db.String(120))
+    cash_responsible = db.Column(db.String(120))
+    wallet_provider = db.Column(db.String(100))
+    wallet_number = db.Column(db.String(80))
+    wallet_holder = db.Column(db.String(120))
+    # Linked entity.  client/supplier resolve to FKs; partner/worker/vehicle/
+    # party are stored as linked_party_name (+ linked_entity_type).
+    linked_entity_type = db.Column(db.String(30), index=True)    # none/client/supplier/partner/worker/vehicle/party
+    linked_client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=True, index=True)
+    linked_supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'), nullable=True, index=True)
+    linked_party_name = db.Column(db.String(160))
+    # Active / Inactive / Archived.  ``is_active`` stays in sync (True only for
+    # 'active') so existing filters keep working.
+    account_status = db.Column(db.String(20), default='active', index=True)
     __mapper_args__ = {'version_id_col': revision}
 
 
@@ -78,6 +100,11 @@ class AccountTransaction(db.Model):
     source_type = db.Column(db.String(50), nullable=True, index=True)
     source_id = db.Column(db.Integer, nullable=True, index=True)
     reconciliation_id = db.Column(db.Integer, db.ForeignKey('account_reconciliation.id'), nullable=True, index=True)
+    # Reason + idempotency key are used by balance-adjustment entries posted
+    # from the Account Edit form so each adjustment is auditable and a retried
+    # / double-clicked submission cannot post twice.
+    reason = db.Column(db.String(300), nullable=True)
+    idempotency_key = db.Column(db.String(64), nullable=True, index=True)
     created_by = db.Column(db.String(80))
     voided_by = db.Column(db.String(80))
     voided_at = db.Column(db.DateTime, nullable=True)

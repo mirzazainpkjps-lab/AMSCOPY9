@@ -1,0 +1,250 @@
+{# Shared form body for Account Create/Edit. Renders the identical structure for
+   both modes; the edit page additionally renders the Current Balance &
+   Adjustment section separately. Expects: form_mode ('create'|'edit'),
+   registry, options, clients, suppliers, today, and (edit) account. #}
+
+{# ---- Section 1: Basic Information ---- #}
+<div class="form-section">
+    <div class="sec-head">
+        <div class="step-badge">1</div>
+        <div>
+            <div class="step-title">Basic Information</div>
+            <div class="step-sub">Give this account a clear, recognizable name.</div>
+        </div>
+    </div>
+    <div class="row g-3">
+        <div class="col-md-12">
+            <label for="name" class="form-label">Account Name <span class="req">*</span></label>
+            <input type="text" class="form-control" id="name" name="name"
+                   value="{{ account.name if form_mode == 'edit' else '' }}"
+                   placeholder="e.g. FBM Cash in Hand, FBM MCB, Ahmed Capital" required>
+        </div>
+        <div class="col-md-12">
+            <label for="note" class="form-label">Note / Description <span class="text-muted small">(optional)</span></label>
+            <textarea class="form-control" id="note" name="note" rows="2"
+                      placeholder="A short internal explanation about this account.">{{ account.note if form_mode == 'edit' else '' }}</textarea>
+        </div>
+    </div>
+</div>
+
+{# ---- Section 2: Financial Classification ---- #}
+<div class="form-section">
+    <div class="sec-head">
+        <div class="step-badge">2</div>
+        <div>
+            <div class="step-title">Financial Classification</div>
+            <div class="step-sub">Category → Subcategory → Account Type. Each step narrows the next.</div>
+        </div>
+    </div>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label for="class_category" class="form-label">Category <span class="req">*</span></label>
+            <select class="form-select" id="class_category" name="class_category" required></select>
+            <div class="cat-desc" id="cat_desc"></div>
+            <div class="field-help">What broad financial area does this account belong to?</div>
+        </div>
+        <div class="col-md-4">
+            <label for="class_subcategory" class="form-label">Subcategory <span class="req">*</span></label>
+            <select class="form-select" id="class_subcategory" name="class_subcategory" required></select>
+            <div class="field-help">What kind of account is it?</div>
+        </div>
+        <div class="col-md-4">
+            <label for="class_account_type" class="form-label">Account Type <span class="req">*</span></label>
+            <select class="form-select" id="class_account_type" name="class_account_type" required></select>
+            <div class="field-help">What specific purpose does this account serve?</div>
+        </div>
+    </div>
+
+    {# ---- Section 3: Linked Entity (conditional) ---- #}
+    <div class="linked-wrap" id="linked_entity_wrap" style="display:none;">
+        <div class="panel-head"><i class="bi bi-link-45deg"></i> <span id="linked_entity_label">Linked Entity</span></div>
+        <input type="hidden" id="linked_entity_type" name="linked_entity_type" value="none">
+        <div id="entity_client" style="display:none;">
+            <label for="linked_client_id" class="form-label">Select Client <span class="req">*</span></label>
+            <select class="form-select" id="linked_client_id" name="linked_client_id">
+                <option value="">Select client…</option>
+                {% for c in clients %}
+                <option value="{{ c.id }}" {% if form_mode=='edit' and account.linked_client_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.code }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div id="entity_supplier" style="display:none;">
+            <label for="linked_supplier_id" class="form-label">Select Supplier <span class="req">*</span></label>
+            <select class="form-select" id="linked_supplier_id" name="linked_supplier_id">
+                <option value="">Select supplier…</option>
+                {% for s in suppliers %}
+                <option value="{{ s.id }}" {% if form_mode=='edit' and account.linked_supplier_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div id="entity_party" style="display:none;">
+            <label for="linked_party_name" class="form-label">Name <span class="req">*</span></label>
+            <input type="text" class="form-control" id="linked_party_name" name="linked_party_name"
+                   value="{{ account.linked_party_name if form_mode == 'edit' else '' }}"
+                   placeholder="Name of the linked partner / worker / vehicle / party">
+        </div>
+    </div>
+
+    {# ---- Section 4: Channel / Medium ---- #}
+    <div class="mt-3" id="channel_wrap" style="display:none;">
+        <label for="channel" class="form-label">Channel / Account Medium</label>
+        <select class="form-select" id="channel" name="channel" style="max-width:340px;"></select>
+        <div class="field-help">Where is this money or balance managed?</div>
+    </div>
+
+    {# Channel-specific detail panels ---- #}
+    <div class="detail-panel" id="cash_details" style="display:none;">
+        <div class="panel-head"><i class="bi bi-cash-coin"></i> Cash Details</div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label for="cash_location" class="form-label">Physical Location</label>
+                <input type="text" class="form-control" id="cash_location" name="cash_location"
+                       value="{{ account.cash_location if form_mode == 'edit' else '' }}"
+                       placeholder="e.g. Main counter drawer, Site safe">
+            </div>
+            <div class="col-md-6">
+                <label for="cash_responsible" class="form-label">Responsible Person <span class="text-muted small">(optional)</span></label>
+                <input type="text" class="form-control" id="cash_responsible" name="cash_responsible"
+                       value="{{ account.cash_responsible if form_mode == 'edit' else '' }}"
+                       placeholder="Who looks after this cash">
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-panel" id="bank_details" style="display:none;">
+        <div class="panel-head"><i class="bi bi-bank2"></i> Bank Account Details</div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label for="bank_name" class="form-label">Bank Name <span class="req">*</span></label>
+                <input type="text" class="form-control" id="bank_name" name="bank_name"
+                       value="{{ account.bank_name if form_mode == 'edit' else '' }}"
+                       placeholder="e.g. MCB, Bank Al Habib">
+            </div>
+            <div class="col-md-6">
+                <label for="account_holder_name" class="form-label">Account Title <span class="req">*</span></label>
+                <input type="text" class="form-control" id="account_holder_name" name="account_holder_name"
+                       value="{{ account.account_holder_name if form_mode == 'edit' else '' }}"
+                       placeholder="As printed on the cheque book">
+            </div>
+            <div class="col-md-6">
+                <label for="account_number" class="form-label">Account Number / IBAN <span class="req">*</span></label>
+                <input type="text" class="form-control" id="account_number" name="account_number"
+                       value="{{ account.account_number if form_mode == 'edit' else '' }}"
+                       placeholder="e.g. 0123-4567890-01 / PK36..."></div>
+            <div class="col-md-6">
+                <label for="branch_code" class="form-label">Branch <span class="text-muted small">(optional)</span></label>
+                <input type="text" class="form-control" id="branch_code" name="branch_code"
+                       value="{{ account.branch_code if form_mode == 'edit' else '' }}"
+                       placeholder="Branch name or code">
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-panel" id="wallet_details" style="display:none;">
+        <div class="panel-head"><i class="bi bi-phone"></i> Digital Wallet Details</div>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="wallet_provider" class="form-label">Provider <span class="req">*</span></label>
+                <input type="text" class="form-control" id="wallet_provider" name="wallet_provider"
+                       value="{{ account.wallet_provider if form_mode == 'edit' else '' }}"
+                       placeholder="e.g. JazzCash, EasyPaisa, NayaPay">
+            </div>
+            <div class="col-md-4">
+                <label for="wallet_number" class="form-label">Wallet Number <span class="req">*</span></label>
+                <input type="text" class="form-control" id="wallet_number" name="wallet_number"
+                       value="{{ account.wallet_number if form_mode == 'edit' else '' }}"
+                       placeholder="Mobile / account number">
+            </div>
+            <div class="col-md-4">
+                <label for="wallet_holder" class="form-label">Account Holder</label>
+                <input type="text" class="form-control" id="wallet_holder" name="wallet_holder"
+                       value="{{ account.wallet_holder if form_mode == 'edit' else '' }}"
+                       placeholder="Registered holder name">
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---- Section 5: Opening Position (CREATE) / historical opening (EDIT) ---- #}
+{% if form_mode == 'create' %}
+<div class="form-section">
+    <div class="sec-head">
+        <div class="step-badge">5</div>
+        <div>
+            <div class="step-title">Opening Position</div>
+            <div class="step-sub">The starting balance of this account on its effective date.</div>
+        </div>
+    </div>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label for="opening_amount" class="form-label">Opening Amount</label>
+            <div class="input-group">
+                <span class="input-group-text">Rs.</span>
+                <input type="number" step="0.01" min="0" class="form-control" id="opening_amount" name="opening_amount" value="0">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Balance Direction</label>
+            <div class="pos-choice">
+                <label class="pos-option selected" data-pos="debit">
+                    <span class="pos-dot"></span>
+                    <div>
+                        <div class="pos-title">Money we have</div>
+                        <div class="pos-sub">Debit (asset / positive)</div>
+                    </div>
+                    <input type="radio" name="opening_position" value="debit" checked>
+                </label>
+                <label class="pos-option" data-pos="credit">
+                    <span class="pos-dot"></span>
+                    <div>
+                        <div class="pos-title">Money we owe</div>
+                        <div class="pos-sub">Credit (liability / negative)</div>
+                    </div>
+                    <input type="radio" name="opening_position" value="credit">
+                </label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label for="opening_effective_date" class="form-label">Effective Date <span class="req">*</span></label>
+            <input type="date" class="form-control" id="opening_effective_date" name="opening_effective_date" value="{{ today }}">
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="form-section">
+    <div class="sec-head">
+        <div class="step-badge">5</div>
+        <div>
+            <div class="step-title">Opening Position <span class="badge bg-secondary ms-1">historical</span></div>
+            <div class="step-sub">The original opening recorded when this account was created. Change today's balance via the adjustment section below.</div>
+        </div>
+    </div>
+    <div class="bal-card">
+        <div class="bal-row"><span class="bal-k">Original Opening Balance</span><span class="bal-v">Rs. {{ "%.2f"|format(account.opening_balance or 0) }}</span></div>
+        <div class="bal-row"><span class="bal-k">Opening Effective Date</span><span class="bal-v">{{ account.opening_balance_date.strftime('%Y-%m-%d') if account.opening_balance_date else '—' }}</span></div>
+    </div>
+</div>
+{% endif %}
+
+{# ---- Section 6: Account Status ---- #}
+<div class="form-section">
+    <div class="sec-head">
+        <div class="step-badge">6</div>
+        <div>
+            <div class="step-title">Account Status</div>
+            <div class="step-sub">Active accounts can be selected for new transactions. Inactive / Archived preserve all history.</div>
+        </div>
+    </div>
+    {% set current_status = (account.account_status if form_mode == 'edit' else 'active') or 'active' %}
+    <div class="status-choice">
+        {% for s in options.statuses %}
+        <label class="status-option {% if s == current_status %}selected{% endif %}" data-status="{{ s }}">
+            <input type="radio" name="account_status" value="{{ s }}" {% if s == current_status %}checked{% endif %}>
+            {% if s == 'active' %}<i class="bi bi-check-circle-fill text-success me-1"></i>
+            {% elif s == 'inactive' %}<i class="bi bi-pause-circle-fill text-warning me-1"></i>
+            {% else %}<i class="bi bi-archive-fill text-secondary me-1"></i>{% endif %}
+            {{ s|capitalize }}
+        </label>
+        {% endfor %}
+    </div>
+</div>
