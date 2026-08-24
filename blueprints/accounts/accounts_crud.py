@@ -75,91 +75,90 @@ def add_account_category():
 @accounts_bp.route('/accounts/add', methods=['GET', 'POST'])
 @login_required
 def add_account():
-    """Add a new account."""
+    """Add a new account (redesigned Create form)."""
     _deny_account_master_mutation()
     _ensure_default_account_categories()
     _backfill_legacy_account_groups()
+    from .classification import registry_json
+    from .account_form import validate_account_form, cascade_options
+
     if request.method == 'POST':
-        name = (request.form.get('name') or '').strip()
-        category = (request.form.get('category') or '').strip().lower()
-        source_category = (request.form.get('source_category') or '').strip()
-        account_type = (request.form.get('account_type') or '').strip()
-        note = request.form.get('note')
-        initial_balance_raw = request.form.get('initial_balance', '0')
-
-        if not name:
-            flash('Account name is required.', 'danger')
-            return redirect(url_for('accounts.add_account'))
-        if category not in ('cash', 'bank'):
-            flash('Please select Cash or Bank.', 'danger')
-            return redirect(url_for('accounts.add_account'))
-        if not account_type:
-            flash('Please select an account type.', 'danger')
-            return redirect(url_for('accounts.add_account'))
-        if not source_category:
-            flash('Please select an account category first.', 'danger')
-            return redirect(url_for('accounts.add_account'))
-        category_exists = AccountCategory.query.filter(
-            func.lower(func.trim(AccountCategory.name)) == source_category.lower(),
-            AccountCategory.is_active == True
-        ).first()
-        if not category_exists:
-            flash('Please select a valid account category.', 'danger')
-            return redirect(url_for('accounts.add_account'))
-
         try:
+            cleaned = validate_account_form(request.form, is_edit=False)
+            name = cleaned["name"]
+
+            # Opening position (PART 7): amount + direction + effective date.
+            # Debit => positive opening (asset-like), Credit => negative opening
+            # (liability-like).  Stored as the explicit opening baseline used by
+            # ledger_balance(), so it is auditable and never a parallel balance.
             from utils.money import from_minor, to_minor
-            initial_balance_minor = to_minor(initial_balance_raw or 0, field='Initial balance')
-            initial_balance = float(from_minor(initial_balance_minor))
-        except ValueError as exc:
-            flash(str(exc), 'danger')
-            return redirect(url_for('accounts.add_account'))
+            opening_amount_raw = (request.form.get('opening_amount') or '0').strip()
+            opening_minor = to_minor(opening_amount_raw or 0, field='Opening amount')
+            position = (request.form.get('opening_position') or 'debit').strip().lower()
+            if position == 'credit':
+                opening_minor = -opening_minor
+            effective_raw = (request.form.get('opening_effective_date') or '').strip()
+            if effective_raw:
+                try:
+                    effective_dt = datetime.strptime(effective_raw, '%Y-%m-%d')
+                except ValueError:
+                    raise ValueError('Opening effective date must be a valid date (YYYY-MM-DD).')
+            else:
+                effective_dt = pk_now()
+            opening_value = float(from_minor(opening_minor))
 
-        if category == 'bank':
-            bank_name = (request.form.get('bank_name') or '').strip()
-            account_holder_name = (request.form.get('account_holder_name') or '').strip()
-            account_number = (request.form.get('account_number') or '').strip()
-            branch_code = (request.form.get('branch_code') or '').strip()
-            if not bank_name or not account_holder_name or not account_number:
-                flash('Bank account name, holder and number are required for bank accounts.', 'danger')
-                return redirect(url_for('accounts.add_account'))
-        else:
-            bank_name = None
-            account_holder_name = None
-            account_number = None
-            branch_code = None
-
-        account = Account(
-            name=name,
-            category=category,
-            source_category=category_exists.name,
-            account_type=account_type,
-            type=account_type,
-            balance=initial_balance,
-            balance_minor=initial_balance_minor,
-            opening_balance=initial_balance,
-            opening_balance_minor=initial_balance_minor,
-            opening_balance_date=pk_now(),
-            bank_name=bank_name,
-            account_holder_name=account_holder_name,
-            account_number=account_number,
-            branch_code=branch_code,
-            note=note
-        )
-        try:
+            account = Account(
+                name=name,
+                category=cleaned["category"],
+                source_category=cleaned["source_category"],
+                account_type=cleaned["account_type"],
+                type=cleaned["type"],
+                balance=opening_value,
+                balance_minor=opening_minor,
+                opening_balance=opening_value,
+                opening_balance_minor=opening_minor,
+                opening_balance_date=effective_dt,
+                bank_name=cleaned["bank_name"],
+                account_holder_name=cleaned["account_holder_name"],
+                account_number=cleaned["account_number"],
+                branch_code=cleaned["branch_code"],
+                class_category=cleaned["class_category"],
+                class_subcategory=cleaned["class_subcategory"],
+                class_account_type=cleaned["class_account_type"],
+                channel=cleaned["channel"],
+                cash_location=cleaned["cash_location"],
+                cash_responsible=cleaned["cash_responsible"],
+                wallet_provider=cleaned["wallet_provider"],
+                wallet_number=cleaned["wallet_number"],
+                wallet_holder=cleaned["wallet_holder"],
+                linked_entity_type=cleaned["linked_entity_type"],
+                linked_client_id=cleaned["linked_client_id"],
+                linked_supplier_id=cleaned["linked_supplier_id"],
+                linked_party_name=cleaned["linked_party_name"],
+                account_status=cleaned["account_status"],
+                is_active=cleaned["is_active"],
+                note=cleaned["note"],
+            )
             from utils.accounting_audit import record_accounting_audit
             db.session.add(account)
             db.session.flush()
             record_accounting_audit(
                 current_user, action='Create', entity_type='Account', entity_id=account.id,
-                after={'name': name, 'category': category, 'source_category': category_exists.name,
-                       'account_type': account_type, 'opening_balance': initial_balance},
-                amount_after=initial_balance, account_after_id=account.id, reason=note,
+                after={
+                    'name': name, 'class_category': cleaned["class_category"],
+                    'class_subcategory': cleaned["class_subcategory"],
+                    'class_account_type': cleaned["class_account_type"],
+                    'channel': cleaned["channel"], 'account_status': cleaned["account_status"],
+                    'opening_balance': opening_value, 'opening_position': position,
+                },
+                amount_after=opening_value, account_after_id=account.id, reason=cleaned["note"],
             )
             db.session.commit()
-        except IntegrityError as exc:
+            flash('Account added successfully!', 'success')
+            return redirect(url_for('accounts.manage_accounts'))
+        except ValueError as exc:
             db.session.rollback()
-            flash(f'Unable to add account due to database constraint: {exc.orig}', 'danger')
+            flash(str(exc), 'danger')
             return redirect(url_for('accounts.add_account'))
         except Exception as exc:
             db.session.rollback()
@@ -167,10 +166,15 @@ def add_account():
             flash(f'Unable to add account: {exc}', 'danger')
             return redirect(url_for('accounts.add_account'))
 
-        flash('Account added successfully!', 'success')
-        return redirect(url_for('accounts.manage_accounts'))
-
-    return render_template('accounts/add_account.html', categories=_account_categories())
+    return render_template(
+        'accounts/add_account.html',
+        categories=_account_categories(),
+        registry=registry_json(),
+        options=cascade_options(),
+        clients=_active_clients(),
+        suppliers=_active_suppliers(),
+        today=pk_today().strftime('%Y-%m-%d'),
+    )
 
 
 @accounts_bp.route('/ledger/<int:account_id>')
@@ -263,7 +267,8 @@ def account_ledger(account_id):
 @accounts_bp.route('/<int:account_id>/data')
 @login_required
 def account_data(account_id):
-    """JSON data for the edit account modal."""
+    """JSON data for an account (kept for backwards compatibility / tooling)."""
+    from app.services.payments_crud import ledger_balance
     a = Account.query.get_or_404(account_id)
     return jsonify({
         'id': a.id,
@@ -272,116 +277,220 @@ def account_data(account_id):
         'source_category': a.source_category,
         'account_type': a.account_type or (getattr(a, 'type', None) or ''),
         'balance': float(a.balance or 0),
+        'calculated_balance': ledger_balance(a.id),
         'bank_name': a.bank_name or '',
         'account_holder_name': a.account_holder_name or '',
         'account_number': a.account_number or '',
         'branch_code': a.branch_code or '',
         'note': a.note or '',
         'is_active': bool(a.is_active),
+        'class_category': a.class_category or '',
+        'class_subcategory': a.class_subcategory or '',
+        'class_account_type': a.class_account_type or '',
+        'channel': a.channel or '',
+        'cash_location': a.cash_location or '',
+        'cash_responsible': a.cash_responsible or '',
+        'wallet_provider': a.wallet_provider or '',
+        'wallet_number': a.wallet_number or '',
+        'wallet_holder': a.wallet_holder or '',
+        'linked_entity_type': a.linked_entity_type or 'none',
+        'linked_client_id': a.linked_client_id,
+        'linked_supplier_id': a.linked_supplier_id,
+        'linked_party_name': a.linked_party_name or '',
+        'account_status': a.account_status or ('active' if a.is_active else 'inactive'),
     })
 
 
-@accounts_bp.route('/<int:account_id>/edit', methods=['POST'])
+@accounts_bp.route('/<int:account_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_account(account_id):
-    """Edit an account's metadata. Balance changes are recorded as Adjustment transactions."""
+    """Edit an account (redesigned Edit form).
+
+    Structurally identical to the Create form, plus one extra Current Balance &
+    Adjustment section (PART 12).  Any balance change is posted as a single
+    traceable Adjustment ledger entry — never a silent overwrite (PART 13/15).
+    """
     _deny_account_master_mutation()
+    from .classification import registry_json
+    from .account_form import validate_account_form, cascade_options
+    from app.services.payments_crud import ledger_balance, _assert_period_open
+
     a = Account.query.get_or_404(account_id)
-    try:
-        before = {
-            'id': a.id, 'name': a.name, 'category': a.category,
-            'source_category': a.source_category, 'account_type': a.account_type,
-            'balance': _money_round(a.balance), 'is_active': bool(a.is_active),
-            'bank_name': a.bank_name, 'account_number': a.account_number, 'note': a.note,
-        }
-        name = (request.form.get('name') or '').strip()
-        category = (request.form.get('category') or '').strip().lower()
-        source_category = (request.form.get('source_category') or '').strip()
-        account_type = (request.form.get('account_type') or '').strip()
-        note = (request.form.get('note') or '').strip()
-        new_balance_raw = request.form.get('balance', '').strip()
 
-        if not name:
-            raise ValueError('Account name is required.')
-        if category not in ('cash', 'bank'):
-            raise ValueError('Please select Cash or Bank.')
-        if not account_type:
-            raise ValueError('Please select an account type.')
-        if not source_category:
-            raise ValueError('Please select an account category.')
+    if request.method == 'POST':
+        try:
+            cleaned = validate_account_form(request.form, is_edit=True)
+            note = cleaned["note"]
 
-        cat = AccountCategory.query.filter(
-            func.lower(func.trim(AccountCategory.name)) == source_category.lower(),
-            AccountCategory.is_active == True
+            before = {
+                'id': a.id, 'name': a.name, 'class_category': a.class_category,
+                'class_subcategory': a.class_subcategory, 'class_account_type': a.class_account_type,
+                'channel': a.channel, 'account_status': a.account_status,
+                'balance': _money_round(a.balance), 'is_active': bool(a.is_active),
+            }
+
+            # Update classification + details.  validate_account_form already
+            # returned only the channel-relevant detail fields and cleared the
+            # incompatible ones (PART 11), so no stale bank/wallet data remains.
+            a.name = cleaned["name"]
+            a.class_category = cleaned["class_category"]
+            a.class_subcategory = cleaned["class_subcategory"]
+            a.class_account_type = cleaned["class_account_type"]
+            a.channel = cleaned["channel"]
+            a.category = cleaned["category"]
+            a.source_category = cleaned["source_category"]
+            a.account_type = cleaned["account_type"]
+            a.type = cleaned["type"]
+            a.cash_location = cleaned["cash_location"]
+            a.cash_responsible = cleaned["cash_responsible"]
+            a.bank_name = cleaned["bank_name"]
+            a.account_holder_name = cleaned["account_holder_name"]
+            a.account_number = cleaned["account_number"]
+            a.branch_code = cleaned["branch_code"]
+            a.wallet_provider = cleaned["wallet_provider"]
+            a.wallet_number = cleaned["wallet_number"]
+            a.wallet_holder = cleaned["wallet_holder"]
+            a.linked_entity_type = cleaned["linked_entity_type"]
+            a.linked_client_id = cleaned["linked_client_id"]
+            a.linked_supplier_id = cleaned["linked_supplier_id"]
+            a.linked_party_name = cleaned["linked_party_name"]
+            a.account_status = cleaned["account_status"]
+            a.is_active = cleaned["is_active"]
+            a.note = note
+
+            # ---- Balance adjustment (PART 12 / PART 13) ----
+            desired_raw = (request.form.get('desired_balance') or '').strip()
+            adjustment_msg = _apply_balance_adjustment(a, desired_raw, request.form)
+            if adjustment_msg:
+                flash(adjustment_msg, 'info')
+
+            a.updated_by = getattr(current_user, 'username', None)
+            a.revision = int(getattr(a, 'revision', None) or 1) + 1
+            from utils.accounting_audit import record_accounting_audit
+            after = {
+                'id': a.id, 'name': a.name, 'class_category': a.class_category,
+                'class_subcategory': a.class_subcategory, 'class_account_type': a.class_account_type,
+                'channel': a.channel, 'account_status': a.account_status,
+                'balance': _money_round(a.balance), 'is_active': bool(a.is_active),
+            }
+            record_accounting_audit(
+                current_user, action='Edit', entity_type='Account', entity_id=a.id,
+                before=before, after=after, amount_before=before['balance'], amount_after=after['balance'],
+                account_before_id=a.id, account_after_id=a.id, reason=note,
+            )
+            db.session.commit()
+            flash('Account updated successfully.', 'success')
+            return redirect(url_for('accounts.manage_accounts'))
+        except ValueError as exc:
+            db.session.rollback()
+            flash(str(exc), 'danger')
+        except Exception as exc:
+            db.session.rollback()
+            logger.exception('Edit account failed')
+            flash(f'Unable to update account: {exc}', 'danger')
+
+        # On validation failure, fall through to re-render the edit page so the
+        # user keeps their entered values and sees the flash message.
+
+    # GET (or re-render after a POST error): preload every value so dependent
+    # dropdowns initialise in the correct order (PART 10).
+    calculated = ledger_balance(a.id)
+    return render_template(
+        'accounts/edit_account.html',
+        account=a,
+        categories=_account_categories(),
+        registry=registry_json(),
+        options=cascade_options(),
+        clients=_active_clients(),
+        suppliers=_active_suppliers(),
+        calculated_balance=calculated,
+        today=pk_today().strftime('%Y-%m-%d'),
+    )
+
+
+def _apply_balance_adjustment(account, desired_raw, form):
+    """Post a single traceable Adjustment ledger entry for the desired balance.
+
+    Returns a short human message, or '' when no adjustment is needed.
+    Raises ValueError for invalid input.  Implements PART 13/14/15:
+
+    * Desired == current  -> no entry, no zero-value transaction (PART 15).
+    * Difference < 0      -> money OUT (visible negative ledger entry).
+    * Difference > 0      -> money IN (visible positive ledger entry).
+    * Idempotency key     -> retried / double-clicked save cannot post twice.
+    """
+    from utils.money import from_minor, to_minor
+    from app.services.payments_crud import _assert_period_open
+
+    if desired_raw == '':
+        return ''
+
+    desired_minor = to_minor(desired_raw, field='Desired balance')
+    current_minor = (
+        int(account.balance_minor)
+        if getattr(account, 'balance_minor', None) is not None
+        else to_minor(account.balance or 0)
+    )
+    diff_minor = desired_minor - current_minor
+    if diff_minor == 0:
+        return ''  # PART 15: no-change save
+
+    # Adjustment reason is mandatory whenever an adjustment is made (PART 12).
+    reason = (form.get('adjustment_reason') or '').strip()
+    reason_other = (form.get('adjustment_reason_other') or '').strip()
+    if (reason or '').lower() == 'other':
+        reason = reason_other
+    if not reason:
+        raise ValueError('An adjustment reason is required when changing the balance.')
+
+    adj_date_raw = (form.get('adjustment_date') or '').strip()
+    if adj_date_raw:
+        try:
+            adj_dt = datetime.strptime(adj_date_raw, '%Y-%m-%d')
+        except ValueError:
+            raise ValueError('Adjustment date must be a valid date (YYYY-MM-DD).')
+    else:
+        adj_dt = pk_now()
+
+    # Reject edits inside a finalised (reconciled) period (PART 14 safety).
+    _assert_period_open(account.id, adj_dt, operation='adjusted')
+
+    # Idempotency: a retried/double-clicked save with the same key skips the
+    # duplicate post.  An adjustment marker keyed to the account+key means a
+    # repeat submission finds the existing entry and does nothing.
+    idem = (form.get('idempotency_key') or '').strip()
+    if idem:
+        from models import AccountTransaction
+        replay = AccountTransaction.query.filter(
+            AccountTransaction.idempotency_key == idem,
+            AccountTransaction.is_void == False,
         ).first()
-        if not cat:
-            raise ValueError('Selected account category not found.')
+        if replay:
+            return ''
 
-        a.name = name
-        a.category = category
-        a.source_category = cat.name
-        a.account_type = account_type
-        a.type = account_type
-        a.note = note or None
-
-        if category == 'bank':
-            a.bank_name = (request.form.get('bank_name') or '').strip() or None
-            a.account_holder_name = (request.form.get('account_holder_name') or '').strip() or None
-            a.account_number = (request.form.get('account_number') or '').strip() or None
-            a.branch_code = (request.form.get('branch_code') or '').strip() or None
-        else:
-            a.bank_name = None
-            a.account_holder_name = None
-            a.account_number = None
-            a.branch_code = None
-
-        if new_balance_raw != '':
-            from utils.money import from_minor, to_minor
-            from app.services.payments_crud import _assert_period_open
-            old_minor = int(a.balance_minor) if getattr(a, 'balance_minor', None) is not None else to_minor(a.balance or 0)
-            new_minor = to_minor(new_balance_raw, field='Balance')
-            diff_minor = new_minor - old_minor
-            if diff_minor:
-                _assert_period_open(a.id, pk_now(), operation='manually adjusted')
-                adj = AccountTransaction(
-                    from_account_id=(a.id if diff_minor < 0 else None),
-                    to_account_id=(a.id if diff_minor > 0 else None),
-                    amount=float(from_minor(abs(diff_minor))), amount_minor=abs(diff_minor),
-                    description='Balance adjustment (manual edit)',
-                    note=(f'Adjusted from Rs. {float(from_minor(old_minor)):.2f} '
-                          f'to Rs. {float(from_minor(new_minor)):.2f}'),
-                    transaction_type='Adjustment', source_type='Account', source_id=a.id,
-                    created_by=getattr(current_user, 'username', None), date_posted=pk_now()
-                )
-                db.session.add(adj)
-                a.balance_minor = new_minor
-                a.balance = float(from_minor(new_minor))
-
-        a.updated_by = getattr(current_user, 'username', None)
-        a.revision = int(getattr(a, 'revision', None) or 1) + 1
-        from utils.accounting_audit import record_accounting_audit
-        after = {
-            'id': a.id, 'name': a.name, 'category': a.category,
-            'source_category': a.source_category, 'account_type': a.account_type,
-            'balance': _money_round(a.balance), 'is_active': bool(a.is_active),
-            'bank_name': a.bank_name, 'account_number': a.account_number, 'note': a.note,
-        }
-        record_accounting_audit(
-            current_user, action='Edit', entity_type='Account', entity_id=a.id,
-            before=before, after=after, amount_before=before['balance'], amount_after=after['balance'],
-            account_before_id=a.id, account_after_id=a.id, reason=note,
-        )
-        db.session.commit()
-        flash('Account updated successfully.', 'success')
-    except ValueError as exc:
-        db.session.rollback()
-        flash(str(exc), 'danger')
-    except Exception as exc:
-        db.session.rollback()
-        logger.exception('Edit account failed')
-        flash(f'Unable to update account: {exc}', 'danger')
-
-    return redirect(url_for('accounts.manage_accounts'))
+    direction = 'decrease' if diff_minor < 0 else 'increase'
+    amount_minor = abs(diff_minor)
+    adj = AccountTransaction(
+        from_account_id=(account.id if diff_minor < 0 else None),
+        to_account_id=(account.id if diff_minor > 0 else None),
+        amount=float(from_minor(amount_minor)), amount_minor=amount_minor,
+        description='Balance adjustment (manual edit)',
+        note=(f'Adjusted from Rs. {float(from_minor(current_minor)):.2f} '
+              f'to Rs. {float(from_minor(desired_minor)):.2f} ({direction} of '
+              f'Rs. {float(from_minor(amount_minor)):.2f})'),
+        reason=reason[:300],
+        transaction_type='Adjustment', source_type='Account', source_id=account.id,
+        idempotency_key=(idem[:64] if idem else None),
+        created_by=getattr(current_user, 'username', None), date_posted=adj_dt,
+    )
+    db.session.add(adj)
+    db.session.flush()
+    from app.services.accounting import _apply_account_tx_effect
+    _apply_account_tx_effect(adj)
+    account.balance_minor = desired_minor
+    account.balance = float(from_minor(desired_minor))
+    return (f'Balance {direction}d by Rs. {float(from_minor(amount_minor)):.2f} '
+            f'via an Adjustment ledger entry.')
 
 
 @accounts_bp.route('/<int:account_id>/toggle', methods=['POST'])
@@ -392,13 +501,17 @@ def toggle_account(account_id):
     a = Account.query.get_or_404(account_id)
     before = {'id': a.id, 'name': a.name, 'is_active': bool(a.is_active)}
     a.is_active = not bool(a.is_active)
+    # Keep the 3-state status in sync with the legacy boolean so both the
+    # redesigned status pills and the legacy filters agree.
+    a.account_status = "active" if a.is_active else "inactive"
     a.updated_by = getattr(current_user, 'username', None)
     a.revision = int(getattr(a, 'revision', None) or 1) + 1
     from utils.accounting_audit import record_accounting_audit
     record_accounting_audit(
         current_user, action='Activate' if a.is_active else 'Suspend',
         entity_type='Account', entity_id=a.id, before=before,
-        after={'id': a.id, 'name': a.name, 'is_active': bool(a.is_active)},
+        after={'id': a.id, 'name': a.name, 'is_active': bool(a.is_active),
+               'account_status': a.account_status},
         account_before_id=a.id, account_after_id=a.id,
     )
     db.session.commit()
@@ -430,6 +543,7 @@ def delete_account(account_id):
         from utils.accounting_audit import record_accounting_audit
         if reference_count:
             a.is_active = False
+            a.account_status = "archived"
             a.updated_by = getattr(current_user, 'username', None)
             a.revision = int(getattr(a, 'revision', None) or 1) + 1
             record_accounting_audit(

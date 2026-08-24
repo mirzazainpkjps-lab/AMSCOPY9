@@ -116,6 +116,7 @@
                     </td>
                     <td>
                         <div>{{ tx.description or '' }}</div>
+                        {% if tx.reason %}<div class="small"><i class="bi bi-chat-left-text me-1 text-muted"></i>{{ tx.reason }}</div>{% endif %}
                         {% if tx.note %}<div class="small text-muted">{{ tx.note }}</div>{% endif %}
                     </td>
                     <td class="text-end">{% if incoming and not tx.is_void %}<span class="led-amt-in">Rs. {{ "%.2f"|format(tx.amount or 0) }}</span>{% endif %}</td>
