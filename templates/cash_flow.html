@@ -387,6 +387,15 @@
   </section><!-- /financial -->
 
   <style>
+    .cf-entry-note {
+      display: inline-block;
+      max-width: 28ch;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: bottom;
+      cursor: help;
+    }
     .cf-dir-tabs {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1279,7 +1288,7 @@
               {% if r.party_type %}<div class="small text-muted">({{ r.party_type }})</div>{% endif %}
             </td>
             <td>{{ r.description }}</td>
-            <td>{{ r.note or '—' }}</td>
+            <td><span class="cf-entry-note" title="{{ r.note or '' }}">{{ r.note or '—' }}</span></td>
             <td><code>{{ r.reference }}</code></td>
             <td class="text-end font-monospace" style="color:#16a34a;font-weight:600;">
               {% if r.cash_in %}Rs. {{ "{:,.0f}".format(r.cash_in) }}{% endif %}

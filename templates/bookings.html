@@ -116,7 +116,7 @@
                     </td>
                     <td class="text-danger fw-bold">{{ currency_symbol }}{{ "%.2f"|format(booking.amount) }}</td>
                     <td class="text-success fw-bold">{{ currency_symbol }}{{ "%.2f"|format(booking.paid_amount) }}</td>
-                    <td><span class="small text-white-50" title="{{ booking.note or '' }}">{{ booking.note or '—' }}</span></td>
+                    <td><span class="small text-white-50 booking-note" title="{{ booking.note or '' }}">{{ booking.note or '—' }}</span></td>
                     <td class="text-end pe-4">
                         {% set booking_bill_ref = (booking.manual_bill_no or booking.auto_bill_no or ('BK-' ~ booking.id)) %}
                         <a href="{{ url_for('view_bill', bill_no=booking_bill_ref|replace('#', '%23'), src='booking', src_id=booking.id, client_name=booking.client_name) }}" class="btn btn-outline-info btn-sm border-2 rounded-pill shadow-sm me-1" title="View"><i class="bi bi-eye"></i></a>
@@ -311,28 +311,72 @@
 <div id="bookingMaterialCombobox" class="combobox-list shadow-lg" style="display: none;"></div>
 
 <style>
+.booking-note {
+    display: inline-block;
+    max-width: 24ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+    cursor: help;
+}
 .booking-modal-dialog {
     max-width: min(1120px, 96vw);
+}
+.booking-modal-dialog .modal-body {
+    overflow-x: hidden;
+}
+.booking-modal-dialog .form-control,
+.booking-modal-dialog .form-select,
+.booking-modal-dialog .btn {
+    min-height: 38px;
+}
+.booking-modal-dialog .form-control-sm,
+.booking-modal-dialog .input-group-sm > .form-control,
+.booking-modal-dialog .input-group-sm > .btn {
+    min-height: 36px;
 }
 
 .booking-item-header {
     display: grid;
-    grid-template-columns: 3.4fr 2.2fr 2.2fr 2.2fr auto;
-    column-gap: 0.5rem;
+    grid-template-columns: minmax(220px, 2.6fr) minmax(130px, 1.1fr) minmax(120px, 1fr) minmax(120px, 1fr) 46px;
+    column-gap: 0.75rem;
+    align-items: center;
 }
 
 .booking-item-grid {
     display: grid;
-    grid-template-columns: 3.4fr 2.2fr 2.2fr 2.2fr auto;
-    column-gap: 0.5rem;
-    row-gap: 0.5rem;
-    align-items: center;
+    grid-template-columns: minmax(220px, 2.6fr) minmax(130px, 1.1fr) minmax(120px, 1fr) minmax(120px, 1fr) 46px;
+    column-gap: 0.75rem;
+    row-gap: 0.55rem;
+    align-items: start;
 }
+.booking-item-grid > * { min-width: 0; }
+.booking-item-grid .line-total { font-weight: 700; }
+.booking-item-grid .text-center .btn { width: 38px; padding-left: 0; padding-right: 0; }
+
+.booking-item-grid > *::before {
+    display: none;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 3px;
+}
+.booking-item-grid > *:nth-child(1)::before { content: "Material"; }
+.booking-item-grid > *:nth-child(2)::before { content: "Qty"; }
+.booking-item-grid > *:nth-child(3)::before { content: "Unit Price"; }
+.booking-item-grid > *:nth-child(4)::before { content: "Item Total"; }
+.booking-item-grid > *:nth-child(5)::before { content: "Remove"; }
 
 @media (max-width: 767.98px) {
+    .booking-item-header { display: none !important; }
     .booking-item-grid {
         grid-template-columns: 1fr 1fr;
     }
+    .booking-item-grid > *::before { display: block; }
+    .booking-item-grid > *:first-child { grid-column: 1 / -1; }
 }
 
 @media (max-width: 575.98px) {
@@ -345,6 +389,15 @@
     .booking-modal-dialog {
         max-width: 100vw;
         margin: 0;
+    }
+    .booking-note {
+        max-width: 100%;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+    .booking-modal-dialog .row > .col-6 {
+        width: 100%;
     }
     .booking-item-grid {
         grid-template-columns: 1fr;
