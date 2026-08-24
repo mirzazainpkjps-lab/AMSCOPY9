@@ -56,7 +56,7 @@
 .sale-form .sale-item-grid > *:nth-child(6)::before { content: "Item Total"; }
 .sale-form .sale-item-grid > *:nth-child(7)::before { content: "Remove"; }
 .sale-form .sale-item-grid > *::before {
-    display: block;
+    display: none;
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -192,6 +192,14 @@
         grid-template-columns: 1.2fr 1fr 1.2fr 120px 1.2fr 1fr auto;
     }
 }
+@media (max-width: 767.98px) {
+    .sale-form .sale-item-header { display: none !important; }
+    .sale-form .sale-item-grid {
+        grid-template-columns: 1fr;
+        row-gap: 0.55rem;
+    }
+    .sale-form .sale-item-grid > *::before { display: block; }
+}
 @media (max-width: 575.98px) {
     .sales-filter-form { row-gap: 0.4rem !important; }
     .sale-form .sale-item-header { display: none; }
@@ -216,6 +224,12 @@
 }
 
 /* Theme-aware form controls inside sale modals */
+.sale-form .input-group-sm > .form-control,
+.sale-form .input-group-sm > .btn,
+.sale-form .form-control-sm,
+.sale-form .form-select-sm {
+    min-height: 36px;
+}
 .sale-form .form-control,
 .sale-form .form-select {
     background: var(--ui-surface-2, #1a2332) !important;
@@ -736,7 +750,8 @@
                                     <label class="text-white-50 small fw-bold mb-1">RENT CHARGED TO CLIENT (TOTAL)</label>
                                     <input type="number" step="0.01" class="form-control bg-dark text-white border-secondary rent-charged-total" value="0" readonly>
                                 </div>
-                               <div class="col-sm-4">
+                            </div>
+                            <div class="col-sm-4">
                                 <div class="mb-3">
                                     <label class="text-white-50 small fw-bold mb-1">DELIVERY PERSON RENT (ACTUAL)</label>
                                     <input type="number" step="0.01" name="delivery_rent" class="form-control bg-dark text-white border-secondary delivery-rent-total" value="0" readonly>

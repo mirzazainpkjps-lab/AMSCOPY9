@@ -1,6 +1,15 @@
 {% extends "layout.html" %}
 {% block content %}
 <style>
+.entry-note {
+    display: inline-block;
+    max-width: 24ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+    cursor: help;
+}
 @media (max-width: 575.98px) {
     .payments-filter-form {
         padding: 0.6rem !important;
@@ -140,6 +149,7 @@
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Client</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Amount</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Method</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Notes</th>
                     <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
                 </tr>
             </thead>
@@ -163,6 +173,9 @@
                     <td class="text-white">{{ payment.client_name }}</td>
                     <td class="text-success fw-bold">{{ currency_symbol }}{{ "%.2f"|format(payment.amount) }}</td>
                     <td class="text-info">{{ payment.method }}</td>
+                    <td class="text-white-50 small">
+                        <span class="entry-note" title="{{ payment.note or '' }}">{{ payment.note or '—' }}</span>
+                    </td>
                     <td class="text-end pe-4">
                         {% set payment_bill_ref = (payment.manual_bill_no or payment.auto_bill_no or ('PAY-' ~ payment.id)) %}
                         <a href="{{ url_for('download_invoice', bill_no=payment_bill_ref|replace('#', '%23'), src='payment', src_id=payment.id, client_name=payment.client_name) }}" class="btn btn-outline-warning btn-sm border-2 rounded-pill shadow-sm me-1" title="Download PDF"><i class="bi bi-download"></i></a>
@@ -188,7 +201,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="text-center py-5 text-white-50">No customer payments found.</td></tr>
+                <tr><td colspan="7" class="text-center py-5 text-white-50">No customer payments found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
