@@ -1,7 +1,8 @@
 {# Shared form body for Account Create/Edit. Renders the identical structure for
-   both modes; the edit page additionally renders the Current Balance &
-   Adjustment section separately. Expects: form_mode ('create'|'edit'),
-   registry, options, clients, suppliers, today, and (edit) account. #}
+   both modes, including an editable Opening Position. The edit page additionally
+   renders the Current Balance & Adjustment section separately. Expects:
+   form_mode ('create'|'edit'), registry, options, clients, suppliers, today,
+   and (edit) account. #}
 
 {# ---- Section 1: Basic Information ---- #}
 <div class="form-section">
@@ -165,66 +166,71 @@
     </div>
 </div>
 
-{# ---- Section 5: Opening Position (CREATE) / historical opening (EDIT) ---- #}
-{% if form_mode == 'create' %}
+{# ---- Section 5: Opening Position (editable on create and edit) ---- #}
+{% set opening_signed = (account.opening_balance if form_mode == 'edit' else 0) or 0 %}
+{% set opening_is_credit = opening_signed < 0 %}
+{% set opening_abs = -opening_signed if opening_is_credit else opening_signed %}
+{% set opening_date_value = (account.opening_balance_date.strftime('%Y-%m-%d') if form_mode == 'edit' and account.opening_balance_date else today) %}
 <div class="form-section">
     <div class="sec-head">
         <div class="step-badge">5</div>
         <div>
             <div class="step-title">Opening Position</div>
+            {% if form_mode == 'create' %}
             <div class="step-sub">The starting balance of this account on its effective date.</div>
+            {% else %}
+            <div class="step-sub">Correct the historical opening so the ledger starts from the real figure. Changing it shifts every later running balance and today's calculated balance by the same amount. Use the adjustment section below only when today's physical cash still does not match.</div>
+            {% endif %}
         </div>
     </div>
+    {% if form_mode == 'edit' %}
+    <input type="hidden" id="original_opening_hidden" value="{{ '%.2f'|format(opening_signed) }}">
+    <div class="bal-card mb-3">
+        <div class="bal-row"><span class="bal-k">Currently stored opening</span><span class="bal-v">Rs. {{ "%.2f"|format(opening_signed) }}</span></div>
+        <div class="bal-row"><span class="bal-k">Currently stored effective date</span><span class="bal-v">{{ account.opening_balance_date.strftime('%Y-%m-%d') if account.opening_balance_date else '—' }}</span></div>
+    </div>
+    {% endif %}
     <div class="row g-3">
         <div class="col-md-4">
             <label for="opening_amount" class="form-label">Opening Amount</label>
             <div class="input-group">
                 <span class="input-group-text">Rs.</span>
-                <input type="number" step="0.01" min="0" class="form-control" id="opening_amount" name="opening_amount" value="0">
+                <input type="number" step="0.01" min="0" class="form-control" id="opening_amount" name="opening_amount" value="{{ '%.2f'|format(opening_abs) }}">
             </div>
         </div>
         <div class="col-md-4">
             <label class="form-label">Balance Direction</label>
             <div class="pos-choice">
-                <label class="pos-option selected" data-pos="debit">
+                <label class="pos-option {% if not opening_is_credit %}selected{% endif %}" data-pos="debit">
                     <span class="pos-dot"></span>
                     <div>
                         <div class="pos-title">Money we have</div>
                         <div class="pos-sub">Debit (asset / positive)</div>
                     </div>
-                    <input type="radio" name="opening_position" value="debit" checked>
+                    <input type="radio" name="opening_position" value="debit" {% if not opening_is_credit %}checked{% endif %}>
                 </label>
-                <label class="pos-option" data-pos="credit">
+                <label class="pos-option {% if opening_is_credit %}selected{% endif %}" data-pos="credit">
                     <span class="pos-dot"></span>
                     <div>
                         <div class="pos-title">Money we owe</div>
                         <div class="pos-sub">Credit (liability / negative)</div>
                     </div>
-                    <input type="radio" name="opening_position" value="credit">
+                    <input type="radio" name="opening_position" value="credit" {% if opening_is_credit %}checked{% endif %}>
                 </label>
             </div>
         </div>
         <div class="col-md-4">
             <label for="opening_effective_date" class="form-label">Effective Date <span class="req">*</span></label>
-            <input type="date" class="form-control" id="opening_effective_date" name="opening_effective_date" value="{{ today }}">
+            <input type="date" class="form-control" id="opening_effective_date" name="opening_effective_date" value="{{ opening_date_value }}">
         </div>
     </div>
-</div>
-{% else %}
-<div class="form-section">
-    <div class="sec-head">
-        <div class="step-badge">5</div>
-        <div>
-            <div class="step-title">Opening Position <span class="badge bg-secondary ms-1">historical</span></div>
-            <div class="step-sub">The original opening recorded when this account was created. Change today's balance via the adjustment section below.</div>
-        </div>
+    {% if form_mode == 'edit' %}
+    <div class="small text-muted mt-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Opening is the starting baseline, not a new ledger entry. A physical mismatch for today belongs in the adjustment section so tomorrow opens from the corrected figure.
     </div>
-    <div class="bal-card">
-        <div class="bal-row"><span class="bal-k">Original Opening Balance</span><span class="bal-v">Rs. {{ "%.2f"|format(account.opening_balance or 0) }}</span></div>
-        <div class="bal-row"><span class="bal-k">Opening Effective Date</span><span class="bal-v">{{ account.opening_balance_date.strftime('%Y-%m-%d') if account.opening_balance_date else '—' }}</span></div>
-    </div>
+    {% endif %}
 </div>
-{% endif %}
 
 {# ---- Section 6: Account Status ---- #}
 <div class="form-section">
