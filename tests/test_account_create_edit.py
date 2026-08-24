@@ -364,6 +364,8 @@ def test_edit_page_preloads_values(client, app):
     # initialise in the correct order.
     assert '"Main Cash"' in body
     assert "ACCOUNT_PRESET" in body
+    assert 'name="opening_amount"' in body
+    assert 'id="opening_amount"' in body
 
 
 def test_edit_changes_classification_and_clears_stale_details(client, app):
@@ -537,6 +539,95 @@ def test_adjustment_reason_required(client, app):
     with app.app_context():
         acc = db.session.get(Account, aid)
         assert acc.balance == 50000.0  # unchanged
+
+
+def test_edit_opening_balance_shifts_current_without_adjustment(client, app):
+    """Correcting the historical opening must rewrite the baseline, not post a txn."""
+    login(client)
+    aid = _seed_account_with_balance(app, "Open Fix", 50000.0)
+    with app.app_context():
+        before_count = AccountTransaction.query.filter_by(is_void=False).count()
+    resp = edit_account(
+        client,
+        aid,
+        name="Open Fix",
+        opening_amount="75000",
+        opening_position="debit",
+        opening_effective_date="2026-01-15",
+        # desired follows the new current so no physical-cash adjustment is posted
+        desired_balance="75000",
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        acc = db.session.get(Account, aid)
+        assert acc.opening_balance == 75000.0
+        assert acc.opening_balance_minor == 7500000
+        assert acc.opening_balance_date.strftime("%Y-%m-%d") == "2026-01-15"
+        assert acc.balance == 75000.0
+        from app.services.payments_crud import ledger_balance
+
+        assert ledger_balance(aid) == 75000.0
+        after_count = AccountTransaction.query.filter_by(is_void=False).count()
+        assert after_count == before_count
+
+
+def test_edit_opening_then_physical_adjustment(client, app):
+    """Opening correction plus today's physical mismatch posts exactly one Adjustment."""
+    login(client)
+    aid = _seed_account_with_balance(app, "Open Plus Adj", 50000.0)
+    resp = edit_account(
+        client,
+        aid,
+        name="Open Plus Adj",
+        opening_amount="60000",
+        opening_position="debit",
+        opening_effective_date="2026-01-01",
+        # After opening 50k→60k, current is 60k. Physical count is 58k.
+        desired_balance="58000",
+        adjustment_reason="Physical cash verification",
+        adjustment_date="2026-08-24",
+        idempotency_key="key-open-adj-1",
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        acc = db.session.get(Account, aid)
+        assert acc.opening_balance == 60000.0
+        assert acc.balance == 58000.0
+        adjs = (
+            AccountTransaction.query.filter_by(transaction_type="Adjustment", is_void=False)
+            .filter(
+                (AccountTransaction.from_account_id == aid)
+                | (AccountTransaction.to_account_id == aid)
+            )
+            .all()
+        )
+        assert len(adjs) == 1
+        assert adjs[0].from_account_id == aid
+        assert adjs[0].amount == 2000.0
+        from app.services.payments_crud import ledger_balance
+
+        assert ledger_balance(aid) == 58000.0
+
+
+def test_edit_opening_credit_direction(client, app):
+    login(client)
+    aid = _seed_account_with_balance(app, "Open Credit", 10000.0)
+    edit_account(
+        client,
+        aid,
+        name="Open Credit",
+        opening_amount="25000",
+        opening_position="credit",
+        opening_effective_date="2026-02-01",
+        desired_balance="-25000",
+    )
+    with app.app_context():
+        acc = db.session.get(Account, aid)
+        assert acc.opening_balance == -25000.0
+        assert acc.balance == -25000.0
+        from app.services.payments_crud import ledger_balance
+
+        assert ledger_balance(aid) == -25000.0
 
 
 def test_adjustment_idempotent_on_retry(client, app):

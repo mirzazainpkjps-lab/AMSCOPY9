@@ -203,13 +203,17 @@
         }
         setText('pv_entity', entLabel);
         setText('pv_status', statusLabel(val('account_status')));
-        if (MODE === 'create') {
-            var amt = parseFloat(val('opening_amount') || '0') || 0;
-            var pos = (val('opening_position') || 'debit');
-            var signed = pos === 'credit' ? -amt : amt;
-            setText('pv_opening', fmtMoney(signed));
-            setText('pv_opening_date', val('opening_effective_date'));
-        }
+        var amt = parseFloat(val('opening_amount') || '0') || 0;
+        var pos = (radioVal('opening_position') || 'debit');
+        var signed = pos === 'credit' ? -amt : amt;
+        setText('pv_opening', fmtMoney(signed));
+        setText('pv_opening_date', val('opening_effective_date'));
+    }
+
+    function signedOpening() {
+        var amt = parseFloat(val('opening_amount') || '0') || 0;
+        var pos = (radioVal('opening_position') || 'debit');
+        return pos === 'credit' ? -amt : amt;
     }
 
     function statusLabel(s) {
@@ -217,11 +221,52 @@
         return map[s] || s || '—';
     }
     function val(id) { var el = $(id); return el ? (el.value || '').trim() : ''; }
+    function radioVal(name) {
+        var checked = document.querySelector('input[name="' + name + '"]:checked');
+        return checked ? (checked.value || '').trim() : '';
+    }
 
-    // ---- edit-only adjustment calculator ---------------------------------
+    // ---- edit-only opening + adjustment calculator -----------------------
+    // Changing the opening baseline shifts today's calculated balance by the
+    // same amount. Preserve any adjustment gap the user already typed.
+    var originalOpening = parseFloat(PRESET.original_opening);
+    if (isNaN(originalOpening)) {
+        originalOpening = parseFloat($('original_opening_hidden') ? $('original_opening_hidden').value : 0) || 0;
+    }
+    var originalCurrent = parseFloat(PRESET.original_current);
+    if (isNaN(originalCurrent)) {
+        originalCurrent = parseFloat($('current_balance_hidden') ? $('current_balance_hidden').value : 0) || 0;
+    }
+    // Gap the user wants between calculated current and desired closing.
+    // Opening edits change current; desired follows so only a typed mismatch
+    // becomes an Adjustment.
+    var adjustmentGap = 0;
+
+    function effectiveCurrent() {
+        return originalCurrent + (signedOpening() - originalOpening);
+    }
+
+    function captureAdjustmentGap() {
+        var desEl = $('desired_balance');
+        if (!desEl) return;
+        var des = parseFloat(desEl.value);
+        if (isNaN(des)) des = effectiveCurrent();
+        adjustmentGap = des - effectiveCurrent();
+    }
+
+    function applyOpeningShiftToDesired() {
+        var desEl = $('desired_balance');
+        if (!desEl) return;
+        desEl.value = (effectiveCurrent() + adjustmentGap).toFixed(2);
+    }
+
     function updateAdjustment() {
         if (MODE !== 'edit') return;
-        var cur = parseFloat($('current_balance_hidden') ? $('current_balance_hidden').value : 0) || 0;
+        var cur = effectiveCurrent();
+        var hid = $('current_balance_hidden');
+        if (hid) hid.value = cur.toFixed(2);
+        var curDisp = $('current_balance_display');
+        if (curDisp) curDisp.textContent = fmtMoney(cur);
         var desEl = $('desired_balance');
         var des = desEl ? (parseFloat(desEl.value) || 0) : cur;
         var diff = des - cur;
@@ -290,21 +335,36 @@
         if (chEl) chEl.addEventListener('change', function () { renderDetails(chEl.value); updatePreview(); });
 
         // Preview-affecting inputs
-        ['name', 'opening_amount', 'opening_position', 'opening_effective_date',
+        ['name', 'opening_amount', 'opening_effective_date',
          'cash_location', 'bank_name', 'account_number', 'wallet_provider',
          'wallet_number', 'linked_party_name', 'account_status', 'desired_balance']
             .forEach(function (id) {
                 var el = $(id);
                 if (!el) return;
                 el.addEventListener('input', function () {
+                    if (id === 'desired_balance') captureAdjustmentGap();
+                    if (id === 'opening_amount') applyOpeningShiftToDesired();
                     updatePreview();
-                    if (id === 'desired_balance') updateAdjustment();
+                    if (id === 'desired_balance' || id === 'opening_amount') updateAdjustment();
                 });
                 el.addEventListener('change', function () {
+                    if (id === 'desired_balance') captureAdjustmentGap();
+                    if (id === 'opening_amount') applyOpeningShiftToDesired();
                     updatePreview();
-                    if (id === 'account_status' || id === 'opening_position') updatePreview();
+                    if (id === 'desired_balance' || id === 'opening_amount') updateAdjustment();
                 });
             });
+        document.querySelectorAll('input[name="opening_position"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                document.querySelectorAll('.pos-option').forEach(function (opt) {
+                    var inp = opt.querySelector('input[name="opening_position"]');
+                    opt.classList.toggle('selected', !!(inp && inp.checked));
+                });
+                applyOpeningShiftToDesired();
+                updatePreview();
+                updateAdjustment();
+            });
+        });
         ['linked_client_id', 'linked_supplier_id'].forEach(function (id) {
             var el = $(id);
             if (el) el.addEventListener('change', updatePreview);

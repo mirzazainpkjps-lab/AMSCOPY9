@@ -307,8 +307,10 @@ def edit_account(account_id):
     """Edit an account (redesigned Edit form).
 
     Structurally identical to the Create form, plus one extra Current Balance &
-    Adjustment section (PART 12).  Any balance change is posted as a single
-    traceable Adjustment ledger entry — never a silent overwrite (PART 13/15).
+    Adjustment section (PART 12).  Opening can be corrected in place (rewrites
+    the historical baseline and shifts today's calculated balance).  A physical
+    mismatch is posted as a single traceable Adjustment ledger entry — never a
+    silent overwrite of current balance (PART 13/15).
     """
     _deny_account_master_mutation()
     from .classification import registry_json
@@ -327,6 +329,10 @@ def edit_account(account_id):
                 'class_subcategory': a.class_subcategory, 'class_account_type': a.class_account_type,
                 'channel': a.channel, 'account_status': a.account_status,
                 'balance': _money_round(a.balance), 'is_active': bool(a.is_active),
+                'opening_balance': _money_round(a.opening_balance),
+                'opening_balance_date': (
+                    a.opening_balance_date.strftime('%Y-%m-%d') if a.opening_balance_date else None
+                ),
             }
 
             # Update classification + details.  validate_account_form already
@@ -358,6 +364,13 @@ def edit_account(account_id):
             a.is_active = cleaned["is_active"]
             a.note = note
 
+            # ---- Opening baseline (editable historical start) ----
+            # Applied first so today's calculated balance already includes the
+            # corrected opening before any physical-cash adjustment is posted.
+            opening_msg = _apply_opening_update(a, request.form)
+            if opening_msg:
+                flash(opening_msg, 'info')
+
             # ---- Balance adjustment (PART 12 / PART 13) ----
             desired_raw = (request.form.get('desired_balance') or '').strip()
             adjustment_msg = _apply_balance_adjustment(a, desired_raw, request.form)
@@ -372,6 +385,10 @@ def edit_account(account_id):
                 'class_subcategory': a.class_subcategory, 'class_account_type': a.class_account_type,
                 'channel': a.channel, 'account_status': a.account_status,
                 'balance': _money_round(a.balance), 'is_active': bool(a.is_active),
+                'opening_balance': _money_round(a.opening_balance),
+                'opening_balance_date': (
+                    a.opening_balance_date.strftime('%Y-%m-%d') if a.opening_balance_date else None
+                ),
             }
             record_accounting_audit(
                 current_user, action='Edit', entity_type='Account', entity_id=a.id,
@@ -408,6 +425,77 @@ def edit_account(account_id):
     )
 
 
+def _current_opening_minor(account):
+    from utils.money import to_minor
+    if getattr(account, 'opening_balance_minor', None) is not None:
+        return int(account.opening_balance_minor)
+    return to_minor(account.opening_balance or 0)
+
+
+def _apply_opening_update(account, form):
+    """Rewrite the auditable opening baseline without posting a ledger entry.
+
+    Changing opening shifts the cached current balance by the same delta so
+    ledger_balance() (opening + movements) stays in lockstep.  Missing
+    ``opening_amount`` is treated as no change so older edit posts keep working.
+    """
+    from utils.money import from_minor, to_minor
+
+    amount_raw = (form.get('opening_amount') if form is not None else None)
+    amount_raw = (amount_raw or '').strip() if amount_raw is not None else ''
+    date_raw = (form.get('opening_effective_date') if form is not None else None)
+    date_raw = (date_raw or '').strip() if date_raw is not None else ''
+    if amount_raw == '' and date_raw == '':
+        return ''
+
+    old_minor = _current_opening_minor(account)
+    new_minor = old_minor
+    if amount_raw != '':
+        amount_minor = to_minor(amount_raw or 0, field='Opening amount')
+        if amount_minor < 0:
+            raise ValueError('Opening amount cannot be negative. Use Credit for money we owe.')
+        position = ((form.get('opening_position') or 'debit') if form is not None else 'debit')
+        position = (position or 'debit').strip().lower()
+        if position not in ('debit', 'credit'):
+            raise ValueError('Opening balance direction must be debit or credit.')
+        if position == 'credit':
+            amount_minor = -amount_minor
+        new_minor = amount_minor
+
+    date_changed = False
+    if date_raw:
+        try:
+            effective_dt = datetime.strptime(date_raw, '%Y-%m-%d')
+        except ValueError:
+            raise ValueError('Opening effective date must be a valid date (YYYY-MM-DD).')
+        old_date = account.opening_balance_date
+        old_d = old_date.date() if isinstance(old_date, datetime) else old_date
+        if old_d != effective_dt.date():
+            account.opening_balance_date = effective_dt
+            date_changed = True
+
+    if new_minor == old_minor:
+        return 'Opening effective date updated.' if date_changed else ''
+
+    delta = new_minor - old_minor
+    account.opening_balance_minor = new_minor
+    account.opening_balance = float(from_minor(new_minor))
+
+    current_minor = (
+        int(account.balance_minor)
+        if getattr(account, 'balance_minor', None) is not None
+        else to_minor(account.balance or 0)
+    )
+    new_current = current_minor + delta
+    account.balance_minor = new_current
+    account.balance = float(from_minor(new_current))
+    return (
+        f'Opening balance updated from Rs. {float(from_minor(old_minor)):.2f} '
+        f'to Rs. {float(from_minor(new_minor)):.2f}. '
+        f'Current calculated balance shifted by the same amount.'
+    )
+
+
 def _apply_balance_adjustment(account, desired_raw, form):
     """Post a single traceable Adjustment ledger entry for the desired balance.
 
@@ -420,17 +508,15 @@ def _apply_balance_adjustment(account, desired_raw, form):
     * Idempotency key     -> retried / double-clicked save cannot post twice.
     """
     from utils.money import from_minor, to_minor
-    from app.services.payments_crud import _assert_period_open
+    from app.services.payments_crud import _assert_period_open, ledger_balance
 
     if desired_raw == '':
         return ''
 
     desired_minor = to_minor(desired_raw, field='Desired balance')
-    current_minor = (
-        int(account.balance_minor)
-        if getattr(account, 'balance_minor', None) is not None
-        else to_minor(account.balance or 0)
-    )
+    # Compare against the reproducible ledger (opening + movements), which
+    # already includes any opening correction applied earlier in this save.
+    current_minor = to_minor(ledger_balance(account.id), field='Current balance')
     diff_minor = desired_minor - current_minor
     if diff_minor == 0:
         return ''  # PART 15: no-change save
