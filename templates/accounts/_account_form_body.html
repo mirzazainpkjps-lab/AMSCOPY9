@@ -28,6 +28,124 @@
     </div>
 </div>
 
+{# ---- Section 1.5: Account Category / Group ---- #}
+<div class="form-section">
+    <div class="sec-head">
+        <div class="step-badge" style="background: linear-gradient(135deg,#10b981,#047857);"><i class="bi bi-tags-fill"></i></div>
+        <div>
+            <div class="step-title">Account Group / Category</div>
+            <div class="step-sub">Assign this account to a transaction group/category for organization and cash-flow flows.</div>
+        </div>
+    </div>
+    <div class="row g-3 align-items-end">
+        <div class="col-md-8">
+            <label for="source_category" class="form-label">Account Category / Group <span class="req">*</span></label>
+            <select class="form-select" id="source_category" name="source_category" required>
+                <option value="">Select category/group…</option>
+                {% for cat in categories %}
+                <option value="{{ cat.name }}" {% if (form_mode == 'edit' and account.source_category == cat.name) %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <button type="button" class="btn btn-outline-success w-100 fw-bold" id="btnQuickAddGroup">
+                <i class="bi bi-plus-lg me-1"></i> Quick Add Group
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Add Group Panel -->
+    <div class="card border-success mt-3 d-none" id="panelQuickAddGroup" style="background: var(--surface-2); border: 1px dashed var(--ui-border);">
+        <div class="card-body py-3">
+            <h6 class="fw-bold text-success mb-2"><i class="bi bi-plus-circle me-1"></i> Quick Add Account Group</h6>
+            <div class="row g-2">
+                <div class="col-md-9">
+                    <input type="text" id="quickGroupName" class="form-control form-control-sm" placeholder="Group name *">
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-sm btn-success w-100 fw-bold" id="btnSaveQuickGroup">Save</button>
+                </div>
+            </div>
+            <div class="small text-danger mt-1 fw-bold" id="quickGroupErr"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnToggle = document.getElementById('btnQuickAddGroup');
+    const panel = document.getElementById('panelQuickAddGroup');
+    const nameInput = document.getElementById('quickGroupName');
+    const btnSave = document.getElementById('btnSaveQuickGroup');
+    const errDiv = document.getElementById('quickGroupErr');
+    const groupSelect = document.getElementById('source_category');
+
+    if (btnToggle && panel) {
+        btnToggle.addEventListener('click', function() {
+            panel.classList.toggle('d-none');
+            if (!panel.classList.contains('d-none')) {
+                nameInput.focus();
+            }
+        });
+    }
+
+    if (btnSave && nameInput && groupSelect) {
+        btnSave.addEventListener('click', function() {
+            errDiv.textContent = '';
+            const name = nameInput.value.trim();
+            if (!name) {
+                errDiv.textContent = 'Please enter a group name.';
+                return;
+            }
+
+            fetch("{{ url_for('accounts.api_add_account_category') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-Token': {{ (csrf_token or '')|tojson }}
+                },
+                body: JSON.stringify({ name: name })
+            })
+            .then(function(response) {
+                return response.json().then(function(data) {
+                    if (!response.ok || !data.ok) {
+                        throw new Error(data.error || 'Failed to add category.');
+                    }
+                    return data;
+                });
+            })
+            .then(function(data) {
+                // Success!
+                // Check if already in select options
+                let exists = false;
+                for (let i = 0; i < groupSelect.options.length; i++) {
+                    if (groupSelect.options[i].value === data.category.name) {
+                        exists = true;
+                        groupSelect.options[i].selected = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    const opt = document.createElement('option');
+                    opt.value = data.category.name;
+                    opt.textContent = data.category.name;
+                    opt.selected = true;
+                    groupSelect.appendChild(opt);
+                }
+
+                // Reset input and hide panel
+                nameInput.value = '';
+                panel.classList.add('d-none');
+            })
+            .catch(function(err) {
+                errDiv.textContent = err.message;
+            });
+        });
+    }
+});
+</script>
+
 {# ---- Section 2: Financial Classification ---- #}
 <div class="form-section">
     <div class="sec-head">

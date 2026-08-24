@@ -213,6 +213,19 @@ def validate_account_form(form, *, is_edit=False):
 
     note = _strip(_form_get(form, "note")) or None
 
+    submitted_source_category = _strip(_form_get(form, "source_category"))
+    if submitted_source_category:
+        from models import AccountCategory, db
+        from sqlalchemy import func
+        # double check if this category exists or create it if not (defensive)
+        exists = AccountCategory.query.filter(
+            func.lower(func.trim(AccountCategory.name)) == submitted_source_category.lower()
+        ).first()
+        if not exists:
+            new_cat = AccountCategory(name=submitted_source_category)
+            db.session.add(new_cat)
+            db.session.commit()
+
     cleaned = {
         "name": name,
         "note": note,
@@ -224,7 +237,7 @@ def validate_account_form(form, *, is_edit=False):
         # Legacy columns kept in sync so existing payment/KPI/transfer code
         # keeps working unchanged (PART 17).
         "category": legacy_category_for(channel),
-        "source_category": legacy_group_for(category, subcategory),
+        "source_category": submitted_source_category or legacy_group_for(category, subcategory),
         "account_type": legacy_account_type_for(category, subcategory, atype),
         "type": legacy_account_type_for(category, subcategory, atype),
         "is_active": status == "active",
