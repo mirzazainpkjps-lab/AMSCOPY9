@@ -26,7 +26,7 @@ def delete_selected_data():
         'clients': ['recon_basket', 'bookings', 'pending_bills', 'payments', 'direct_sales', 'entry', 'fbm_rental_clients', 'accounts', 'account_transactions', 'accounts_domain_wipe'],
         'suppliers': ['grn', 'supplier_payments', 'payments', 'invoices', 'accounts_domain_wipe'],
         'direct_sales': ['direct_sales', 'entry', 'invoice', 'invoices', 'delivery_person_payments', 'pending_bills', 'payments', 'accounts_domain_wipe'],
-        'accounts': ['accounts', 'account_transactions', 'payments', 'supplier_payments', 'grn', 'direct_sales', 'fbm_rentals'],
+        'accounts': ['accounts', 'account_transactions', 'account_reconciliations', 'cash_flow_entries', 'payments', 'supplier_payments', 'grn', 'direct_sales', 'fbm_rentals'],
         'payments': ['payments', 'supplier_payments', 'delivery_person_payments', 'pending_bills', 'account_transactions', 'accounts_domain_wipe'],
         'invoices': ['invoices', 'direct_sales', 'entry', 'pending_bills', 'accounts_domain_wipe'],
         'bookings': ['bookings', 'booking_item', 'pending_bills', 'accounts_domain_wipe'],
@@ -136,36 +136,73 @@ def delete_selected_data():
         is_full_wipe = full_set.issubset(set(targets))
 
         if is_full_wipe:
-            # Full transactional reset (everything except users/settings/staff email).
+            # Full transactional reset (everything except users/settings/audit).
+            # Order matters: this app enforces SQLite foreign keys, so every
+            # child/ledger table must go before the master table it references.
+            # --- notifications & follow-ups (children of pending bills) ---
             _tq(FollowUpContact).delete()
             _tq(FollowUpReminder).delete()
             _tq(StaffEmail).delete()
+            # --- pending bills (follow-ups cleared above) ---
             _tq(PendingBill).delete()
-            _tq(Entry).delete()
+            # --- stock in/out + deliveries (entry references invoice) ---
             _tq(DeliveryItem).delete()
             _tq(Delivery).delete()
+            _tq(Entry).delete()
             _tq(GRNItem).delete()
             _tq(GRN).delete()
-            _tq(DirectSaleItem).delete()
-            _tq(DirectSale).delete()
+            # --- allocation rows referencing sales/booking/grn items ---
+            _tq(GRNAllocation).delete()
+            _tq(BookingAllocationRepairArchive).delete()
+            _tq(BookingAllocation).delete()
+            # --- driver payments: void their ledger rows, then remove rows ---
+            _purge_driver_payment_ledger(_tq(DeliveryPersonPayment))
+            _tq(DeliveryPersonPayment).delete()
+            _tq(SaleDeliveryPerson).delete()
+            _tq(DeliveryRent).delete()
+            # --- money documents before the sales/booking parents ---
+            _tq(WaiveOff).delete()
             _tq(MaterialReturnItem).delete()
             _tq(MaterialReturn).delete()
-            _tq(WaiveOff).delete()
             _tq(Payment).delete()
             _tq(SupplierPayment).delete()
+            # --- sales & bookings (children first, invoice last of the group) ---
+            _tq(DirectSaleItem).delete()
+            _tq(DirectSale).delete()
+            _tq(DirectSaleDraft).delete()
             _tq(BookingItem).delete()
             _tq(Booking).delete()
             _tq(Invoice).delete()
             _tq(ReconBasket).delete()
+            # --- rental management (FBM): rentals link to client/item/account ---
+            _tq(FBMRental).delete()
+            _tq(FBMClient).delete()
+            _tq(FBMRentalItem).delete()
+            # --- financial accounts & cash management (ledger first, then
+            #     account definitions — a true full wipe removes accounts too,
+            #     unlike the granular 'accounts' reset option) ---
+            _tq(CashFlowEntryAudit).delete()
+            _tq(CashFlowEntry).delete()
+            _tq(AccountTransaction).delete()
+            _tq(AccountReconciliation).delete()
+            _tq(FbmCashDrawerEntry).delete()
+            _tq(FbmCashDrawerCategory).delete()
+            _tq(CashFlowReconciliationAudit).delete()
+            _tq(CashFlowDifferenceAdjustment).delete()
+            _tq(CashFlowSubcategory).delete()
+            _tq(CashFlowCategory).delete()
+            _tq(CashFlowParty).delete()
+            _tq(AccountCategory).delete()
+            _tq(Account).delete()
+            # --- masters (no remaining references) ---
             _tq(Supplier).delete()
-            _tq(DeliveryRent).delete()
+            _tq(Client).delete()
             _tq(DeliveryPerson).delete()
             _tq(Material).delete()
             _tq(MaterialCategory).delete()
-            _tq(Client).delete()
             _tq(BillCounter).delete()
             db.session.add(BillCounter(namespace=AUTO_BILL_NS_DEFAULT, count=1000))
-            deleted_info.append('Full Wipe (All Transactions)')
+            deleted_info.append('Full Wipe (All Transactions, Accounts, Cash & Rentals)')
             if history_row:
                 history_row.wipe_status = 'completed'
                 history_row.note = f'Completed full wipe. Targets: {", ".join(sorted(set(targets)))}'
@@ -198,6 +235,8 @@ def delete_selected_data():
             deleted_info.append('Receiving Entries')
 
         if 'grn' in targets:
+            # FIFO allocation rows reference grn items — clear them first.
+            _tq(GRNAllocation).delete()
             _tq(GRNItem).delete()
             _tq(GRN).delete()
             deleted_info.append('GRN Records')
@@ -208,6 +247,7 @@ def delete_selected_data():
 
         if 'suppliers' in targets:
             _tq(GRN).update({'supplier_id': None}, synchronize_session=False)
+            _tq(Account).update({'linked_supplier_id': None}, synchronize_session=False)
             _tq(SupplierPayment).delete()
             _tq(Supplier).delete()
             deleted_info.append('Suppliers')
@@ -227,6 +267,10 @@ def delete_selected_data():
             _dpp_sale_scope.delete(synchronize_session=False)
             _tq(DeliveryRent).delete()
             _tq(SaleDeliveryPerson).delete()
+            # Allocation rows reference sale/sale-item — clear before the sale.
+            _tq(GRNAllocation).delete()
+            _tq(BookingAllocationRepairArchive).delete()
+            _tq(BookingAllocation).delete()
             _tq(DirectSaleItem).delete()
             _tq(DirectSale).delete()
             _tq(Entry).filter(Entry.nimbus_no == 'Direct Sale').delete(synchronize_session=False)
@@ -241,13 +285,21 @@ def delete_selected_data():
             _tq(MaterialReturnItem).delete()
             _tq(MaterialReturn).delete()
             _tq(Entry).filter(Entry.nimbus_no == 'Material Return').delete(synchronize_session=False)
+            # Waive-off rows reference their payment — clear those first.
+            _return_payment_ids = [
+                row[0] for row in _tq(Payment).with_entities(Payment.id)
+                .filter(Payment.note.like('[MATERIAL_RETURN:%')).all()
+            ]
+            if _return_payment_ids:
+                _tq(WaiveOff).filter(WaiveOff.payment_id.in_(_return_payment_ids)).delete(synchronize_session=False)
             _tq(Payment).filter(Payment.note.like('[MATERIAL_RETURN:%')).delete(synchronize_session=False)
             deleted_info.append('Material Returns')
 
         if 'payments' in targets:
+            # Material returns can reference their payment — unlink first.
+            _tq(MaterialReturn).update({'payment_id': None}, synchronize_session=False)
             _tq(WaiveOff).delete()
             _tq(Payment).delete()
-            _tq(MaterialReturn).update({'payment_id': None}, synchronize_session=False)
             _tq(PendingBill).filter(
                 func.lower(func.coalesce(PendingBill.reason, '')).like('payment received%')
             ).delete(synchronize_session=False)
@@ -268,6 +320,9 @@ def delete_selected_data():
             deleted_info.append('Delivery Persons')
 
         if 'bookings' in targets:
+            # Allocation rows reference booking items — clear them first.
+            _tq(BookingAllocationRepairArchive).delete()
+            _tq(BookingAllocation).delete()
             _tq(BookingItem).delete()
             _tq(Booking).delete()
             _tq(PendingBill).filter(
@@ -291,6 +346,8 @@ def delete_selected_data():
             deleted_info.append('Material Categories')
 
         if 'clients' in targets:
+            # Accounts may link to clients — unlink before removal.
+            _tq(Account).update({'linked_client_id': None}, synchronize_session=False)
             _tq(Client).delete()
             _tq(ReconBasket).delete()
             deleted_info.append('Clients + Reconciliation Basket')
@@ -301,12 +358,36 @@ def delete_selected_data():
             deleted_info.append('Cash Reconciliation Audit Trail')
 
         if 'cash_reconciliation_data' in targets:
+            # Audit rows reference the adjustment rows — audit goes first.
+            _tq(CashFlowReconciliationAudit).delete()
             _tq(CashFlowDifferenceAdjustment).delete()
             deleted_info.append('Cash Reconciliation Data')
 
         if 'account_transactions' in targets:
+            # Cash-flow rows link to ledger rows; drop the link before removal.
+            _tq(CashFlowEntry).update({'account_tx_id': None}, synchronize_session=False)
             _tq(AccountTransaction).delete()
             deleted_info.append('Account Transactions')
+
+        if 'account_reconciliations' in targets:
+            _tq(AccountTransaction).update({'reconciliation_id': None}, synchronize_session=False)
+            _tq(AccountReconciliation).delete()
+            deleted_info.append('Account Reconciliations')
+
+        if 'cash_flow_entries' in targets:
+            _tq(CashFlowEntryAudit).delete()
+            _tq(CashFlowEntry).delete()
+            deleted_info.append('Cash Flow Entries')
+
+        if 'cash_flow_categories' in targets:
+            _tq(CashFlowEntry).update(
+                {'category_id': None, 'subcategory_id': None, 'party_id': None},
+                synchronize_session=False,
+            )
+            _tq(CashFlowSubcategory).delete()
+            _tq(CashFlowCategory).delete()
+            _tq(CashFlowParty).delete()
+            deleted_info.append('Cash Flow Categories & Parties')
 
         if 'cash_drawer_entries' in targets:
             _tq(FbmCashDrawerEntry).delete()
@@ -364,12 +445,19 @@ def delete_selected_data():
                 _tq(FbmCashDrawerEntry).delete()
             except Exception:
                 pass
+            # Audit rows reference the adjustment rows — audit goes first.
+            try:
+                _tq(CashFlowReconciliationAudit).delete()
+            except Exception:
+                pass
             try:
                 _tq(CashFlowDifferenceAdjustment).delete()
             except Exception:
                 pass
+            # Drop links from cash-flow / reconciliation rows to the wiped ledger.
             try:
-                _tq(CashFlowReconciliationAudit).delete()
+                _tq(CashFlowEntry).update({'account_tx_id': None}, synchronize_session=False)
+                _tq(AccountReconciliation).update({'adjustment_transaction_id': None}, synchronize_session=False)
             except Exception:
                 pass
             # Nullify payment-account links but preserve the account records.
@@ -384,6 +472,8 @@ def delete_selected_data():
         if 'accounts_domain_wipe' in targets or is_full_wipe:
             # Delete transaction-level data and snapshot tables.
             try:
+                # Cash-flow rows link to ledger rows; drop the link first.
+                _tq(CashFlowEntry).update({'account_tx_id': None}, synchronize_session=False)
                 _tq(AccountTransaction).delete()
             except Exception:
                 pass
@@ -395,12 +485,13 @@ def delete_selected_data():
                 _tq(FbmCashDrawerCategory).delete()
             except Exception:
                 pass
+            # Audit rows reference the adjustment rows — audit goes first.
             try:
-                _tq(CashFlowDifferenceAdjustment).delete()
+                _tq(CashFlowReconciliationAudit).delete()
             except Exception:
                 pass
             try:
-                _tq(CashFlowReconciliationAudit).delete()
+                _tq(CashFlowDifferenceAdjustment).delete()
             except Exception:
                 pass
             # Clear supplier and payment links to accounts

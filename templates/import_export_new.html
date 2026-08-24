@@ -8,7 +8,7 @@
                 <span class="ui-title-icon"><i class="bi bi-arrow-left-right"></i></span>
                 Import / Export Center
             </h1>
-            <div class="ui-subtitle">Create a complete XLSX backup or restore every compatible row with a clear issue report.</div>
+            <div class="ui-subtitle">Back up and restore the whole database — or just one module at a time.</div>
         </div>
         <span class="badge rounded-pill text-bg-success px-3 py-2">
             <i class="bi bi-database-check me-1"></i>Single-store full transfer
@@ -26,12 +26,122 @@
         </div>
     </div>
 
+    <!-- ===== Granular (per-module) backup / restore ===== -->
+    <div class="row g-4 align-items-stretch mb-2">
+        <div class="col-12">
+            <h2 class="h5 fw-bold text-warning mb-1"><i class="bi bi-collection me-1"></i>Granular Backup &amp; Restore (per module)</h2>
+            <p class="text-white-50 small mb-0">
+                Back up, restore, export or import <strong>one module at a time</strong> — Clients, Financial Accounts,
+                Cash Flow, Cash Drawer, Rentals, Sales, Payments and more. A module backup contains exactly that module's
+                tables, and a module restore only touches the tables found in the uploaded file — every other module stays untouched.
+            </p>
+        </div>
+
+        <div class="col-lg-6">
+            <section class="ui-card h-100 d-flex flex-column">
+                <div class="ui-card-header">
+                    <h3><i class="bi bi-file-earmark-arrow-down text-success"></i>Backup Selected Modules</h3>
+                    <span class="badge text-bg-success">Granular Export</span>
+                </div>
+                <div class="ui-card-body d-flex flex-column flex-grow-1">
+                    <p class="text-white-50 mb-3">
+                        Tick the modules you want to back up. The downloaded workbook contains exactly those tables
+                        (full fidelity, same engine as the full backup).
+                    </p>
+                    <form method="POST" action="{{ url_for('import_export.transfer_export') }}" class="d-flex flex-column flex-grow-1">
+                        <input type="hidden" name="sections" value="literal_all">
+                        <div class="row g-1 mb-3 module-picker">
+                            {% for m in export_modules %}
+                            <div class="col-6 col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="modules" value="{{ m.key }}" id="modExp{{ m.key }}">
+                                    <label class="form-check-label small text-white" for="modExp{{ m.key }}" title="{{ m.tables|join(', ') }}">{{ m.label }}</label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-check mt-auto mb-2">
+                            <input class="form-check-input" type="checkbox" id="modExpAll">
+                            <label class="form-check-label small text-warning fw-bold" for="modExpAll">Select all modules</label>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-file-earmark-excel me-1"></i><span>Download Selected Modules Backup</span>
+                        </button>
+                    </form>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-6">
+            <section class="ui-card h-100 d-flex flex-column">
+                <div class="ui-card-header">
+                    <h3><i class="bi bi-file-earmark-arrow-up text-warning"></i>Restore Selected Modules</h3>
+                    <span class="badge text-bg-warning">Granular Import</span>
+                </div>
+                <div class="ui-card-body d-flex flex-column flex-grow-1">
+                    {% if full_raw_import_enabled %}
+                    <p class="text-white-50 mb-3">
+                        Upload a module backup (or a full backup). Only the tables you tick below are imported;
+                        everything else is left exactly as it is.
+                    </p>
+                    <form method="POST"
+                          action="{{ url_for('import_export.transfer_import') }}"
+                          enctype="multipart/form-data"
+                          class="ui-form d-flex flex-column flex-grow-1">
+                        <input type="hidden" name="sections" value="literal_all">
+                        <div class="ui-field mb-3">
+                            <label for="moduleImportFile" class="ui-label">XLSX backup file</label>
+                            <input id="moduleImportFile" type="file" name="file" class="form-control" accept=".xlsx" required>
+                            <span class="ui-helper">Works with module backups and full backups.</span>
+                        </div>
+                        <div class="ui-field mb-3">
+                            <label for="moduleImportMode" class="ui-label">Restore mode</label>
+                            <select id="moduleImportMode" name="mode" class="form-select">
+                                <option value="append">Append — keep existing rows (recommended)</option>
+                                <option value="replace_tenant_data">Overwrite — replace the selected tables with the file's data</option>
+                            </select>
+                            <span class="ui-helper">Overwrite clears only the selected tables that are present in the file.</span>
+                        </div>
+                        <div class="row g-1 mb-2 module-picker">
+                            {% for m in export_modules %}
+                            <div class="col-6 col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="modules" value="{{ m.key }}" id="modImp{{ m.key }}">
+                                    <label class="form-check-label small text-white" for="modImp{{ m.key }}" title="{{ m.tables|join(', ') }}">{{ m.label }}</label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="modImpAll">
+                            <label class="form-check-label small text-white-50" for="modImpAll">Leave empty = restore every table found in the file</label>
+                        </div>
+                        <div class="alert alert-warning small py-2 mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Tick only the modules to restore (e.g. "Financial Accounts"). Unticked modules are never touched.
+                        </div>
+                        <button type="submit" class="btn btn-warning w-100 mt-auto" onclick="return confirmModuleOverwrite(this)">
+                            <i class="bi bi-arrow-repeat me-1"></i><span>Restore Selected Modules</span>
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-lock me-1"></i>
+                        Full import is disabled by the server safety setting. Set <code>FULL_RAW_IMPORT_ENABLED=1</code> to enable it.
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ===== Full database backup / restore ===== -->
     <div class="row g-4 align-items-stretch">
         <div class="col-lg-6">
             <section class="ui-card h-100 d-flex flex-column">
                 <div class="ui-card-header">
                     <h3><i class="bi bi-file-earmark-arrow-down text-success"></i>Export Full XLSX</h3>
-                    <span class="badge text-bg-success">Backup</span>
+                    <span class="badge text-bg-success">Full Backup</span>
                 </div>
                 <div class="ui-card-body d-flex flex-column flex-grow-1">
                     <p class="text-white-50 mb-3">
@@ -56,7 +166,7 @@
             <section class="ui-card h-100 d-flex flex-column">
                 <div class="ui-card-header">
                     <h3><i class="bi bi-file-earmark-arrow-up text-warning"></i>Import Full XLSX</h3>
-                    <span class="badge text-bg-warning">Restore</span>
+                    <span class="badge text-bg-warning">Full Restore</span>
                 </div>
                 <div class="ui-card-body d-flex flex-column flex-grow-1">
                     {% if full_raw_import_enabled %}
@@ -132,6 +242,7 @@
 .import-export-page .ui-card-header .badge { min-width: 76px; }
 .import-report-summary { background: var(--ui-surface-2); border-color: var(--ui-border) !important; }
 .import-export-page .alert { border-color: color-mix(in srgb, currentColor 28%, transparent); }
+.module-picker { max-height: 220px; overflow: auto; border: 1px solid var(--ui-border, rgba(255,255,255,.12)); border-radius: 8px; padding: 8px; }
 </style>
 
 <script>
@@ -147,5 +258,34 @@ function confirmOverwrite(btn) {
     }
     return true;
 }
+function confirmModuleOverwrite(btn) {
+    const form = btn && btn.form ? btn.form : null;
+    if (!form) return true;
+    const mode = form.querySelector('select[name="mode"]');
+    if (mode && mode.value === 'replace_tenant_data') {
+        const selected = Array.from(form.querySelectorAll('input[name="modules"]:checked')).map(c => c.value);
+        const what = selected.length ? selected.join(', ') : 'every table found in the file';
+        return confirm(
+            'Overwrite will CLEAR and replace: ' + what + '. ' +
+            'Other modules are not touched. Continue?'
+        );
+    }
+    return true;
+}
+document.addEventListener('DOMContentLoaded', function () {
+    [['modExpAll', 'modExp'], ['modImpAll', 'modImp']].forEach(([allId, prefix]) => {
+        const all = document.getElementById(allId);
+        const boxes = Array.from(document.querySelectorAll('input[id^="' + prefix + '"]'));
+        if (!all || !boxes.length) return;
+        all.addEventListener('change', () => {
+            boxes.forEach(b => { b.checked = all.checked; });
+        });
+        boxes.forEach(b => b.addEventListener('change', () => {
+            const checked = boxes.filter(x => x.checked).length;
+            all.checked = checked === boxes.length;
+            all.indeterminate = checked > 0 && checked < boxes.length;
+        }));
+    });
+});
 </script>
 {% endblock %}

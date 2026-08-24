@@ -27,10 +27,15 @@ def import_export_page():
     else:
         full_raw_import_report = None
     tenants = []
+    export_modules = [
+        {'key': key, 'label': cfg['label'], 'tables': cfg['tables']}
+        for key, cfg in EXPORT_MODULES.items()
+    ]
     return render_template(
         'import_export_new.html',
         full_raw_import_enabled=full_raw_import_enabled,
         full_raw_import_report=full_raw_import_report,
         tenants=tenants,
+        export_modules=export_modules,
     )
 

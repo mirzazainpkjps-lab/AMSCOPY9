@@ -354,18 +354,23 @@
                 <h6 class="fw-bold text-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Granular Data Wipe</h6>
             </div>
             <div class="card-body p-3">
-                <p class="text-white-50 x-small mb-3">Select yard datasets to clear. Users and passwords are <strong>never</strong> wiped. Take a backup first if you may restore later.</p>
+                <p class="text-white-50 x-small mb-3">Select yard datasets to clear. Users and passwords are <strong>never</strong> wiped. <strong class="text-danger">"Check All Datasets" now wipes every module</strong> — including Financial Accounts (with balances), Cash Flow, Cash Drawer, and Rentals. Take a backup first if you may restore later.</p>
                 <form action="{{ url_for('delete_selected_data') }}" method="POST">
                     <div class="form-check small mb-2">
                         <input class="form-check-input" type="checkbox" id="wipeCheckAll">
-                        <label class="form-check-label text-warning fw-bold" for="wipeCheckAll">Check All Datasets</label>
+                        <label class="form-check-label text-warning fw-bold" for="wipeCheckAll">Check All Datasets (Full Wipe — includes Accounts &amp; Cash)</label>
                     </div>
-                    <div class="row g-2 mb-3">
+                    <div class="fw-bold text-warning x-small text-uppercase mb-1">Clients, Suppliers &amp; Bills</div>
+                    <div class="row g-2 mb-2">
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="clients" id="wipeClients"><label class="form-check-label text-white" for="wipeClients">Clients</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="suppliers" id="wipeSuppliers"><label class="form-check-label text-white" for="wipeSuppliers">Suppliers</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="supplier_payments" id="wipeSupplierPayments"><label class="form-check-label text-white" for="wipeSupplierPayments">Supplier Payments</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="pending_bills" id="wipeBills"><label class="form-check-label text-white" for="wipeBills">Pending Bills</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="notifications" id="wipeNotifications"><label class="form-check-label text-white" for="wipeNotifications">Notifications Data</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="bookings" id="wipeBookings"><label class="form-check-label text-white" for="wipeBookings">Bookings</label></div></div>
+                    </div>
+                    <div class="fw-bold text-warning x-small text-uppercase mb-1">Stock, Sales &amp; Delivery</div>
+                    <div class="row g-2 mb-2">
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="dispatching" id="wipeDispatch"><label class="form-check-label text-white" for="wipeDispatch">Dispatch (OUT)</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="receiving" id="wipeReceive"><label class="form-check-label text-white" for="wipeReceive">Receive (IN)</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="grn" id="wipeGrn"><label class="form-check-label text-white" for="wipeGrn">GRN</label></div></div>
@@ -375,17 +380,29 @@
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="material_returns" id="wipeMaterialReturns"><label class="form-check-label text-white" for="wipeMaterialReturns">Material Returns</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="delivery_rents" id="wipeDeliveryRents"><label class="form-check-label text-white" for="wipeDeliveryRents">Delivery Rents</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="delivery_persons" id="wipeDeliveryPersons"><label class="form-check-label text-white" for="wipeDeliveryPersons">Delivery Persons</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="delivery_person_payments" id="wipeDeliveryPersonPayments"><label class="form-check-label text-white" for="wipeDeliveryPersonPayments">Driver Payments</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="invoices" id="wipeInvoices"><label class="form-check-label text-white" for="wipeInvoices">Invoices</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="payments" id="wipePayments"><label class="form-check-label text-white" for="wipePayments">Payments</label></div></div>
-                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="bookings" id="wipeBookings"><label class="form-check-label text-white" for="wipeBookings">Bookings</label></div></div>
-                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="accounts" id="wipeAccounts"><label class="form-check-label text-white" for="wipeAccounts">Financial Accounts</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="direct_sale_drafts" id="wipeDirectSaleDrafts"><label class="form-check-label text-white" for="wipeDirectSaleDrafts">Unsaved Sales Drafts</label></div></div>
+                    </div>
+                    <div class="fw-bold text-warning x-small text-uppercase mb-1">Financial Accounts &amp; Cash</div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="accounts" id="wipeAccounts"><label class="form-check-label text-white" for="wipeAccounts">Financial Accounts (reset balances)</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="account_categories" id="wipeAccountCategories"><label class="form-check-label text-white" for="wipeAccountCategories">Account Categories</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="account_transactions" id="wipeAccountTransactions"><label class="form-check-label text-white" for="wipeAccountTransactions">Account Transactions</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="account_reconciliations" id="wipeAccountReconciliations"><label class="form-check-label text-white" for="wipeAccountReconciliations">Account Reconciliations</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="cash_flow_entries" id="wipeCashFlowEntries"><label class="form-check-label text-white" for="wipeCashFlowEntries">Cash Flow Entries</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="cash_flow_categories" id="wipeCashFlowCategories"><label class="form-check-label text-white" for="wipeCashFlowCategories">Cash Flow Categories &amp; Parties</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="cash_reconciliation_data" id="wipeCashReconciliation"><label class="form-check-label text-white" for="wipeCashReconciliation">Cash Reconciliation Data</label></div></div>
                         <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="cash_reconciliation_audit" id="wipeCashReconciliationAudit"><label class="form-check-label text-white" for="wipeCashReconciliationAudit">Cash Audit Trail</label></div></div>
-                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="delivery_person_payments" id="wipeDeliveryPersonPayments"><label class="form-check-label text-white" for="wipeDeliveryPersonPayments">Driver Payments</label></div></div>
-                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="direct_sale_drafts" id="wipeDirectSaleDrafts"><label class="form-check-label text-white" for="wipeDirectSaleDrafts">Unsaved Sales Drafts</label></div></div>
-
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="cash_drawer_entries" id="wipeCashDrawerEntries"><label class="form-check-label text-white" for="wipeCashDrawerEntries">Cash Drawer Entries</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="cash_drawer_categories" id="wipeCashDrawerCategories"><label class="form-check-label text-white" for="wipeCashDrawerCategories">Cash Drawer Categories</label></div></div>
+                    </div>
+                    <div class="fw-bold text-warning x-small text-uppercase mb-1">Rental Management (FBM)</div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="fbm_rentals" id="wipeFbmRentals"><label class="form-check-label text-white" for="wipeFbmRentals">Rental Agreements</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="fbm_rental_clients" id="wipeFbmRentalClients"><label class="form-check-label text-white" for="wipeFbmRentalClients">Rental Customers</label></div></div>
+                        <div class="col-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="delete_targets" value="fbm_rental_items" id="wipeFbmRentalItems"><label class="form-check-label text-white" for="wipeFbmRentalItems">Rental Inventory</label></div></div>
                     </div>
 
                     <button type="button" id="openWipeModal" class="btn btn-danger btn-sm w-100 fw-bold" data-bs-toggle="modal" data-bs-target="#wipeConfirmModal">Wipe Selected</button>
@@ -471,7 +488,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 e.preventDefault();
                 return;
             }
-            const forbiddenTargets = new Set(['clients','materials','pending_bills','dispatching','receiving','direct_sales','material_returns','payments','bookings','invoices','accounts','delivery_person_payments']);
+            const forbiddenTargets = new Set(['clients','materials','pending_bills','dispatching','receiving','direct_sales','material_returns','payments','bookings','invoices','accounts','delivery_person_payments','fbm_rental_clients','fbm_rentals']);
             const hasBlockedTargets = checked.some(c => forbiddenTargets.has(c.value));
             const list = document.getElementById('selectedDatasetsList');
             list.innerHTML = '';
