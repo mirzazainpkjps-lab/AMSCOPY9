@@ -177,10 +177,12 @@ def transfer_export():
     sections = [str(x).strip().lower() for x in request.form.getlist('sections') if str(x).strip()]
     if not sections:
         sections = ['all_business']
+    modules = [str(x).strip().lower() for x in request.form.getlist('modules') if str(x).strip()]
+    module_tables = _tables_for_modules(modules)
 
     if 'literal_all' in sections:
-        content = _build_full_raw_export_bytes(scope_ctx=scope_ctx)
-        fname = _download_filename('ALLEXPORT', 'xlsx')
+        content = _build_full_raw_export_bytes(scope_ctx=scope_ctx, tables=module_tables or None)
+        fname = _download_filename('MODULEEXPORT' if module_tables else 'ALLEXPORT', 'xlsx')
     elif 'all_business' in sections:
         content = _build_master_export_bytes(scope_ctx=scope_ctx)
         fname = _download_filename('MASTERBACKUP', 'xlsx')

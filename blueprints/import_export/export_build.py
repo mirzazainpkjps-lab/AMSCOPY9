@@ -243,13 +243,24 @@ def _build_master_export_bytes(scope_ctx=None):
     return output.getvalue()
 
 
-def _build_full_raw_export_bytes(scope_ctx=None):
-    """Export physical tables with strict role/scope filtering."""
+def _build_full_raw_export_bytes(scope_ctx=None, tables=None):
+    """Export physical tables with strict role/scope filtering.
+
+    ``tables`` (optional) restricts the workbook to the given physical table
+    names — this powers the granular per-module backup.  The metadata sheet
+    records which tables were selected so import can treat the workbook as a
+    partial (module) backup instead of a full-database backup.
+    """
     if scope_ctx is None:
         scope_ctx = _default_scope_context()
+    all_tables = _full_raw_tables_for_scope(scope_ctx)
+    if tables:
+        wanted = set(tables)
+        all_tables = [t for t in all_tables if t.name in wanted]
+    partial = bool(tables) and len(all_tables) < len(_full_raw_tables_for_scope(scope_ctx))
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        for table in _full_raw_tables_for_scope(scope_ctx):
+        for table in all_tables:
             q = _scope_table_select(table, scope_ctx)
             if q is None:
                 continue
@@ -268,8 +279,12 @@ def _build_full_raw_export_bytes(scope_ctx=None):
             # Excel sheet names max length = 31
             sheet_name = table.name[:31]
             pd.DataFrame(data or [], columns=cols).to_excel(writer, sheet_name=sheet_name, index=False)
+        meta_rows = _export_meta_rows('literal_all', scope_ctx)
+        if partial:
+            meta_rows.append({'key': 'partial', 'value': '1'})
+            meta_rows.append({'key': 'partial_tables', 'value': ','.join(t.name for t in all_tables)})
         pd.DataFrame(
-            _export_meta_rows('literal_all', scope_ctx),
+            meta_rows,
             columns=['key', 'value']
         ).to_excel(writer, sheet_name=META_SHEET_NAME, index=False)
     return output.getvalue()

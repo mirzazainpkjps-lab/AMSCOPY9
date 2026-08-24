@@ -298,7 +298,7 @@ def _write_full_import_report(report, issue_rows, mode, scope_ctx, source_file_n
     return report_name, report_meta
 
 
-def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name):
+def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name, allowed_tables=None):
     try:
         xls = pd.ExcelFile(io.BytesIO(file_bytes))
     except Exception as exc:
@@ -314,9 +314,25 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name):
             )
         sheet_to_table[sheet_name] = table
 
+    # Granular restore: only the tables selected by the user are imported and
+    # (in overwrite mode) cleared.  No selection means "everything in file".
+    allowed = set(allowed_tables) if allowed_tables else None
+
     workbook_sheets = list(xls.sheet_names or [])
     selected_tables = [sheet_to_table[name] for name in workbook_sheets if name in sheet_to_table]
+    not_selected_tables = [
+        sheet_to_table[name] for name in workbook_sheets
+        if name in sheet_to_table and allowed is not None and sheet_to_table[name].name not in allowed
+    ]
+    if allowed is not None:
+        selected_tables = [t for t in selected_tables if t.name in allowed]
     if not selected_tables:
+        if not_selected_tables:
+            raise ValueError(
+                'None of the sheets in this file belong to the modules you selected. '
+                'Select the matching module(s) (or leave module selection empty to '
+                'restore every table found in the file).'
+            )
         raise ValueError(
             'No importable sheets found for current scope. The file does not look like an '
             'export from this app — use "Export Full XLSX" on the Import & Export page to '
@@ -349,11 +365,26 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name):
             'reason': note, 'primary_key': '', 'label': '', 'row_json': '',
         })
 
+    # Sheets that exist in the file but were not part of the selected modules:
+    # leave them untouched and say so (informational, not a warning).
+    for table in not_selected_tables:
+        note = 'Sheet was not selected for this restore; existing data was kept.'
+        report['table_results'].append({
+            'name': table.name, 'status': 'skipped', 'inserted': 0, 'updated': 0,
+            'skipped': 0, 'failed': 0, 'error': note,
+        })
+        issue_rows.append({
+            'table': table.name, 'sheet_row': '', 'status': 'skipped_not_selected',
+            'reason': note, 'primary_key': '', 'label': '', 'row_json': '',
+        })
+
     # A literal export with a missing sheet is incomplete.  Keep that table's
-    # current rows (even in overwrite mode) and identify it clearly.
+    # current rows (even in overwrite mode) and identify it clearly.  For
+    # partial (module) backups only the selected tables are expected.
     if _read_meta_kind_from_excel(xls) == 'literal_all':
         workbook_set = set(workbook_sheets)
-        for table in scoped_tables:
+        expected_tables = [t for t in scoped_tables if allowed is None or t.name in allowed]
+        for table in expected_tables:
             expected = table.name[:31]
             if expected in workbook_set:
                 continue

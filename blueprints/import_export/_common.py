@@ -108,3 +108,98 @@ MASTER_ALL_SHEETS = [
     'FBMCashDrawer', 'FBMCashDrawerCategories', 'Users',
 ]
 META_SHEET_NAME = '__AMS_META__'
+
+# ===== Granular (per-module) backup / restore / import / export =====
+# Each module maps to the *physical tables* that make up that module.
+# Exporting a module writes exactly those tables (full fidelity, same engine
+# as the full XLSX backup); restoring a module imports exactly the tables the
+# workbook supplies, so other modules are left untouched.
+EXPORT_MODULES = {
+    'clients': {
+        'label': 'Clients',
+        'tables': ['client', 'recon_basket'],
+    },
+    'suppliers': {
+        'label': 'Suppliers & Supplier Payments',
+        'tables': ['supplier', 'supplier_payment'],
+    },
+    'pending_bills': {
+        'label': 'Pending Bills & Follow-ups',
+        'tables': ['pending_bill', 'follow_up_contact', 'follow_up_reminder'],
+    },
+    'notifications': {
+        'label': 'Notification Data (Staff Emails)',
+        'tables': ['staff_email', 'follow_up_contact', 'follow_up_reminder'],
+    },
+    'stock_movements': {
+        'label': 'Stock Dispatch & Receiving (IN/OUT)',
+        'tables': ['entry', 'delivery', 'delivery_item'],
+    },
+    'grn': {
+        'label': 'GRN (Stock In)',
+        'tables': ['grn', 'grn_item', 'grn_allocation'],
+    },
+    'materials': {
+        'label': 'Materials & Categories',
+        'tables': ['material', 'material_category'],
+    },
+    'direct_sales': {
+        'label': 'Direct Sales, Invoices & Driver Payments',
+        'tables': [
+            'direct_sale', 'direct_sale_item', 'direct_sale_draft',
+            'invoice', 'delivery_rent', 'sale_delivery_persons',
+            'delivery_person_payment',
+        ],
+    },
+    'material_returns': {
+        'label': 'Material Returns',
+        'tables': ['material_return', 'material_return_item'],
+    },
+    'bookings': {
+        'label': 'Bookings',
+        'tables': ['booking', 'booking_item', 'booking_allocation',
+                  'booking_allocation_repair_archive'],
+    },
+    'payments': {
+        'label': 'Payments',
+        'tables': ['payment', 'waive_off'],
+    },
+    'delivery_persons': {
+        'label': 'Delivery Persons & Driver Payments',
+        'tables': ['delivery_person', 'delivery_person_payment',
+                  'sale_delivery_persons', 'delivery_rent'],
+    },
+    'accounts': {
+        'label': 'Financial Accounts (Khata)',
+        'tables': ['account', 'account_category', 'account_transaction'],
+    },
+    'cash_drawer': {
+        'label': 'Cash Drawer',
+        'tables': ['fbm_cash_drawer_entry', 'fbm_cash_drawer_category'],
+    },
+    'cash_flow': {
+        'label': 'Cash Flow & Reconciliations',
+        'tables': [
+            'cash_flow_entry', 'cash_flow_entry_audit', 'cash_flow_category',
+            'cash_flow_subcategory', 'cash_flow_party',
+            'account_reconciliation', 'cash_flow_difference_adjustment',
+            'cash_flow_reconciliation_audit',
+        ],
+    },
+    'rentals': {
+        'label': 'Rental Management (FBM)',
+        'tables': ['fbm_rental', 'fbm_rental_item', 'fbm_client'],
+    },
+}
+
+
+def _tables_for_modules(module_keys):
+    """Expand user-selected module keys into the union of their table names."""
+    tables = []
+    seen = set()
+    for key in module_keys or []:
+        for table in EXPORT_MODULES.get(key, {}).get('tables', []):
+            if table not in seen:
+                seen.add(table)
+                tables.append(table)
+    return tables

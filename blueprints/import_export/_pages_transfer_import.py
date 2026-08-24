@@ -108,18 +108,26 @@ def transfer_import():
                 return _json_import_error(msg, 400)
             flash(msg, 'danger')
             return redirect(url_for('import_export.import_export_page'))
+        # Granular restore: restrict import (and overwrite clearing) to the
+        # modules the user selected.  Empty selection = every table in file.
+        import_modules = [
+            str(x).strip().lower() for x in request.form.getlist('modules') if str(x).strip()
+        ]
+        allowed_tables = _tables_for_modules(import_modules) or None
         try:
             report, report_name = _run_full_raw_import_bytes(
                 file_bytes=file_bytes,
                 scope_ctx=scope_ctx,
                 mode=mode,
                 source_file_name=file.filename,
+                allowed_tables=allowed_tables,
             )
             failed = int(report.get('failed') or report.get('errors') or 0)
             warnings = int(report.get('warnings') or 0)
             outcome = 'complete with row-level problems' if failed else ('complete with warnings' if warnings else 'complete')
+            scope_note = f" modules: {', '.join(import_modules)}" if allowed_tables else ''
             msg = (
-                f"Literal full import {outcome} ({mode}). Inserted: {report.get('inserted', 0)}, "
+                f"Literal import {outcome} ({mode}{scope_note}). Inserted: {report.get('inserted', 0)}, "
                 f"Updated: {report.get('updated', 0)}, Skipped: {report.get('skipped', 0)}, "
                 f"Failed: {failed}, Warnings: {warnings}, Tables: {report.get('tables', 0)}. "
                 "Valid rows were saved; rejected or unavailable data is listed below."
