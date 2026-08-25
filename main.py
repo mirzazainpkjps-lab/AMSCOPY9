@@ -1,12 +1,14 @@
-"""AMS application entrypoint + GitHub auto-pull webhook."""
+"""AMS application entrypoint and GitHub auto-deploy webhook."""
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import logging
 import os
 import shutil
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -14,91 +16,40 @@ from flask import jsonify, request
 
 from app import create_app
 
-
-# ============================================================
-# [Ahmed] AMS APPLICATION
-# ============================================================
-
 app = create_app()
 
-
-# ============================================================
-# [Ahmed] ENTER YOUR DETAILS HERE
-# ============================================================
-
-# 1. WEBHOOK TOKEN — set via the AMS_WEBHOOK_TOKEN environment variable.
-#
-# IMPORTANT: never commit a token here.
-#
-# The previously committed literal default has been removed: a token in a
-# public repository is a published credential, and this endpoint performs a
-# `git reset --hard` + redeploy. When AMS_WEBHOOK_TOKEN is unset the auto-pull
-# endpoint disables itself rather than falling back to a known value.
-WEBHOOK_TOKEN = (os.environ.get("AMS_WEBHOOK_TOKEN") or "").strip()
-
-
-# 2. ENTER YOUR PYTHONANYWHERE WSGI FILE PATH HERE
-#
-# Example:
-# /var/www/tempservofbm_pythonanywhere_com_wsgi.py
-#
-WSGI_FILE = "/var/www/tempservofbm_pythonanywhere_com_wsgi.py"
-
-
-# ============================================================
-# [Ahmed] GITHUB SETTINGS
-# ============================================================
-
-GITHUB_REPO = (
-    "https://github.com/rehmanahmedca-source/ams99.git"
-)
-
-GITHUB_BRANCH = "main"
-
-
-# ============================================================
-# [Ahmed] SYSTEM SETTINGS
-# ============================================================
-
 BASE_DIR = Path(__file__).resolve().parent
+GITHUB_REPO = "https://github.com/mirzazainpkjps-lab/AMSCOPY9.git"
+GITHUB_BRANCH = "main"
+WEBHOOK_SECRET = (os.environ.get("AMS_WEBHOOK_SECRET") or "").strip()
 
-DEPLOYMENT_LOCK = threading.Lock()
+# PythonAnywhere API settings. PythonAnywhere automatically exposes the
+# account API token as API_TOKEN to webapps after an API token is created.
+PA_USERNAME = (os.environ.get("PA_USERNAME") or "mirzazain90").strip()
+PA_DOMAIN = (os.environ.get("PA_DOMAIN") or "mirzazain90.pythonanywhere.com").strip()
+PA_API_TOKEN = (
+    os.environ.get("PA_API_TOKEN")
+    or os.environ.get("API_TOKEN")
+    or ""
+).strip()
+PA_API_HOST = (os.environ.get("PA_API_HOST") or "www.pythonanywhere.com").strip()
 
 LOG_FILE = BASE_DIR / "deployment.log"
-
-# The instance directory holds the LIVE application data (the SQLite
-# database plus its -wal/-shm files, the health snapshot, logs and the
-# secret key).  It must never be overwritten by a code deployment.
 INSTANCE_DIR = BASE_DIR / "instance"
-INSTANCE_PRESERVE_DIR = BASE_DIR / ".instance_preserve"
-
-
-# ============================================================
-# [Ahmed] LOGGING
-# ============================================================
+PRESERVE_DIR = BASE_DIR / ".instance_preserve"
+DEPLOYMENT_LOCK = threading.Lock()
 
 logging.basicConfig(
     filename=str(LOG_FILE),
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
-
 logger = logging.getLogger("AMS-GitHub")
 
 
-# ============================================================
-# [Ahmed] COMMAND RUNNER
-# ============================================================
-
-def run_command(command, timeout=300):
-
-    logger.info(
-        "Running: %s",
-        " ".join(command),
-    )
-
+def run_command(command: list[str], timeout: int = 300):
+    logger.info("RUNNING: %s", " ".join(command))
     try:
-
         result = subprocess.run(
             command,
             cwd=str(BASE_DIR),
@@ -106,448 +57,221 @@ def run_command(command, timeout=300):
             stderr=subprocess.STDOUT,
             text=True,
             timeout=timeout,
+            check=False,
         )
-
-        logger.info(
-            "Exit code: %s\n%s",
-            result.returncode,
-            result.stdout,
-        )
-
+        logger.info("EXIT CODE: %s\n%s", result.returncode, result.stdout)
         return result.returncode, result.stdout
-
     except Exception as exc:
-
-        logger.exception(
-            "Command failed: %s",
-            exc,
-        )
-
+        logger.exception("COMMAND ERROR: %s", exc)
         return 1, str(exc)
 
 
-# ============================================================
-# [Ahmed] LIVE DATA PROTECTION (instance directory)
-# ============================================================
-#
-# The GitHub auto-deploy below runs ``git checkout`` + ``git reset --hard``
-# on top of the live deployment.  The live SQLite database (and its
-# -wal/-shm files) live inside the repository checkout under ``instance/``,
-# so a blind reset overwrites the LIVE database with whatever copy was last
-# committed to GitHub.  That is exactly how saved sales (and other data)
-# "disappear" after a push, then "reappear" when a newer snapshot is
-# committed — while rows saved in between are lost.
-#
-# These helpers snapshot the instance directory BEFORE the reset and put the
-# live files back AFTER it, so a deployment updates code only and can never
-# roll back application data.
-
-
-def preserve_instance_data():
-    """Copy the live instance directory aside before the git reset."""
+def preserve_instance_data() -> bool:
     if not INSTANCE_DIR.exists():
-        logger.info("No instance directory to preserve.")
-        return None
-    try:
-        if INSTANCE_PRESERVE_DIR.exists():
-            shutil.rmtree(
-                INSTANCE_PRESERVE_DIR,
-                ignore_errors=True,
-            )
-        shutil.copytree(
-            INSTANCE_DIR,
-            INSTANCE_PRESERVE_DIR,
-            symlinks=True,
-            ignore=shutil.ignore_patterns(
-                ".instance_preserve",
-            ),
-        )
-        logger.info(
-            "Preserved live instance data to %s before git reset.",
-            INSTANCE_PRESERVE_DIR,
-        )
         return True
-    except Exception as exc:
-        # Never block a deploy because the safety copy failed, but make it
-        # loud: without the restore step the reset would clobber live data.
-        logger.exception(
-            "WARNING: could NOT preserve instance data: %s",
-            exc,
-        )
+    try:
+        if PRESERVE_DIR.exists():
+            shutil.rmtree(PRESERVE_DIR, ignore_errors=True)
+        shutil.copytree(INSTANCE_DIR, PRESERVE_DIR, symlinks=True)
+        logger.info("Preserved instance data")
+        return True
+    except Exception:
+        logger.exception("Could not preserve instance data")
         return False
 
 
-def restore_instance_data(preserved):
-    """Put the live instance files back after the git reset.
-
-    Every file that existed before the deployment is restored from the
-    preserved copy, so the reset can change code but not data.  Files that
-    are new in the commit (e.g. a fresh config) are left in place.
-    """
-    if not preserved:
-        logger.warning(
-            "Skipping instance restore because the preserve step did not "
-            "complete. The git reset may have overwritten live data — "
-            "verify instance/ahmed_cement_v44_fresh.db immediately."
-        )
+def restore_instance_data() -> None:
+    if not PRESERVE_DIR.exists():
         return
     try:
         INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
-        restored = 0
-        for src in sorted(INSTANCE_PRESERVE_DIR.rglob("*")):
-            if not src.is_file():
+        for source in PRESERVE_DIR.rglob("*"):
+            if not source.is_file():
                 continue
-            rel = src.relative_to(INSTANCE_PRESERVE_DIR)
-            dst = INSTANCE_DIR / rel
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dst)
-            restored += 1
-        logger.info(
-            "Restored %d live instance file(s) after git reset.",
-            restored,
-        )
-    except Exception as exc:
-        logger.exception(
-            "WARNING: instance restore failed: %s",
-            exc,
-        )
+            relative = source.relative_to(PRESERVE_DIR)
+            destination = INSTANCE_DIR / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+        logger.info("Restored live instance data")
+    except Exception:
+        logger.exception("Could not restore instance data")
 
 
-# ============================================================
-# [Ahmed] TOKEN VALIDATION
-# ============================================================
-
-def valid_token(token):
-
-    if not WEBHOOK_TOKEN:
-
-        logger.error(
-            "Auto-deploy webhook is DISABLED: AMS_WEBHOOK_TOKEN is not set."
-        )
-
+def reload_pythonanywhere() -> bool:
+    """Reload this PythonAnywhere webapp through the official API."""
+    if not PA_API_TOKEN:
+        logger.error("No PythonAnywhere API token: API_TOKEN/PA_API_TOKEN missing")
         return False
 
-    # Constant-time compare so the token cannot be recovered byte-by-byte
-    # from response-time differences.
-    return hmac.compare_digest(str(token or ""), WEBHOOK_TOKEN)
+    try:
+        import requests
+    except ImportError:
+        logger.exception("requests is not installed")
+        return False
+
+    # Official PythonAnywhere v0 endpoint. PythonAnywhere documents this
+    # endpoint as POST /api/v0/user/{username}/webapps/{domain_name}/reload/.
+    endpoint = (
+        f"https://{PA_API_HOST}/api/v0/user/{PA_USERNAME}/"
+        f"webapps/{PA_DOMAIN}/reload/"
+    )
+    headers = {"Authorization": f"Token {PA_API_TOKEN}"}
+
+    logger.info("Reloading PythonAnywhere webapp via API: %s", endpoint)
+
+    try:
+        response = requests.post(endpoint, headers=headers, timeout=60)
+    except Exception:
+        logger.exception("PythonAnywhere API request failed")
+        return False
+
+    logger.info(
+        "PythonAnywhere API reload response: status=%s body=%s",
+        response.status_code,
+        response.text[:2000],
+    )
+
+    if 200 <= response.status_code < 300:
+        logger.info("PythonAnywhere webapp reload successful")
+        return True
+
+    logger.error("PythonAnywhere webapp reload failed: HTTP %s", response.status_code)
+    return False
 
 
-# ============================================================
-# [Ahmed] AUTO DEPLOYMENT
-# ============================================================
-
-def deploy():
-
-    if not DEPLOYMENT_LOCK.acquire(
-        blocking=False
-    ):
-
-        logger.warning(
-            "Deployment already running."
-        )
-
+def deploy() -> None:
+    if not DEPLOYMENT_LOCK.acquire(blocking=False):
+        logger.warning("Deployment already running")
         return
 
     preserved = False
-
     try:
-
-        logger.info(
-            "========================================"
-        )
-
-        logger.info(
-            "[Ahmed] GITHUB AUTO DEPLOY STARTED"
-        )
-
-        # ----------------------------------------------------
-        # STEP 0
-        # Preserve the LIVE database and instance data so the
-        # git checkout/reset below can never roll back live
-        # application data to the last committed snapshot.
-        # ----------------------------------------------------
+        logger.info("========================================")
+        logger.info("GITHUB AUTO DEPLOY STARTED")
 
         preserved = preserve_instance_data()
 
-        # ----------------------------------------------------
-        # STEP 1
-        # Fetch latest GitHub code
-        # ----------------------------------------------------
-
-        code, output = run_command(
-            [
-                "git",
-                "fetch",
-                "--prune",
-                "origin",
-                GITHUB_BRANCH,
-            ]
-        )
-
+        code, output = run_command(["git", "remote", "set-url", "origin", GITHUB_REPO])
         if code != 0:
+            raise RuntimeError("git remote set-url failed:\n" + output)
 
-            raise RuntimeError(
-                "Git fetch failed:\n" + output
-            )
-
-        # ----------------------------------------------------
-        # STEP 2
-        # Switch to main
-        # ----------------------------------------------------
-
-        code, output = run_command(
-            [
-                "git",
-                "checkout",
-                "-B",
-                GITHUB_BRANCH,
-                f"origin/{GITHUB_BRANCH}",
-            ]
-        )
-
+        code, output = run_command(["git", "fetch", "--prune", "origin", GITHUB_BRANCH])
         if code != 0:
+            raise RuntimeError("git fetch failed:\n" + output)
 
-            raise RuntimeError(
-                "Git checkout failed:\n" + output
-            )
-
-        # ----------------------------------------------------
-        # STEP 3
-        # Force PythonAnywhere to match GitHub
-        # ----------------------------------------------------
-
-        code, output = run_command(
-            [
-                "git",
-                "reset",
-                "--hard",
-                f"origin/{GITHUB_BRANCH}",
-            ]
-        )
-
+        code, output = run_command([
+            "git", "checkout", "-B", GITHUB_BRANCH,
+            f"origin/{GITHUB_BRANCH}",
+        ])
         if code != 0:
+            raise RuntimeError("git checkout failed:\n" + output)
 
-            raise RuntimeError(
-                "Git reset failed:\n" + output
-            )
+        code, output = run_command(["git", "reset", "--hard", f"origin/{GITHUB_BRANCH}"])
+        if code != 0:
+            raise RuntimeError("git reset failed:\n" + output)
 
-        # ----------------------------------------------------
-        # STEP 4
-        # Install requirements
-        # ----------------------------------------------------
+        if preserved:
+            restore_instance_data()
 
         requirements = BASE_DIR / "requirements.txt"
-
         if requirements.exists():
-
-            logger.info(
-                "Installing requirements..."
-            )
-
-            code, output = run_command(
-                [
-                    "python3",
-                    "-m",
-                    "pip",
-                    "install",
-                    "--user",
-                    "-r",
-                    "requirements.txt",
-                ],
-                timeout=600,
-            )
-
+            code, output = run_command([
+                sys.executable, "-m", "pip", "install", "--user",
+                "-r", str(requirements),
+            ], timeout=900)
             if code != 0:
+                raise RuntimeError("pip install failed:\n" + output)
 
-                raise RuntimeError(
-                    "requirements installation failed:\n"
-                    + output
-                )
-
-        # ----------------------------------------------------
-        # STEP 5
-        # Reload PythonAnywhere
-        # ----------------------------------------------------
-
-        if WSGI_FILE:
-
-            wsgi_path = Path(
-                WSGI_FILE
-            ).expanduser()
-
-            if wsgi_path.exists():
-
-                wsgi_path.touch()
-
-                logger.info(
-                    "PythonAnywhere WSGI reload triggered."
-                )
-
+        # API reload is the primary reload mechanism.
+        if not reload_pythonanywhere():
+            logger.warning("API reload failed; trying WSGI touch fallback")
+            wsgi_file = Path("/var/www/mirzazain90_pythonanywhere_com_wsgi.py")
+            if wsgi_file.exists():
+                wsgi_file.touch()
+                logger.info("Fallback WSGI reload triggered")
             else:
+                logger.error("Fallback WSGI file not found: %s", wsgi_file)
 
-                logger.error(
-                    "WSGI file NOT FOUND: %s",
-                    wsgi_path,
-                )
-
-        logger.info(
-            "[Ahmed] GITHUB AUTO DEPLOY SUCCESS"
-        )
-
-        logger.info(
-            "========================================"
-        )
+        logger.info("GITHUB AUTO DEPLOY SUCCESS")
+        logger.info("========================================")
 
     except Exception as exc:
-
-        logger.exception(
-            "[Ahmed] DEPLOYMENT FAILED: %s",
-            exc,
-        )
-
+        logger.exception("DEPLOYMENT FAILED: %s", exc)
+        if preserved:
+            restore_instance_data()
     finally:
-
-        # Restore the live instance files on every path — success or
-        # failure — so a failed deploy midway through the git reset
-        # cannot leave the live database in the committed state.
-        restore_instance_data(preserved)
-
         DEPLOYMENT_LOCK.release()
 
 
-# ============================================================
-# [Ahmed] GITHUB WEBHOOK
-# ============================================================
+def verify_github_signature() -> bool:
+    if not WEBHOOK_SECRET:
+        logger.error("AMS_WEBHOOK_SECRET is not configured")
+        return False
 
-@app.route(
-    "/git-auto-pull",
-    methods=["GET", "POST"],
-)
+    signature = request.headers.get("X-Hub-Signature-256", "")
+    if not signature.startswith("sha256="):
+        return False
+
+    expected = hmac.new(
+        WEBHOOK_SECRET.encode("utf-8"),
+        request.get_data(),
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(signature[7:], expected)
+
+
+@app.route("/git-auto-pull", methods=["GET", "POST"])
 def git_auto_pull():
-
-    token = request.args.get(
-        "token",
-        "",
-        type=str,
-    ).strip()
-
-    # --------------------------------------------------------
-    # Verify token
-    # --------------------------------------------------------
-
-    if not valid_token(token):
-
-        logger.warning(
-            "Unauthorized GitHub deployment request."
-        )
-
-        return jsonify(
-            {
-                "success": False,
-                "message": "Unauthorized",
-            }
-        ), 403
-
-    # --------------------------------------------------------
-    # Browser test
-    # --------------------------------------------------------
-
     if request.method == "GET":
+        return jsonify({
+            "success": True,
+            "service": "AMS GitHub Auto Deploy",
+            "status": "online",
+        }), 200
 
-        return jsonify(
-            {
-                "success": True,
-                "service": "AMS Git Auto Pull",
-                "status": "online",
-            }
-        ), 200
+    event = request.headers.get("X-GitHub-Event", "")
+    delivery = request.headers.get("X-GitHub-Delivery", "")
 
-    # --------------------------------------------------------
-    # GitHub event
-    # --------------------------------------------------------
+    logger.info("GitHub webhook received: event=%s delivery=%s", event, delivery)
 
-    event = request.headers.get(
-        "X-GitHub-Event",
-        "",
-    )
+    if not verify_github_signature():
+        logger.warning("Invalid GitHub webhook signature")
+        return jsonify({"success": False, "message": "Invalid signature"}), 403
 
-    if event and event != "push":
+    if event != "push":
+        return jsonify({"success": True, "message": "Event ignored"}), 200
 
-        return jsonify(
-            {
-                "success": True,
-                "message": "Event ignored",
-            }
-        ), 200
+    payload = request.get_json(silent=True) or {}
+    ref = payload.get("ref", "")
+    repository = payload.get("repository") or {}
+    repository_name = repository.get("full_name", "")
 
-    # --------------------------------------------------------
-    # Check branch
-    # --------------------------------------------------------
+    logger.info("Webhook repository=%s ref=%s", repository_name, ref)
 
-    payload = request.get_json(
-        silent=True
-    ) or {}
+    if repository_name != "mirzazainpkjps-lab/AMSCOPY9":
+        return jsonify({"success": True, "message": "Repository ignored"}), 200
 
-    ref = payload.get(
-        "ref",
-        "",
-    )
-
-    if ref and ref != "refs/heads/main":
-
-        return jsonify(
-            {
-                "success": True,
-                "message": "Branch ignored",
-            }
-        ), 200
-
-    # --------------------------------------------------------
-    # Prevent duplicate deployment
-    # --------------------------------------------------------
+    if ref != "refs/heads/main":
+        return jsonify({"success": True, "message": "Branch ignored"}), 200
 
     if DEPLOYMENT_LOCK.locked():
+        return jsonify({"success": True, "message": "Deployment already running"}), 202
 
-        return jsonify(
-            {
-                "success": True,
-                "message": "Deployment already running",
-            }
-        ), 202
+    threading.Thread(target=deploy, daemon=True).start()
 
-    # --------------------------------------------------------
-    # Start deployment
-    # --------------------------------------------------------
+    return jsonify({
+        "success": True,
+        "message": "Deployment started",
+        "repository": repository_name,
+        "branch": "main",
+        "delivery": delivery,
+    }), 202
 
-    thread = threading.Thread(
-        target=deploy,
-        daemon=True,
-    )
-
-    thread.start()
-
-    return jsonify(
-        {
-            "success": True,
-            "message": "Deployment started",
-        }
-    ), 202
-
-
-# ============================================================
-# [Ahmed] LOCAL FLASK SERVER
-# ============================================================
 
 if __name__ == "__main__":
-
-    # Werkzeug's debugger allows arbitrary code execution for anyone who can
-    # reach the port, and this server binds 0.0.0.0 (the whole LAN).  Keep it
-    # off unless AMS_DEBUG=1 is set explicitly.
-    debug_mode = (os.environ.get("AMS_DEBUG") or "").strip() == "1"
-
     app.run(
         host="0.0.0.0",
-        port=int(os.environ.get("PORT", "5000") or "5000"),
-        debug=debug_mode,
+        port=int(os.environ.get("PORT", "5000")),
+        debug=False,
         use_reloader=False,
     )

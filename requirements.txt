@@ -8,11 +8,10 @@ openpyxl>=3.1.5
 pandas>=2.2.0
 reportlab>=4.0.7
 # Primary HTML -> PDF engine for invoice / ledger / report exports.
-# Requires system libraries (pango, cairo, gdk-pixbuf).  When those are absent
+# Requires system libraries (pango, cairo, gdk-pixbuf). When those are absent
 # (common on shared hosts) the app automatically renders the PDF with the
-# pure-Python ReportLab fallback in app/services/pdf_fallback.py, so PDF
-# downloads never silently degrade to HTML.
+# pure-Python ReportLab fallback in app/services/pdf_fallback.py.
 flask-weasyprint>=0.6.0
 pytest>=8.0.0
-# Test-only: verifies exported PDFs contain the expected figures verbatim.
 pypdf>=4.0.0
+requests>=2.31.0

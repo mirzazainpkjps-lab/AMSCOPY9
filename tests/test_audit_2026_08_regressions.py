@@ -322,20 +322,55 @@ def test_cors_does_not_reflect_arbitrary_origins(app):
 # MEDIUM: deploy webhook / startup diagnostics.
 # --------------------------------------------------------------------------
 
-def test_webhook_refuses_to_run_without_a_configured_token(monkeypatch):
+def test_webhook_refuses_to_run_without_a_configured_secret(monkeypatch):
     """main.py shipped a hardcoded token in a public repo, guarding an endpoint
-    that runs `git reset --hard`. With no token the endpoint must fail closed,
-    and an empty supplied token must never compare equal."""
+    that runs `git reset --hard`.
+
+    The deploy webhook was since reworked upstream to verify a GitHub
+    HMAC-SHA256 signature instead of a query-string token. That is a stronger
+    mechanism, but the property this test defends is unchanged: with no secret
+    configured the endpoint must fail CLOSED, and a forged signature must never
+    be accepted.
+    """
+    import hashlib
+    import hmac
+
     import main
 
-    monkeypatch.setattr(main, "WEBHOOK_TOKEN", "")
-    assert main.valid_token("") is False
-    assert main.valid_token(None) is False
-    assert main.valid_token("anything") is False
+    body = b'{"ref": "refs/heads/main"}'
 
-    monkeypatch.setattr(main, "WEBHOOK_TOKEN", "s3cret")
-    assert main.valid_token("s3cret") is True
-    assert main.valid_token("wrong") is False
+    def _signature(secret: bytes) -> str:
+        return "sha256=" + hmac.new(secret, body, hashlib.sha256).hexdigest()
+
+    # No secret configured -> fail closed, even for a well-formed signature.
+    monkeypatch.setattr(main, "WEBHOOK_SECRET", "")
+    with main.app.test_request_context(
+        "/git-auto-pull",
+        method="POST",
+        data=body,
+        headers={"X-Hub-Signature-256": _signature(b"anything")},
+    ):
+        assert main.verify_github_signature() is False
+
+    # Secret configured -> only the genuine signature is accepted.
+    monkeypatch.setattr(main, "WEBHOOK_SECRET", "s3cret")
+
+    with main.app.test_request_context(
+        "/git-auto-pull", method="POST", data=body,
+        headers={"X-Hub-Signature-256": _signature(b"s3cret")},
+    ):
+        assert main.verify_github_signature() is True
+
+    for bad in ("sha256=deadbeef", _signature(b"wrong-secret"), "", "garbage"):
+        with main.app.test_request_context(
+            "/git-auto-pull", method="POST", data=body,
+            headers={"X-Hub-Signature-256": bad},
+        ):
+            assert main.verify_github_signature() is False, bad
+
+    # A missing signature header must also be refused.
+    with main.app.test_request_context("/git-auto-pull", method="POST", data=body):
+        assert main.verify_github_signature() is False
 
 
 def test_no_hardcoded_webhook_token_in_source():
