@@ -41,7 +41,55 @@ for _before_request_list in app.before_request_funcs.values():
 BASE_DIR = Path(__file__).resolve().parent
 GITHUB_REPO = "https://github.com/mirzazainpkjps-lab/AMSCOPY9.git"
 GITHUB_BRANCH = "main"
-WEBHOOK_SECRET = (os.environ.get("AMS_WEBHOOK_SECRET") or "").strip()
+
+# Default private file on PythonAnywhere. Do not commit this file.
+# PythonAnywhere free Web tabs often have no Environment variables UI, so the
+# GitHub webhook secret is stored here instead of AMS_WEBHOOK_SECRET.
+DEFAULT_WEBHOOK_SECRET_FILE = Path("/home/mirzazain90/.ams_webhook_secret")
+
+
+def _candidate_secret_files() -> list[Path]:
+    custom = (os.environ.get("AMS_WEBHOOK_SECRET_FILE") or "").strip()
+    if custom:
+        return [Path(custom)]
+    paths = [DEFAULT_WEBHOOK_SECRET_FILE, Path.home() / ".ams_webhook_secret"]
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    return unique
+
+
+def load_webhook_secret() -> str:
+    """Return the GitHub webhook secret from env or a private file.
+
+    Lookup order:
+    1. AMS_WEBHOOK_SECRET environment variable
+    2. AMS_WEBHOOK_SECRET_FILE, if set
+    3. /home/mirzazain90/.ams_webhook_secret
+    4. ~/.ams_webhook_secret
+    """
+    env_secret = (os.environ.get("AMS_WEBHOOK_SECRET") or "").strip()
+    if env_secret:
+        return env_secret
+
+    for path in _candidate_secret_files():
+        try:
+            if not path.is_file():
+                continue
+            secret = path.read_text(encoding="utf-8").strip()
+            if secret:
+                return secret
+        except OSError:
+            continue
+    return ""
+
+
+WEBHOOK_SECRET = load_webhook_secret()
 
 # PythonAnywhere API settings. PythonAnywhere automatically exposes the
 # account API token as API_TOKEN to webapps after an API token is created.
@@ -224,7 +272,11 @@ def deploy() -> None:
 
 def verify_github_signature() -> bool:
     if not WEBHOOK_SECRET:
-        logger.error("AMS_WEBHOOK_SECRET is not configured")
+        logger.error(
+            "GitHub webhook secret is not configured. "
+            "Set AMS_WEBHOOK_SECRET or create %s",
+            DEFAULT_WEBHOOK_SECRET_FILE,
+        )
         return False
 
     signature = request.headers.get("X-Hub-Signature-256", "")

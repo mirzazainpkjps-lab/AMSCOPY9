@@ -380,6 +380,30 @@ def test_no_hardcoded_webhook_token_in_source():
     assert "PakistanZindabad1947-2026" not in source.read_text(encoding="utf-8")
 
 
+def test_webhook_secret_loads_from_private_file(tmp_path, monkeypatch):
+    """PythonAnywhere free Web tabs have no Environment variables UI.
+
+    The webhook secret must still be configurable via a private file so GitHub
+    HMAC verification works without AMS_WEBHOOK_SECRET in the process env.
+    """
+    import main
+
+    secret_file = tmp_path / ".ams_webhook_secret"
+    secret_file.write_text("file-secret-value\n", encoding="utf-8")
+
+    monkeypatch.delenv("AMS_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("AMS_WEBHOOK_SECRET_FILE", str(secret_file))
+    assert main.load_webhook_secret() == "file-secret-value"
+
+    monkeypatch.setenv("AMS_WEBHOOK_SECRET", "env-wins")
+    assert main.load_webhook_secret() == "env-wins"
+
+    missing = tmp_path / "does-not-exist"
+    monkeypatch.delenv("AMS_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("AMS_WEBHOOK_SECRET_FILE", str(missing))
+    assert main.load_webhook_secret() == ""
+
+
 # --------------------------------------------------------------------------
 # HIGH: concurrent payments were dropped by optimistic-locking conflicts.
 # --------------------------------------------------------------------------
