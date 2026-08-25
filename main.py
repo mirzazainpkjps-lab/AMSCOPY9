@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 import shutil
@@ -25,18 +26,15 @@ app = create_app()
 # [Ahmed] ENTER YOUR DETAILS HERE
 # ============================================================
 
-# 1. ENTER YOUR NEW WEBHOOK TOKEN HERE
+# 1. WEBHOOK TOKEN — set via the AMS_WEBHOOK_TOKEN environment variable.
 #
-# IMPORTANT:
-# Use a NEW token. Do not use the old token you exposed.
+# IMPORTANT: never commit a token here.
 #
-# Prefer the AMS_WEBHOOK_TOKEN environment variable. The literal below is
-# only a fallback for existing deployments — a token committed to the
-# repository is public, so set the environment variable and rotate it.
-WEBHOOK_TOKEN = (
-    os.environ.get("AMS_WEBHOOK_TOKEN")
-    or "PakistanZindabad1947-2026"
-)
+# The previously committed literal default has been removed: a token in a
+# public repository is a published credential, and this endpoint performs a
+# `git reset --hard` + redeploy. When AMS_WEBHOOK_TOKEN is unset the auto-pull
+# endpoint disables itself rather than falling back to a known value.
+WEBHOOK_TOKEN = (os.environ.get("AMS_WEBHOOK_TOKEN") or "").strip()
 
 
 # 2. ENTER YOUR PYTHONANYWHERE WSGI FILE PATH HERE
@@ -224,12 +222,14 @@ def valid_token(token):
     if not WEBHOOK_TOKEN:
 
         logger.error(
-            "Webhook token is empty."
+            "Auto-deploy webhook is DISABLED: AMS_WEBHOOK_TOKEN is not set."
         )
 
         return False
 
-    return token == WEBHOOK_TOKEN
+    # Constant-time compare so the token cannot be recovered byte-by-byte
+    # from response-time differences.
+    return hmac.compare_digest(str(token or ""), WEBHOOK_TOKEN)
 
 
 # ============================================================

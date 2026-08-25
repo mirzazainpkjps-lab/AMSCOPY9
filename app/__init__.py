@@ -9,8 +9,17 @@ from logging.handlers import RotatingFileHandler
 from datetime import timedelta
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, request
 from flask_login import LoginManager
+
+
+def _env_flag(name: str, default: str = "") -> bool:
+    """True when an environment variable is set to an affirmative value."""
+    return (os.environ.get(name, default) or "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
 from sqlalchemy import event
 
 from models import db
@@ -141,6 +150,14 @@ def create_app(test_config: dict | None = None) -> Flask:
                     enabled = cursor.execute("PRAGMA foreign_keys").fetchone()
                     if not enabled or enabled[0] != 1:
                         raise RuntimeError("SQLite foreign-key enforcement could not be enabled")
+                    # busy_timeout is PER CONNECTION. It used to be issued once
+                    # via db.session in a before_request hook, which only ever
+                    # configured whichever pooled connection served that first
+                    # request; every other connection kept SQLite's default of
+                    # 0ms and aborted instantly on contention. Concurrent
+                    # writers then lost their transaction instead of waiting.
+                    busy_ms = int(os.environ.get("SQLITE_BUSY_TIMEOUT_MS", "15000"))
+                    cursor.execute(f"PRAGMA busy_timeout={busy_ms}")
                 finally:
                     cursor.close()
 
@@ -285,6 +302,30 @@ def create_app(test_config: dict | None = None) -> Flask:
                             exc_info=True,
                         )
                 _bootstrap_database()
+                # Record what the schema on disk ACTUALLY is. The config pins
+                # AMS_SCHEMA_VERSION=v44 unconditionally, which previously made
+                # boot logs and health output claim a v4.4 install even though
+                # the SQL bundle is absent and the ORM built the schema.
+                try:
+                    from app.services.v44_schema import describe_schema_state
+
+                    schema_state = describe_schema_state(db_path)
+                    app.config["AMS_SCHEMA_STATE"] = schema_state
+                    if not schema_state["schema_bundle_present"]:
+                        logging.getLogger(__name__).warning(
+                            "Schema provenance: AMS_SCHEMA_VERSION=%s is "
+                            "configured, but %s is missing, so the live schema "
+                            "is %r (built by db.create_all from the ORM "
+                            "models). No SQL-level CHECK constraints from the "
+                            "v4.4 bundle are in force.",
+                            app.config.get("AMS_SCHEMA_VERSION"),
+                            schema_state["schema_bundle_path"],
+                            schema_state["effective_schema"],
+                        )
+                except Exception:
+                    logging.getLogger(__name__).warning(
+                        "Could not determine schema provenance", exc_info=True
+                    )
                 try:
                     _db_health_check_after_bootstrap()
                 except Exception:
@@ -295,11 +336,35 @@ def create_app(test_config: dict | None = None) -> Flask:
                     )
         except Exception:
             logging.getLogger(__name__).critical(
-                "DATABASE BOOTSTRAP FAILED — the application will return HTTP 500 "
-                "on any page that touches the database.",
+                "DATABASE BOOTSTRAP FAILED — the application will refuse "
+                "requests until this is resolved.",
                 exc_info=True,
             )
             app.config["AMS_BOOTSTRAP_ERROR"] = traceback.format_exc()
+            # Fail closed. Previously the error was only recorded in config and
+            # nothing ever read it, so the app came up "healthy" and every
+            # database-backed page died with an opaque HTTP 500 — including
+            # pages that write. Serving a half-bootstrapped database risks
+            # partial writes against a schema that may be missing columns.
+            if _env_flag("AMS_STRICT_BOOTSTRAP"):
+                raise
+
+    @app.before_request
+    def _refuse_when_bootstrap_failed():
+        error = app.config.get("AMS_BOOTSTRAP_ERROR")
+        if not error:
+            return None
+        if (request.endpoint or "") == "static":
+            return None
+        body = (
+            "Service unavailable: the database failed to initialise.\n\n"
+            "The application is refusing requests rather than operating "
+            "against a half-initialised database. See the server log for the "
+            "full traceback.\n"
+        )
+        if _env_flag("AMS_DEBUG_STARTUP"):
+            body += "\n" + error
+        return app.response_class(body, status=503, mimetype="text/plain")
 
     # Start once at application startup, never from a user request. The
     # cross-process filesystem lock prevents duplicate work under Gunicorn.

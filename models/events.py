@@ -4,6 +4,8 @@ from .stock import *  # noqa
 from .parties import *  # noqa
 from .cash import *  # noqa
 from .delivery import *  # noqa
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
 from utils.money import sync_money_fields
 from .helpers import (
     _normalize_auto_bill_model,
@@ -12,12 +14,69 @@ from .helpers import (
     _parse_bill_kind_model,
 )
 
+# Money columns that are plain ``db.Float`` with no integer-minor mirror.
+# Binary floats cannot represent most decimal money values, so arithmetic like
+# ``qty * unit_rate`` drifts and the drift reaches storage — a PendingBill was
+# found holding ``99999.69999999998``. Every write already passes through
+# ``before_flush``, so quantising here is the one place that covers all
+# mutation routes, including legacy ones that assign a raw float.
+_FLOAT_MONEY_FIELDS = {
+    'AccountReconciliation': ('adjustment_amount',),
+    'Booking': ('amount', 'discount', 'paid_amount'),
+    'BookingItem': ('price_at_time',),
+    'CashFlowDifferenceAdjustment': ('amount',),
+    'Client': ('opening_balance',),
+    'DeliveryPerson': ('opening_balance',),
+    'DeliveryPersonPayment': ('waive_off_amount',),
+    'DeliveryRent': ('amount',),
+    'DirectSale': ('amount', 'delivery_rent_cost', 'discount', 'paid_amount'),
+    'DirectSaleDraft': ('total_amount',),
+    'DirectSaleItem': ('cost_rate_at_sale', 'price_at_time'),
+    'FBMRental': ('discount_amount', 'paid_amount', 'total_amount'),
+    'FbmCashDrawerEntry': ('amount',),
+    'GRN': ('adjustment_amount', 'discount', 'freight_cost', 'loading_cost',
+            'paid_amount', 'tax_amount'),
+    'GRNAllocation': ('cost_rate',),
+    'GRNItem': ('price_at_time',),
+    'Invoice': ('balance', 'total_amount'),
+    'Material': ('unit_price',),
+    'MaterialReturn': ('amount',),
+    'MaterialReturnItem': ('price_at_time', 'rent_rate', 'unit_rate'),
+    'PendingBill': ('amount',),
+    'SaleDeliveryPerson': ('rent_amount',),
+    'Supplier': ('opening_balance',),
+    'WaiveOff': ('amount',),
+}
+
+
+def _quantize_float_money(obj):
+    """Round an object's float money columns to exactly 2 decimal places."""
+    fields = _FLOAT_MONEY_FIELDS.get(type(obj).__name__)
+    if not fields:
+        return
+    for attr in fields:
+        value = getattr(obj, attr, None)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            rounded = float(
+                Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            )
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        if rounded == 0.0:
+            rounded = 0.0  # normalise -0.0
+        if rounded != value:
+            setattr(obj, attr, rounded)
+
+
 @event.listens_for(db.session, 'before_flush')
 def _normalize_bill_identities(session, flush_context, instances):
     # Normalize bill identities and exact minor-unit mirrors before writing any
     # changed/new object.  This also protects older mutation routes that still
     # assign a Python float to a legacy column.
     for obj in list(session.new) + list(session.dirty):
+        _quantize_float_money(obj)
         if isinstance(obj, Account):
             sync_money_fields(obj, 'balance', 'balance_minor')
             if getattr(obj, 'opening_balance', None) is not None:

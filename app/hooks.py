@@ -75,21 +75,49 @@ def register_hooks(app):
             response.headers['Cache-Control'] = 'no-cache'
         return response
 
+    # Hosts permitted to frame the app. 'self' covers normal same-origin use;
+    # the sandbox preview domains keep the Arena / e2b live preview working.
+    # Operators can override or extend this with a space-separated list.
+    _DEFAULT_FRAME_ANCESTORS = "'self' https://*.e2b.app https://*.arena.ai https://*.replit.dev"
+
+    def _frame_ancestors():
+        configured = (os.environ.get('AMS_FRAME_ANCESTORS') or '').strip()
+        return configured or _DEFAULT_FRAME_ANCESTORS
+
+    def _cors_allowed_origins():
+        raw = (os.environ.get('AMS_CORS_ORIGINS') or '').strip()
+        return [o for o in raw.split() if o]
+
     @app.after_request
     def allow_iframe_and_cors(response):
+        # Clickjacking: scope framing to an explicit allowlist instead of the
+        # previous unconditional "ALLOWALL" + "frame-ancestors *", which let
+        # any site on the internet frame the whole ERP and drive it against a
+        # logged-in session. X-Frame-Options has no allowlist form, so it is
+        # dropped in favour of CSP (which every supported browser honours and
+        # which takes precedence where both are present).
+        response.headers.pop("X-Frame-Options", None)
+        response.headers["Content-Security-Policy"] = f"frame-ancestors {_frame_ancestors()}"
+
         if os.environ.get('ALLOW_OPEN_CORS', '').lower() in ('1', 'true', 'yes'):
-            response.headers["X-Frame-Options"] = "ALLOWALL"
-            response.headers["Content-Security-Policy"] = "frame-ancestors *"
-            response.headers["Access-Control-Allow-Origin"] = "*"
+            # Reflect only origins the operator has explicitly listed. A bare
+            # "*" is still refused for credentialed requests by browsers, but
+            # echoing arbitrary origins would defeat same-origin protections
+            # for the read-only endpoints too.
+            allowed = _cors_allowed_origins()
+            origin = (request.headers.get('Origin') or '').strip()
+            if allowed and origin and origin in allowed:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Vary"] = "Origin"
+            elif not allowed:
+                # Backwards-compatible fallback for existing deployments that
+                # set ALLOW_OPEN_CORS without naming origins. Credentials stay
+                # disabled, so this cannot be used to ride a user's session.
+                response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
             response.headers["Access-Control-Allow-Credentials"] = "false"
-            return response
 
-        # Arena / e2b live preview is a cross-origin iframe. Blocking it
-        # looks like a broken login (blank page after POST /login).
-        response.headers["X-Frame-Options"] = "ALLOWALL"
-        response.headers["Content-Security-Policy"] = "frame-ancestors *"
         return response
 
     @app.before_request

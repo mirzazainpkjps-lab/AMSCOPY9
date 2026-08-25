@@ -58,6 +58,53 @@ def is_v44_database(connection: sqlite3.Connection) -> bool:
     ).fetchone())
 
 
+def schema_bundle_available() -> bool:
+    """True when the optional v4.4 SQL bundle is actually present on disk.
+
+    ``v44/SCHEMA_v4_4.sql`` is referenced by config but is not in the
+    repository, so in practice every database is built by ``db.create_all()``
+    from the ORM models and can never satisfy :func:`is_v44_database`. Callers
+    use this to describe the schema state truthfully instead of reporting a
+    "v4.4" install that was never applied.
+    """
+    return schema_path().exists()
+
+
+def describe_schema_state(db_path) -> dict:
+    """Report what the database on disk actually is, for logs and /health.
+
+    The app pins AMS_SCHEMA_VERSION=v44 unconditionally, which made the
+    configured version look authoritative even though the SQL bundle is
+    missing and the real schema came from the ORM.
+    """
+    path = Path(db_path).expanduser()
+    state = {
+        "db_path": str(path),
+        "schema_bundle_present": schema_bundle_available(),
+        "schema_bundle_path": str(schema_path()),
+        "database_exists": path.exists() and path.stat().st_size > 0,
+        "is_v44_schema": False,
+        "effective_schema": "absent",
+    }
+    if not state["database_exists"]:
+        return state
+    try:
+        conn = sqlite3.connect(str(path))
+        try:
+            state["is_v44_schema"] = is_v44_database(conn)
+            if state["is_v44_schema"]:
+                state["effective_schema"] = "v44-sql-bundle"
+            elif has_any_table(conn):
+                state["effective_schema"] = "orm-create-all"
+            else:
+                state["effective_schema"] = "empty"
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        state["effective_schema"] = "unreadable"
+    return state
+
+
 def has_any_table(connection: sqlite3.Connection) -> bool:
     """True when the SQLite file contains at least one user table.
 
@@ -97,10 +144,18 @@ def initialize_v44_database(db_path: str, *, default_user: str = "Admin",
                 # ever applied to a brand new file.  This used to raise, which
                 # aborted the whole startup bootstrap and left the instance
                 # serving HTTP 500 on every database-backed page.
+                # This is the normal steady state, not an anomaly: the v4.4
+                # SQL bundle is not in the repository, so the first boot builds
+                # the database with db.create_all() and it is therefore never
+                # flagged v4.4 on any later boot. Say so plainly rather than
+                # implying an upgrade is pending.
                 logging.getLogger(__name__).info(
-                    "Existing non-v4.4 database at %s left untouched; "
-                    "skipping the v4.4 schema bundle.",
+                    "Database at %s uses the ORM schema (db.create_all); the "
+                    "v4.4 SQL bundle %s and is not applied to existing "
+                    "databases.",
                     path,
+                    "is present but only applies to new files"
+                    if schema_file.exists() else "is not present",
                 )
                 return False
             # An empty SQLite file (e.g. created by a connection before the

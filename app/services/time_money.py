@@ -156,6 +156,65 @@ def _parse_discount_fields(raw_discount, raw_reason='', *, label='Discount', req
     return discount, reason
 
 
+def parse_quantity(raw, *, label='Quantity', allow_zero=False):
+    """Strictly parse a user-supplied quantity.
+
+    Unlike ``_to_float_or_zero`` this REJECTS unparseable input instead of
+    silently coercing it to 0, and rejects non-positive values.  Quantity
+    fields guarded only by an upper bound (``if qty > remaining``) are
+    bypassable with a negative value, so the lower bound is enforced here
+    for every caller.
+    """
+    if raw is None or str(raw).strip() == '':
+        raise ValueError(f'{label} is required.')
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        raise ValueError(f'{label} must be a valid number.')
+    if value != value or value in (float('inf'), float('-inf')):
+        raise ValueError(f'{label} must be a valid number.')
+    if allow_zero:
+        if value < 0:
+            raise ValueError(f'{label} cannot be negative.')
+    elif value <= 0:
+        raise ValueError(f'{label} must be greater than zero.')
+    return value
+
+
+def parse_money_amount(raw, *, label='Amount', allow_zero=True):
+    """Strictly parse a user-supplied money amount (never negative)."""
+    if raw is None or str(raw).strip() == '':
+        if allow_zero:
+            return 0.0
+        raise ValueError(f'{label} is required.')
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        raise ValueError(f'{label} must be a valid number.')
+    if value != value or value in (float('inf'), float('-inf')):
+        raise ValueError(f'{label} must be a valid number.')
+    value = _money_round(value)
+    if value < 0:
+        raise ValueError(f'{label} cannot be negative.')
+    if not allow_zero and value <= 0:
+        raise ValueError(f'{label} must be greater than zero.')
+    return value
+
+
+def validate_paid_against_total(paid, total, discount=0.0, *, label='Paid amount'):
+    """Enforce the ``paid <= total - discount`` invariant for a bill/booking."""
+    payable = _money_round(_to_float_or_zero(total) - _to_float_or_zero(discount))
+    paid_val = _money_round(_to_float_or_zero(paid))
+    if payable < 0:
+        payable = 0.0
+    # Tolerate sub-paisa float noise so legitimate exact settlements still pass.
+    if paid_val - payable > 0.005:
+        raise ValueError(
+            f'{label} ({paid_val:,.2f}) cannot exceed the payable amount ({payable:,.2f}).'
+        )
+    return paid_val
+
+
 def _parse_dt_safe(value):
     if value is None:
         return None

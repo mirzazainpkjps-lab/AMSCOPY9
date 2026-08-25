@@ -23,6 +23,16 @@ def add_record():
         client_name = client_obj.name
 
     entry_type = request.form.get('type', 'IN')
+
+    # Validate quantity once, for EVERY entry type, before any branch uses it.
+    # A negative qty previously slipped past the OUT over-dispatch guard
+    # (`if req_qty > remaining`) and inflated stock on the IN path.
+    try:
+        entry_qty = parse_quantity(request.form.get('qty'), label='Quantity')
+    except ValueError as ve:
+        flash(str(ve), 'danger')
+        return redirect(url_for('dispatching' if entry_type == 'OUT' else 'index'))
+
     if entry_type == 'OUT' and not driver_name:
         flash('Driver name is required for delivery dispatch.', 'danger')
         return redirect(url_for('dispatching'))
@@ -51,10 +61,7 @@ def add_record():
         mat_name = mat_obj.name
         mat_key = _material_norm_key(mat_name)
 
-        try:
-            req_qty = float(request.form.get('qty', 0) or 0)
-        except ValueError:
-            req_qty = 0
+        req_qty = entry_qty
 
         booked = 0.0
         booking_items = BookingItem.query.join(Booking).filter(
@@ -98,7 +105,7 @@ def add_record():
                   material=entry_material_name,
                   client=client_name,
                   client_code=client_code,
-                  qty=float(request.form.get('qty', 0) or 0),
+                  qty=entry_qty,
                   bill_no=request.form.get('bill_no', '').strip(),
                   nimbus_no=nimbus_no_val,
                   created_by=current_user.username,

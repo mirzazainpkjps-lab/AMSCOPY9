@@ -26,6 +26,24 @@ def login():
         username_norm = username.lower()
         password = str(request.form.get('password') or '')
         remember = (request.form.get('remember_me') or '').lower() in ('1', 'true', 'on', 'yes')
+
+        # Brute-force guard: refuse before touching the database or comparing
+        # any credential, so a locked-out identity costs an attacker nothing
+        # to learn and gains them nothing.
+        from utils import login_guard
+        source_ip = login_guard.client_ip()
+        locked_for = login_guard.check(username, source_ip)
+        if locked_for:
+            minutes = max(1, (locked_for + 59) // 60)
+            logging.getLogger('auth').warning(
+                "Login blocked by rate limit username=%s ip=%s", username, source_ip
+            )
+            flash(
+                f'Too many failed login attempts. Please try again in about {minutes} minute(s).',
+                'danger',
+            )
+            return render_template('login.html'), 429
+
         user = None
         try:
             user = User.query.filter(func.lower(func.trim(User.username)) == username_norm).order_by(User.id.asc()).first()
@@ -52,46 +70,41 @@ def login():
             stored_hash = (getattr(u, 'password_hash', None) or '').strip()
             stored_plain = (getattr(u, 'password_plain', None) or '').strip()
 
-            # 1) Normal Werkzeug hash verification.
-            if stored_hash:
-                try:
-                    if check_password_hash(stored_hash, raw_password):
-                        # A successful hash login no longer needs the legacy
-                        # plaintext fallback. Clear it without logging either
-                        # value; a commit failure must not lock the user out.
-                        if stored_plain:
-                            try:
-                                u.password_plain = None
-                                db.session.commit()
-                            except Exception:
-                                db.session.rollback()
-                        return True
-                except Exception:
-                    # Some legacy DBs stored plaintext in password_hash; fall back below.
-                    pass
+            # Hash verification is the ONLY accepted credential path.
+            #
+            # The legacy plaintext fallbacks (matching `password_plain`, or a
+            # cleartext value left in `password_hash`) were removed: they meant
+            # a database leak yielded directly usable credentials. Existing
+            # plaintext is converted to a hash at boot by
+            # app.services.schema._migrate_legacy_plaintext_passwords, so no
+            # account loses access.
+            if not stored_hash:
+                return False
+            try:
+                if not check_password_hash(stored_hash, raw_password):
+                    return False
+            except Exception:
+                # A malformed/legacy hash is a failed login, never a bypass.
+                logging.getLogger('auth').warning(
+                    "Unreadable password hash for user id=%s; rejecting login.",
+                    getattr(u, 'id', None)
+                )
+                return False
 
-            # 2) Legacy plaintext fallbacks (upgrade on success).
-            legacy_match = False
-            if stored_plain and stored_plain == raw_password:
-                legacy_match = True
-            elif stored_hash and stored_hash == raw_password:
-                legacy_match = True
-
-            if legacy_match:
+            # Belt and braces: drop any residual plaintext for this account.
+            if stored_plain:
                 try:
-                    u.password_hash = generate_password_hash(raw_password)
                     u.password_plain = None
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
-                return True
-
-            return False
+            return True
 
         if user and _verify_and_upgrade_password(user, password):
             if (user.status or '').strip().lower() != 'active':
                 flash('Account suspended', 'danger')
                 return render_template('login.html')
+            login_guard.record_success(username, source_ip)
             # Remember by default so LAN HTTP sessions survive the post-login redirect.
             login_user(user, remember=True)
             session.permanent = True
@@ -113,15 +126,24 @@ def login():
             if not next_url.startswith('/') or next_url.startswith('//'):
                 next_url = ''
             return redirect(next_url or url_for('index'))
+        locked_for = login_guard.record_failure(username, source_ip)
         try:
             logging.getLogger('auth').info(
-                "Login failed username=%s exists=%s has_hash=%s",
+                "Login failed username=%s ip=%s exists=%s has_hash=%s",
                 username,
+                source_ip,
                 bool(user),
                 bool(getattr(user, 'password_hash', None))
             )
         except Exception:
             pass
+        if locked_for:
+            minutes = max(1, (locked_for + 59) // 60)
+            flash(
+                f'Too many failed login attempts. Please try again in about {minutes} minute(s).',
+                'danger',
+            )
+            return render_template('login.html'), 429
         flash('Invalid Credentials', 'danger')
     return render_template('login.html')
 
