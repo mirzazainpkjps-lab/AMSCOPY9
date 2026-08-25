@@ -25,3 +25,6 @@ config.txt
 *.pyc
 # QA scratch harness (local test runs, not part of the app)
 .qa/
+
+# Private GitHub webhook secret (PythonAnywhere file, never commit)
+.ams_webhook_secret
