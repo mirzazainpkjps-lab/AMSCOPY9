@@ -58,6 +58,13 @@ def _collect_booking_item_updates(materials_list, qtys, rates, item_ids=None, ma
             raise ValueError(f'Unit rate is required and must be greater than 0 for "{mat_name}".')
         if not mat_name and not str(mid or '').strip():
             continue
+        # A material was named, so this is a real line: the quantity must be
+        # positive.  Without this, a negative qty passed straight through and
+        # produced a negative booking line (and a negative booking total).
+        if qty_val <= 0:
+            raise ValueError(
+                f'Quantity must be greater than zero for "{mat_name or "the selected material"}".'
+            )
         mat_obj = resolve_transaction_material(
             material_id=mid,
             typed_text=mat_name,
@@ -229,15 +236,16 @@ def add_booking():
     material_ids = request.form.getlist('material_id[]')
     qtys = request.form.getlist('qty[]')
     rates = request.form.getlist('unit_rate[]')
-    amount = _to_float_or_zero(request.form.get('amount', 0))
-    paid_amount = _to_float_or_zero(request.form.get('paid_amount', 0))
     try:
+        amount = parse_money_amount(request.form.get('amount', 0), label='Booking amount')
+        paid_amount = parse_money_amount(request.form.get('paid_amount', 0), label='Paid amount')
         discount, discount_reason = _parse_discount_fields(
             request.form.get('discount', 0),
             request.form.get('discount_reason', ''),
             label='Booking discount',
             require_reason=False
         )
+        paid_amount = validate_paid_against_total(paid_amount, amount, discount)
     except ValueError as ve:
         flash(str(ve), 'danger')
         return redirect(url_for('bookings_page'))
@@ -291,7 +299,18 @@ def add_booking():
         rate_val = _to_float_or_zero(rate)
         if qty_val <= 0 and not mat_name and not str(mid or '').strip():
             continue
-        if qty_val > 0 and rate_val <= 0:
+        # A material was named, so this is a real line: reject a non-positive
+        # quantity outright rather than silently skipping the row (which used
+        # to let a negative-total booking through with no line items).
+        if qty_val <= 0:
+            db.session.rollback()
+            flash(
+                f'Quantity must be greater than zero for "{mat_name or "the selected material"}".',
+                'danger'
+            )
+            return redirect(url_for('bookings_page'))
+        if rate_val <= 0:
+            db.session.rollback()
             flash(f'Unit rate is required and must be greater than 0 for "{mat_name}".', 'danger')
             return redirect(url_for('bookings_page'))
         try:
@@ -304,7 +323,7 @@ def add_booking():
             db.session.rollback()
             flash(str(ve), 'danger')
             return redirect(url_for('bookings_page'))
-        if not mat_obj or qty_val <= 0:
+        if not mat_obj:
             continue
         db.session.add(
             BookingItem(booking_id=booking.id,
@@ -372,14 +391,17 @@ def edit_booking(id):
     qtys = request.form.getlist('qty[]')
     rates = request.form.getlist('unit_rate[]')
     item_ids = request.form.getlist('booking_item_id[]')
-    booking.amount = _to_float_or_zero(request.form.get('amount', 0))
-    booking.paid_amount = _to_float_or_zero(request.form.get('paid_amount', 0))
     try:
+        booking.amount = parse_money_amount(request.form.get('amount', 0), label='Booking amount')
+        booking.paid_amount = parse_money_amount(request.form.get('paid_amount', 0), label='Paid amount')
         booking.discount, booking.discount_reason = _parse_discount_fields(
             request.form.get('discount', 0),
             request.form.get('discount_reason', ''),
             label='Booking discount',
             require_reason=False
+        )
+        booking.paid_amount = validate_paid_against_total(
+            booking.paid_amount, booking.amount, booking.discount
         )
         desired_rows = _collect_booking_item_updates(materials_list, qtys, rates, item_ids)
         _apply_booking_item_updates(booking, desired_rows)

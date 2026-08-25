@@ -123,34 +123,55 @@ def add_payment():
         return redirect(url_for('accounts.client_payments'))
     try:
         from app.services.payments_crud import save_client_payment
+        from utils.retry_commit import retry_on_conflict
+        # The upload is side-effecting and must not be repeated per attempt.
         uploaded = save_photo(request.files.get('photo'))
-        payment, _ = save_client_payment(
-            client_code=request.form.get('client_code', ''),
-            client_name=request.form.get('client_name', ''),
-            amount=request.form.get('amount', 0),
-            discount=request.form.get('discount', 0),
-            discount_reason=request.form.get('discount_reason', ''),
-            payment_type=request.form.get('payment_type', 'Receipt'),
-            method=request.form.get('method', 'Cash'),
-            payment_account_id=request.form.get('payment_account_id'),
-            manual_bill_no=request.form.get('manual_bill_no', ''),
-            date_posted=request.form.get('date', ''),
-            note=request.form.get('note', ''),
-            photo_path=uploaded,
-            photo_url=request.form.get('photo_url', ''),
-            idempotency_key=request.form.get('idempotency_key'),
-            actor=current_user,
-        )
-        db.session.commit()
+        form = request.form
+
+        def _save():
+            # `Account` uses optimistic locking (version_id_col='revision'), so
+            # two payments hitting the same account concurrently make the loser
+            # raise StaleDataError. Re-running the whole unit of work re-reads
+            # the account at its new revision and recomputes the balance from
+            # committed state; retrying only the COMMIT would re-apply a stale
+            # in-memory balance and silently lose the other payment.
+            payment, _ = save_client_payment(
+                client_code=form.get('client_code', ''),
+                client_name=form.get('client_name', ''),
+                amount=form.get('amount', 0),
+                discount=form.get('discount', 0),
+                discount_reason=form.get('discount_reason', ''),
+                payment_type=form.get('payment_type', 'Receipt'),
+                method=form.get('method', 'Cash'),
+                payment_account_id=form.get('payment_account_id'),
+                manual_bill_no=form.get('manual_bill_no', ''),
+                date_posted=form.get('date', ''),
+                note=form.get('note', ''),
+                photo_path=uploaded,
+                photo_url=form.get('photo_url', ''),
+                idempotency_key=form.get('idempotency_key'),
+                actor=current_user,
+            )
+            db.session.commit()
+            return payment
+
+        retry_on_conflict(_save, label='add_payment')
         flash('Payment received successfully.', 'success')
         return redirect(url_for('accounts.client_payments', show='active'))
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.getLogger('payments').exception('Payment create failed')
-        flash('Unable to save payment: the payment could not be saved. Please check the details and try again.', 'danger')
+        from utils.retry_commit import _is_transient
+        if _is_transient(exc):
+            # Don't misattribute a lock conflict to bad input - the data was
+            # fine, the account was just busy.
+            flash('This account is busy with another transaction. '
+                  'Nothing was saved - please submit the payment again.', 'warning')
+        else:
+            flash('Unable to save payment: the payment could not be saved. Please check the details and try again.', 'danger')
     return redirect(url_for('accounts.client_payments'))
 
 
@@ -161,35 +182,53 @@ def edit_payment(id):
     if not _user_can('can_manage_payments'):
         flash('Permission denied', 'danger')
         return redirect(url_for('accounts.client_payments'))
-    payment = Payment.query.get_or_404(id)
+    Payment.query.get_or_404(id)
     try:
         from app.services.payments_crud import _client_payment_kind, save_client_payment
+        from utils.retry_commit import retry_on_conflict
+
+        # Side effects that must NOT be repeated on retry are done once, up
+        # front, outside the retried unit of work.
         uploaded = save_photo(request.files.get('photo'))
-        save_client_payment(
-            payment_id=id,
-            client_code=request.form.get('client_code', ''),
-            client_name=request.form.get('client_name', payment.client_name or ''),
-            amount=request.form.get('amount', abs(float(payment.amount or 0))),
-            discount=request.form.get('discount', payment.discount or 0),
-            discount_reason=request.form.get('discount_reason', payment.discount_reason or ''),
-            payment_type=request.form.get('payment_type', _client_payment_kind(payment)),
-            method=request.form.get('method', payment.method or 'Cash'),
-            payment_account_id=request.form.get('payment_account_id') or payment.payment_account_id,
-            manual_bill_no=request.form.get('manual_bill_no', payment.manual_bill_no or ''),
-            date_posted=request.form.get('date', ''),
-            note=request.form.get('note', payment.note or ''),
-            photo_path=uploaded,
-            photo_url=request.form.get('photo_url', payment.photo_url or ''),
-            expected_revision=request.form.get('revision'),
-            actor=current_user,
-        )
-        db.session.commit()
+        form = request.form
+
+        def _save():
+            # Re-read the row inside the attempt: retry_on_conflict rolls the
+            # session back between attempts, so any instance loaded earlier is
+            # detached/stale and its attributes cannot be used as defaults.
+            current = Payment.query.get_or_404(id)
+            save_client_payment(
+                payment_id=id,
+                client_code=form.get('client_code', ''),
+                client_name=form.get('client_name', current.client_name or ''),
+                amount=form.get('amount', abs(float(current.amount or 0))),
+                discount=form.get('discount', current.discount or 0),
+                discount_reason=form.get('discount_reason', current.discount_reason or ''),
+                payment_type=form.get('payment_type', _client_payment_kind(current)),
+                method=form.get('method', current.method or 'Cash'),
+                payment_account_id=form.get('payment_account_id') or current.payment_account_id,
+                manual_bill_no=form.get('manual_bill_no', current.manual_bill_no or ''),
+                date_posted=form.get('date', ''),
+                note=form.get('note', current.note or ''),
+                photo_path=uploaded,
+                photo_url=form.get('photo_url', current.photo_url or ''),
+                expected_revision=form.get('revision'),
+                actor=current_user,
+            )
+            db.session.commit()
+
+        retry_on_conflict(_save, label='edit_payment')
         flash('Payment updated. All balances were recalculated.', 'success')
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.getLogger('payments').exception('Payment edit failed')
-        flash('Unable to update payment: the payment could not be saved. Please check the details and try again.', 'danger')
+        from utils.retry_commit import _is_transient
+        if _is_transient(exc):
+            flash('This account is busy with another transaction. '
+                  'Nothing was saved - please submit the change again.', 'warning')
+        else:
+            flash('Unable to update payment: the payment could not be saved. Please check the details and try again.', 'danger')
     return redirect(url_for('accounts.client_payments', show='active'))

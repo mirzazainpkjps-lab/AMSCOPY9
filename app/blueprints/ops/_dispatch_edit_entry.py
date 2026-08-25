@@ -38,7 +38,15 @@ def edit_entry(id):
         e.client = None
         e.client_code = None
 
-    e.qty = float(request.form.get('qty', e.qty) or e.qty)
+    # Same invariant as /add_record: a zero or negative quantity here would
+    # credit stock back and inflate a booking's remaining allowance, which is
+    # exactly the over-dispatch bypass the create path now blocks.
+    if 'qty' in request.form:
+        try:
+            e.qty = parse_quantity(request.form.get('qty'), label='Quantity')
+        except ValueError as ve:
+            flash(str(ve), 'danger')
+            return redirect(request.referrer or url_for('tracking'))
     e.bill_no = request.form.get('bill_no', '').strip() or None
     e.nimbus_no = request.form.get('nimbus_no', '').strip() or None
     driver_name = (request.form.get('driver_name') or '').strip()

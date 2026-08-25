@@ -106,6 +106,73 @@ def _ensure_user_password_column():
         db.session.rollback()
 
 
+def _migrate_legacy_plaintext_passwords():
+    """Convert any stored plaintext password into a Werkzeug hash, then erase it.
+
+    The login path used to accept a plaintext match (from `password_plain`, or
+    from a plaintext value sitting in `password_hash`) and upgrade it lazily on
+    next successful login. That left usable cleartext credentials in the
+    database indefinitely for any account that never logged back in. Doing the
+    upgrade here, at boot, means the login fallback can be removed outright
+    without locking anyone out.
+
+    No password value is logged.
+    """
+    from werkzeug.security import generate_password_hash
+
+    def _looks_hashed(value):
+        # Werkzeug hashes are "method$salt$digest" (e.g. scrypt/pbkdf2).
+        return bool(value) and value.count('$') >= 2
+
+    try:
+        rows = db.session.execute(text("PRAGMA table_info('user')")).fetchall()
+        cols = [r[1] for r in rows]
+        if 'password_hash' not in cols:
+            return
+        has_plain = 'password_plain' in cols
+
+        select_cols = "id, password_hash" + (", password_plain" if has_plain else "")
+        records = db.session.execute(text(f"SELECT {select_cols} FROM user")).fetchall()
+
+        upgraded = 0
+        cleared = 0
+        for rec in records:
+            uid = rec[0]
+            stored_hash = (rec[1] or '').strip()
+            stored_plain = (rec[2] or '').strip() if has_plain else ''
+
+            new_hash = None
+            if stored_hash and not _looks_hashed(stored_hash):
+                # Plaintext was stored in the hash column.
+                new_hash = generate_password_hash(stored_hash)
+            elif not stored_hash and stored_plain:
+                new_hash = generate_password_hash(stored_plain)
+
+            if new_hash:
+                db.session.execute(
+                    text("UPDATE user SET password_hash = :h WHERE id = :i"),
+                    {"h": new_hash, "i": uid},
+                )
+                upgraded += 1
+
+            if has_plain and stored_plain:
+                db.session.execute(
+                    text("UPDATE user SET password_plain = NULL WHERE id = :i"),
+                    {"i": uid},
+                )
+                cleared += 1
+
+        if upgraded or cleared:
+            db.session.commit()
+            logging.getLogger("app").warning(
+                "Legacy password remediation: hashed %d plaintext password(s), "
+                "cleared %d plaintext column value(s).", upgraded, cleared
+            )
+    except Exception:
+        db.session.rollback()
+        logging.getLogger("app").exception("Legacy plaintext password migration failed")
+
+
 def _ensure_model_columns():
     """Add any missing columns declared in models but missing in the DB."""
     from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, Text, BigInteger, Numeric
@@ -791,6 +858,13 @@ def _bootstrap_database():
         pass
     try:
         _ensure_model_columns()
+    except Exception:
+        pass
+    try:
+        # Must run after the columns exist and before the app serves traffic:
+        # the login path no longer accepts plaintext, so any legacy cleartext
+        # has to be converted to a hash here.
+        _migrate_legacy_plaintext_passwords()
     except Exception:
         pass
     try:

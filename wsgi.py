@@ -37,17 +37,25 @@ try:
     app = create_app()
     application = app
 except Exception:  # pragma: no cover - startup diagnostics only
-    # Without this, a factory error is only visible in the server error log and
-    # the browser shows an opaque "Something went wrong" page.  Serve the real
-    # traceback instead so the failure can be fixed quickly.
+    # The traceback always goes to the server log. It is only echoed in the
+    # HTTP response when AMS_DEBUG_STARTUP is explicitly enabled: a startup
+    # traceback leaks absolute paths, installed versions and code structure to
+    # anyone who can reach the site.
     STARTUP_TRACEBACK = traceback.format_exc()
     logging.getLogger("wsgi").critical("AMS failed to start:\n%s", STARTUP_TRACEBACK)
+    _EXPOSE_TRACEBACK = os.environ.get("AMS_DEBUG_STARTUP", "").strip().lower() in (
+        "1", "true", "yes",
+    )
 
     def application(environ, start_response):  # type: ignore[misc]
-        body = (
-            "AMS failed to start.\n\n"
-            + STARTUP_TRACEBACK
-        ).encode("utf-8")
+        if _EXPOSE_TRACEBACK:
+            body = ("AMS failed to start.\n\n" + STARTUP_TRACEBACK).encode("utf-8")
+        else:
+            body = (
+                "AMS failed to start.\n\n"
+                "The error has been recorded in the server log. Set "
+                "AMS_DEBUG_STARTUP=1 to display it here.\n"
+            ).encode("utf-8")
         start_response(
             "500 Internal Server Error",
             [
