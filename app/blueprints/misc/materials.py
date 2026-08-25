@@ -64,7 +64,7 @@ def merge_materials():
         flash(f'Successfully merged "{source_name}" into "{target_name}". All records updated.', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Merge failed: {str(e)}', 'danger')
+        flash('Merge failed: the materials could not be merged. Please check the details and try again.', 'danger')
 
     return redirect(url_for('materials'))
 

@@ -135,7 +135,7 @@ def admin_accounts_domain_wipe():
                 except Exception:
                     db.session.rollback()
             logging.getLogger('app').exception('Accounts domain wipe failed')
-            flash(f'Accounts domain wipe failed: {e}', 'danger')
+            flash('Accounts domain wipe failed: the wipe could not be completed and no data was changed. Please try again.', 'danger')
     finally:
         # PHASE 7: Always release the lock (success or failure)
         released, release_error = release_system_lock(lock_name)

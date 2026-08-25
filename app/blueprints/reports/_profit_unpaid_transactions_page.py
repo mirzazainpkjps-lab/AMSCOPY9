@@ -169,10 +169,15 @@ def current_payable_detail_api(client_id):
 
 
 @bp.route("/export_current_payables")
-@bp.route("/export_unpaid_transactions")
 @login_required
 def export_current_payables():
-    """Export the complete filtered grouped dataset, never just the visible page."""
+    """Export the complete filtered grouped dataset, never just the visible page.
+
+    ``/export_unpaid_transactions`` is deliberately NOT registered here: that
+    URL belongs to ``misc.export_unpaid_transactions`` (admin-only generic
+    export engine).  Registering it twice made Flask resolve this CSV handler
+    first and permanently shadow the guarded handler.
+    """
     filters = _payable_filters()
     report = _payable_report(filters, page=1, per_page=200)
     # build_current_payables caps a page at 200; use all_rows so large exports

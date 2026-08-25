@@ -4,6 +4,44 @@ import os, time, logging, secrets
 from flask import request
 from werkzeug.exceptions import RequestEntityTooLarge
 
+# Internal-detail signatures that must never reach the user.  Flask messages
+# are sanitised centrally (see ``_stamp_actor_on_crud``) so a single legacy
+# route cannot leak SQL, parameter bindings or driver URLs into the UI.
+_ERROR_LEAK_SIGNATURES = (
+    "sqlite3.integrityerror",
+    "sqlalchemy.exc",
+    "sqlalchemy",
+    "integrityerror",
+    "operationalerror",
+    "programmingerror",
+    "statementerror",
+    " [sql: ",
+    "sqlalche.me",
+    "unique constraint failed",
+    "foreign key constraint failed",
+    "no such table",
+    "(background on this error",
+    "traceback (most recent call last)",
+    " [parameters:",
+    "database is locked",
+    "not null constraint failed",
+    "check constraint failed",
+)
+
+
+def _safe_flash_text(text):
+    """Replace an exception/SQL leak with a clean, actionable message."""
+    raw = str(text or "")
+    lowered = raw.lower()
+    if any(sig in lowered for sig in _ERROR_LEAK_SIGNATURES):
+        return (
+            "The operation could not be completed due to a data error. "
+            "No changes were saved — please retry, and contact support if "
+            "the problem persists."
+        )
+    return raw
+
+
 def register_hooks(app):
     from flask import jsonify, flash, redirect, url_for, session
     from flask_login import current_user
@@ -93,7 +131,7 @@ def register_hooks(app):
                 tagged = []
                 marker = f'— by {who}'
                 for cat, msg in flashes:
-                    text = str(msg or '')
+                    text = _safe_flash_text(msg)
                     if cat in ('success', 'warning', 'info', 'danger') and marker not in text:
                         text = f'{text} {marker}'
                     tagged.append((cat, text))
@@ -134,19 +172,27 @@ def register_hooks(app):
 
     @app.before_request
     def _protect_against_csrf():
-        """Session-bound CSRF protection for financial Accounts mutations."""
+        """Session-bound CSRF protection for every mutating endpoint.
+
+        The layout template attaches the session token to every mutating
+        form (and patches fetch/XHR to send the X-CSRF-Token header), so
+        the gate is transparent to the UI.  Enforcement is skipped only in
+        explicit test-mode opt-outs; the ``login`` endpoint is protected as
+        well (its template carries the token).
+        """
         token = session.get('_csrf_token')
         if not token:
             token = secrets.token_urlsafe(32)
             session['_csrf_token'] = token
         if app.config.get('TESTING') or app.config.get('WTF_CSRF_ENABLED') is False:
-            return None
+            if not app.config.get('AMS_CSRF_ALWAYS'):
+                return None
         if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
             return None
         endpoint = request.endpoint or ''
-        if not (endpoint == 'accounts' or endpoint.startswith('accounts.')):
+        if endpoint in ('static',) or endpoint.startswith('static.'):
             return None
-        supplied = request.form.get('_csrf_token') or request.headers.get('X-CSRF-Token')
+        supplied = request.form.get('_csrf_token') or request.headers.get('X-CSRF-Token') or request.headers.get('X-CSRFToken')
         if supplied and secrets.compare_digest(str(supplied), str(token)):
             return None
         logging.getLogger('security').warning('CSRF rejected: endpoint=%s ip=%s', endpoint, request.remote_addr)

@@ -75,6 +75,7 @@
         {% endwith %}
 
         <form action="" method="POST" autocomplete="on">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <div class="mb-3">
                 <label class="text-white-50 small fw-bold mb-1">USERNAME</label>
                 <div class="input-group">

@@ -1698,6 +1698,43 @@ function toggleNavGroup(groupId, btn) {
             input.type = 'hidden'; input.name = '_csrf_token'; input.value = csrfToken;
             form.appendChild(input);
         });
+
+        // Same-origin fetch/XHR mutations also carry the session token, so
+        // JS-driven posts (imports, uploads, theme toggle) stay protected
+        // behind the same server-side gate as regular forms.
+        const csrfIsMutating = function (method) {
+            return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
+        };
+        const csrfIsSameOrigin = function (url) {
+            try {
+                const u = new URL(String(url || ''), window.location.origin);
+                return u.origin === window.location.origin;
+            } catch (e) { return true; }
+        };
+        if (typeof window.fetch === 'function' && !window.fetch.__amsCsrfPatched) {
+            const originalFetch = window.fetch;
+            window.fetch = function (input, init) {
+                const method = (init && init.method) || (input && input.method) || 'GET';
+                if (csrfIsMutating(method) && csrfIsSameOrigin(input && input.url)) {
+                    init = init || {};
+                    init.headers = Object.assign({}, init.headers || {});
+                    init.headers['X-CSRF-Token'] = csrfToken;
+                }
+                return originalFetch.call(this, input, init);
+            };
+            window.fetch.__amsCsrfPatched = true;
+        }
+        if (typeof XMLHttpRequest !== 'undefined' && !XMLHttpRequest.prototype.__amsCsrfPatched) {
+            const originalOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function (method, url) {
+                const result = originalOpen.apply(this, arguments);
+                if (csrfIsMutating(method) && csrfIsSameOrigin(url)) {
+                    this.setRequestHeader('X-CSRF-Token', csrfToken);
+                }
+                return result;
+            };
+            XMLHttpRequest.prototype.__amsCsrfPatched = true;
+        }
     });
 
     // Reusable searchable enhancement for native selects whose options are

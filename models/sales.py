@@ -119,6 +119,7 @@ class Payment(db.Model):
     account_no = db.Column(db.String(50))
     payment_account_id = db.Column(db.Integer, db.ForeignKey('account.id'), nullable=True)
     idempotency_key = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    idempotency_payload_hash = db.Column(db.String(64), nullable=True, index=True)
     revision = db.Column(db.Integer, default=1, nullable=True)
     created_by = db.Column(db.String(80))
     updated_by = db.Column(db.String(80))
@@ -174,7 +175,12 @@ class BillCounter(db.Model):
 
 class DirectSale(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    idempotency_key = db.Column(db.String(64), nullable=True, index=True)
+    idempotency_key = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    # SHA-256 fingerprint of the submitted payload (client, items, qty/rates,
+    # bill refs, discount).  Binds the idempotency key to the exact payload so
+    # a reused key with different content is rejected instead of being
+    # silently treated as a replay.
+    idempotency_payload_hash = db.Column(db.String(64), nullable=True, index=True)
     client_name = db.Column(db.String(100))
     client_code = db.Column(db.String(50), index=True)
     category = db.Column(db.String(50))

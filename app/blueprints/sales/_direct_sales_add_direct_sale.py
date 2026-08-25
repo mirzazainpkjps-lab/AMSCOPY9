@@ -1,5 +1,11 @@
 """direct_sales — split from sales.py."""
 from ._common import *  # noqa
+import secrets
+from sqlalchemy.exc import IntegrityError
+from app.services.sales_core import (
+    _direct_sale_payload_hash,
+    _direct_sale_idem_key_is_recent,
+)
 
 @bp.route('/add_direct_sale', methods=['POST'])
 @login_required
@@ -91,19 +97,49 @@ def add_direct_sale():
     # opened. A double-click / network retry re-submits the same key, so treat
     # it as an already-saved sale instead of creating a second transaction.
     idem_key = (request.form.get('idempotency_key') or '').strip() or None
+    payload_hash = _direct_sale_payload_hash(request.form)
+
+    def _redirect_to_prior_sale(prior_sale):
+        prior_bill = _direct_sale_default_bill_ref(prior_sale)
+        flash('This sale was already saved (duplicate submission ignored).', 'info')
+        return redirect(url_for(
+            'direct_sales_page',
+            download_bill=prior_bill,
+            download_src='direct_sale',
+            download_src_id=prior_sale.id,
+            download_client_code=prior_sale.client_code,
+            download_client_name=prior_sale.client_name,
+        ))
+
     if idem_key:
         prior_sale = DirectSale.query.filter_by(idempotency_key=idem_key).order_by(DirectSale.id.desc()).first()
         if prior_sale:
-            prior_bill = _direct_sale_default_bill_ref(prior_sale)
-            flash('This sale was already saved (duplicate submission ignored).', 'info')
-            return redirect(url_for(
-                'direct_sales_page',
-                download_bill=prior_bill,
-                download_src='direct_sale',
-                download_src_id=prior_sale.id,
-                download_client_code=prior_sale.client_code,
-                download_client_name=prior_sale.client_name,
-            ))
+            # The key must be bound to the payload it was minted for.  The
+            # same key carrying different content is NOT a replay — silently
+            # dropping the second sale loses a real transaction.
+            stored_hash = getattr(prior_sale, 'idempotency_payload_hash', None)
+            if stored_hash and stored_hash != payload_hash:
+                return _fail_sale(
+                    'This form token was already used for a different sale. '
+                    'Reload the page and submit again.'
+                )
+            return _redirect_to_prior_sale(prior_sale)
+
+    if not idem_key:
+        # Server-side replay guard for keyless submissions: the backend must
+        # not depend on the JS-minted key.  A deterministic payload
+        # fingerprint rejects an immediate double-post of the same sale while
+        # still allowing a genuine identical repeat order later (the fresh
+        # submission gets a disambiguated fingerprint key).
+        fp = f'FP-{payload_hash[:40]}'
+        prior_fp = DirectSale.query.filter_by(idempotency_key=fp).order_by(DirectSale.id.desc()).first()
+        if prior_fp and getattr(prior_fp, 'idempotency_payload_hash', None) == payload_hash \
+                and _direct_sale_idem_key_is_recent(prior_fp):
+            return _redirect_to_prior_sale(prior_fp)
+        if prior_fp:
+            idem_key = f'FP-{payload_hash[:32]}-{secrets.token_hex(3)}'
+        else:
+            idem_key = fp
 
     # Check for global setting
     settings = Settings.query.first()
@@ -455,6 +491,13 @@ def add_direct_sale():
         client_name = manual_client_name
         create_invoice = False
         track_as_cash = False
+        # Materialise the shared OPEN-KHATA master row so the receivable is
+        # visible in payables/API/CSV and can be settled through payments.
+        try:
+            from app.services.schema import ensure_open_khata_client
+            ensure_open_khata_client()
+        except Exception:
+            pass
 
     # Force manual bill requirement for non-cash sales if not provided
     if category != 'Cash' and not manual_bill_no and not create_invoice:
@@ -524,6 +567,7 @@ def add_direct_sale():
     auto_bill_no = get_next_bill_no(AUTO_BILL_NAMESPACES['DIRECT_SALE'])
 
     sale = DirectSale(idempotency_key=idem_key,
+                      idempotency_payload_hash=payload_hash,
                       client_name=client_name,
                       client_code=sale_client_code,
                       amount=amount,
@@ -636,7 +680,20 @@ def add_direct_sale():
     # four syncs here too was redundant duplicate work per submit.
     finalize_transaction('sales', sale.id)
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # A concurrent identical submission won the unique idempotency-key
+        # race (uq_direct_sale_idempotency_key).  That is a replay, not an
+        # error: point the user at the already-saved sale.
+        db.session.rollback()
+        try:
+            prior_sale = DirectSale.query.filter_by(idempotency_key=idem_key).order_by(DirectSale.id.desc()).first()
+            if prior_sale:
+                return _redirect_to_prior_sale(prior_sale)
+        except Exception:
+            pass
+        raise
     if draft_id:
         try:
             draft_row = DirectSaleDraft.query.get(draft_id)
@@ -649,10 +706,19 @@ def add_direct_sale():
     if create_invoice and inv:
         msg += f" â€” Invoice: {inv.invoice_no}"
     flash(msg, 'success')
-  except Exception as e:
+  except ValueError as ve:
+    # Validation messages (insufficient stock, missing rate, closed period,
+    # …) are written for users — show them verbatim.
     db.session.rollback()
-    logging.error(f"Direct Sale Error: {str(e)}")
-    flash(f"Error processing sale: {str(e)}", "danger")
+    flash(str(ve), 'danger')
+    _stash_direct_sale_form_draft(request.form, mode='add')
+    return redirect(url_for('direct_sales_page', resume='add'))
+  except Exception:
+    db.session.rollback()
+    # Never surface SQL/driver details to the user; log the full traceback
+    # server-side instead.
+    logging.getLogger('sales').exception('Direct sale save failed')
+    flash('Error processing sale: the sale could not be saved. Please check the details and try again.', 'danger')
     _stash_direct_sale_form_draft(request.form, mode='add')
     return redirect(url_for('direct_sales_page', resume='add'))
 

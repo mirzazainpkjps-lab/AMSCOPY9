@@ -399,6 +399,68 @@ def _direct_sale_default_bill_ref(sale):
     return f"DS-{sale.id}"
 
 
+def _direct_sale_payload_hash(form):
+    """Deterministic SHA-256 fingerprint of a direct-sale submission.
+
+    Binds the idempotency key to the exact payload so a key reused with a
+    different sale is rejected, and gives keyless submissions a server-side
+    duplicate fingerprint (PRED-006/PRED-007).
+    """
+    import hashlib
+
+    def norm(value):
+        return str(value or "").strip().lower()
+
+    def lst(name):
+        return [norm(v) for v in form.getlist(name)]
+
+    parts = [
+        norm(form.get("client_name")),
+        norm(form.get("client_code")),
+        norm(form.get("manual_client_name")),
+        norm(form.get("category")),
+        norm(form.get("driver_name")),
+        "|".join(lst("product_name[]")),
+        "|".join(lst("qty[]")),
+        "|".join(lst("unit_rate[]")),
+        "|".join(lst("grn_item_id[]")),
+        "|".join(lst("alternate_material[]")),
+        "|".join(lst("material_id[]")),
+        "|".join(lst("alternate_material_id[]")),
+        norm(form.get("discount")),
+        norm(form.get("discount_reason")),
+        norm(form.get("paid_amount")),
+        norm(form.get("manual_bill_no")),
+        norm(form.get("sale_date")),
+        norm(form.get("note")),
+        norm(form.get("payment_method")),
+        norm(form.get("payment_account_id")),
+        norm(form.get("delivery_rent")),
+        norm(form.get("create_invoice")),
+        norm(form.get("track_as_cash")),
+    ]
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def _direct_sale_idem_key_is_recent(sale, window_seconds=300):
+    """A fingerprint/key match is only a replay when the first save is fresh.
+
+    Two *legitimate* identical sales keyed with the same auto-fingerprint
+    (same client/items/date form) are distinguished from a double-click by
+    the age of the first save: a network retry lands within seconds, a real
+    repeat order happens later.
+    """
+    if sale is None:
+        return False
+    posted = getattr(sale, "date_posted", None)
+    if posted is None:
+        return False
+    try:
+        return (pk_now() - posted).total_seconds() <= max(0, window_seconds)
+    except TypeError:
+        return False
+
+
 def _direct_sale_bill_refs(sale):
     refs = {f"DS-{sale.id}", f"UNBILLED-{sale.id}", f"CSH-{sale.id}"}
     if sale.manual_bill_no:

@@ -191,7 +191,7 @@ def add_supplier_payment():
     except Exception as exc:
         db.session.rollback()
         logging.exception('Supplier payment create failed')
-        flash(f'Unable to record supplier payment: {exc}', 'danger')
+        flash('Unable to record supplier payment: the payment could not be saved. Please check the details and try again.', 'danger')
     return_to = (request.form.get('return_to') or '').strip().lower()
     if return_to == 'payments':
         return redirect(url_for('accounts.supplier_payments'))
@@ -230,7 +230,7 @@ def edit_supplier_payment(id):
     except Exception as exc:
         db.session.rollback()
         logging.exception('Supplier payment edit failed')
-        flash(f'Unable to update supplier payment: {exc}', 'danger')
+        flash('Unable to update supplier payment: the payment could not be updated. Please check the details and try again.', 'danger')
     return redirect(url_for('accounts.supplier_payments', show='all'))
 
 
@@ -255,7 +255,7 @@ def delete_supplier_payment(id):
     except Exception as exc:
         db.session.rollback()
         logging.exception('Supplier payment delete failed')
-        flash(f'Unable to delete supplier payment: {exc}', 'danger')
+        flash('Unable to delete supplier payment: the payment could not be deleted. Please try again.', 'danger')
     return redirect(url_for('accounts.supplier_payments', show='all'))
 
 
@@ -279,5 +279,5 @@ def restore_supplier_payment(id):
     except Exception as exc:
         db.session.rollback()
         logging.exception('Supplier payment restore failed')
-        flash(f'Unable to restore supplier payment: {exc}', 'danger')
+        flash('Unable to restore supplier payment: the payment could not be restored. Please try again.', 'danger')
     return redirect(url_for('accounts.supplier_payments', show='all'))

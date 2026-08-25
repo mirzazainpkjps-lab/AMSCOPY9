@@ -98,6 +98,14 @@ def login(client):
     return resp
 
 
+def business_clients():
+    """Client master rows excluding the system-maintained OPEN-KHATA row."""
+    return [
+        c for c in Client.query.all()
+        if (c.code or "").strip().upper() != "OPEN-KHATA"
+    ]
+
+
 def seed_all_modules():
     """Populate every wipeable module with one recognizable row each."""
     now = datetime(2026, 8, 24, 10, 0, 0)
@@ -267,8 +275,9 @@ def test_granular_wipe_cash_flow_only(client, app):
         assert CashFlowSubcategory.query.count() == 0
         assert CashFlowParty.query.count() == 0
         assert AccountReconciliation.query.count() == 0
-        # Other modules must be untouched.
-        assert Client.query.count() == 1
+        # Other modules must be untouched.  (The OPEN-KHATA walk-in master
+        # client is a system-maintained row and is not part of the seed.)
+        assert len(business_clients()) == 1
         assert Account.query.count() == 1
         assert Account.query.first().balance == 5000.0
         assert Payment.query.count() == 1
@@ -307,8 +316,8 @@ def test_granular_wipe_accounts_resets_balances(client, app):
         assert DirectSale.query.count() == 0
         assert DeliveryPersonPayment.query.count() == 0
         assert FBMRental.query.count() == 0
-        # Party masters survive.
-        assert Client.query.count() == 1
+        # Party masters survive (excluding the system OPEN-KHATA row).
+        assert len(business_clients()) == 1
         assert Supplier.query.count() == 1
 
 
@@ -380,7 +389,8 @@ def test_granular_module_restore_into_fresh_app(app_factory, client, app, tmp_pa
     #     so it can never touch the real instance directory) ---
     dest_db = os.path.join(str(tmp_path), "granular_dest.db")
     dest_app = app_factory(dest_db)
-    dest_client = dest_app.test_client()
+    from conftest import make_csrf_client
+    dest_client = make_csrf_client(dest_app)
     login(dest_client)
     with dest_app.app_context():
         # Local data that must survive the restore.
@@ -405,9 +415,10 @@ def test_granular_module_restore_into_fresh_app(app_factory, client, app, tmp_pa
     with dest_app.app_context():
         assert Account.query.count() == 1
         assert Account.query.first().name == "Wipe Cash"
-        # Untouched modules keep only their local rows.
-        assert Client.query.count() == 1
-        assert Client.query.first().name == "Local Client"
+        # Untouched modules keep only their local rows (the OPEN-KHATA master
+        # is the system-maintained client row).
+        assert len(business_clients()) == 1
+        assert business_clients()[0].name == "Local Client"
         assert Supplier.query.count() == 1
         assert Payment.query.count() == 1
 
@@ -426,7 +437,7 @@ def test_granular_module_restore_into_fresh_app(app_factory, client, app, tmp_pa
     assert resp.status_code in (302, 303), resp.get_data(as_text=True)[:500]
     with dest_app.app_context():
         # clients replaced by the backup; the other modules are untouched.
-        clients = Client.query.all()
+        clients = business_clients()
         assert len(clients) == 1
         assert clients[0].name == "Wipe Client"
         assert Supplier.query.count() == 1      # local supplier kept

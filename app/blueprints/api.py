@@ -277,7 +277,63 @@ def api_suppliers_search():
 @bp.route('/api/check_bill/<path:bill_no>')
 @login_required
 def check_bill_api(bill_no):
-    entry = Entry.query.filter_by(bill_no=bill_no).first()
+    """Check a bill reference across every bill-bearing source.
+
+    The legacy implementation probed only ``Entry.bill_no``, so auto-billed
+    sales (``direct_sale.auto_bill_no``) reported ``exists: false`` while
+    the row and its page existed.  The shared ``_lookup_bill`` matcher walks
+    bookings, payments, invoices, sales, GRNs and pending bills.
+    """
+    from app.services.billing import _lookup_bill, _bill_no_variants
+
+    booking, payment, invoice, sale, grn, pending = _lookup_bill(bill_no)
+    if sale is not None:
+        return jsonify({
+            'exists': True,
+            'kind': 'direct_sale',
+            'id': sale.id,
+            'bill_no': sale.manual_bill_no or sale.auto_bill_no or f'DS-{sale.id}',
+            'client_name': sale.client_name or '',
+            'url': url_for('view_bill', bill_no=sale.manual_bill_no or sale.auto_bill_no or f'DS-{sale.id}'),
+        })
+    if booking is not None:
+        return jsonify({
+            'exists': True,
+            'kind': 'booking',
+            'id': booking.id,
+            'bill_no': booking.manual_bill_no or booking.auto_bill_no or f'BK-{booking.id}',
+        })
+    if payment is not None:
+        return jsonify({
+            'exists': True,
+            'kind': 'payment',
+            'id': payment.id,
+            'bill_no': payment.manual_bill_no or payment.auto_bill_no or f'PAY-{payment.id}',
+        })
+    if invoice is not None:
+        return jsonify({
+            'exists': True,
+            'kind': 'invoice',
+            'id': invoice.id,
+            'bill_no': invoice.invoice_no,
+        })
+    if grn is not None:
+        return jsonify({
+            'exists': True,
+            'kind': 'grn',
+            'id': grn.id,
+            'bill_no': grn.manual_bill_no or grn.auto_bill_no,
+        })
+    if pending is not None:
+        return jsonify({
+            'exists': True,
+            'kind': 'pending_bill',
+            'id': pending.id,
+            'bill_no': pending.bill_no,
+        })
+
+    variants = _bill_no_variants(bill_no)
+    entry = Entry.query.filter(Entry.bill_no.in_(variants), Entry.is_void == False).first()
     if entry:
         return jsonify({
             'exists': True,

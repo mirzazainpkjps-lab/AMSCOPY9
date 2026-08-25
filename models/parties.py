@@ -55,6 +55,7 @@ class SupplierPayment(db.Model):
     manual_bill_no = db.Column(db.String(50))
     auto_bill_no = db.Column(db.String(50))
     idempotency_key = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    idempotency_payload_hash = db.Column(db.String(64), nullable=True, index=True)
     revision = db.Column(db.Integer, default=1, nullable=True)
     created_by = db.Column(db.String(80))
     updated_by = db.Column(db.String(80))

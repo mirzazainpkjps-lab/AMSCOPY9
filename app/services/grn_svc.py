@@ -156,6 +156,24 @@ def _sync_grn_auto_supplier_payment(grn, old_supplier_id=None):
             _sync_supplier_payment_accounting(row)
         return
 
+    is_new_row = row is None
+    financial_changed = bool(row) and any((
+        float(getattr(row, 'amount', 0) or 0) != paid,
+        getattr(row, 'payment_account_id', None) != getattr(grn, 'payment_account_id', None),
+        getattr(row, 'date_posted', None) != (grn.date_posted or pk_now()),
+        bool(getattr(row, 'is_void', False)),
+    ))
+    if (is_new_row or financial_changed) and paid > 0:
+        # Finalised reconciliation periods are immutable: creating (or
+        # financially changing) a supplier payment inside a closed period
+        # must be rejected, exactly like the manual payment paths.
+        from app.services.payments_crud import _assert_period_open
+        _assert_period_open(
+            getattr(grn, 'payment_account_id', None),
+            grn.date_posted or pk_now(),
+            operation='posted',
+        )
+
     if not row:
         row = SupplierPayment(
             supplier_id=grn.supplier_id,

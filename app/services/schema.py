@@ -539,6 +539,78 @@ def _ensure_direct_sale_idempotency_index():
         db.session.rollback()
 
 
+def _ensure_auto_bill_unique_indexes():
+    """DB-level uniqueness for auto-generated bill numbers.
+
+    The atomic counter allocator in ``billing.get_next_bill_no`` prevents two
+    requests from ever receiving the same number, and these partial unique
+    indexes make a duplicate commit impossible even if a future code path
+    regresses.  A populated (legacy/imported) database can already contain
+    duplicated auto bills: in that case the index for that table is skipped
+    (logged) so bootstrapping a legacy DB never fails, and the counter stays
+    ahead of the highest used sequence via ``_sync_bill_counter_with_db``.
+    """
+    tables = ("booking", "payment", "supplier_payment", "direct_sale",
+              "material_return", "grn", "entry")
+    for table in tables:
+        try:
+            dup = db.session.execute(text(
+                f"SELECT COUNT(*) FROM (SELECT auto_bill_no FROM {table} "
+                "WHERE auto_bill_no IS NOT NULL AND TRIM(auto_bill_no) <> '' "
+                "GROUP BY auto_bill_no HAVING COUNT(*) > 1)"
+            )).scalar()
+            if dup:
+                logging.getLogger(__name__).warning(
+                    "Skipping unique auto-bill index for %s: %s duplicated bill numbers exist.",
+                    table, dup,
+                )
+                continue
+            db.session.execute(text(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{table}_auto_bill_no "
+                f"ON {table}(auto_bill_no) WHERE auto_bill_no IS NOT NULL"
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logging.getLogger(__name__).warning(
+                "Could not create unique auto-bill index for %s", table,
+            )
+
+
+def ensure_open_khata_client():
+    """Materialise the shared Open-Khata walk-in client master row.
+
+    Open-Khata sales are stored with ``client_code='OPEN-KHATA'`` and a
+    free-text customer name, historically without any Client master row.
+    That made the receivable invisible to the payables report/API/CSV and
+    impossible to settle.  A single stable master row keyed by the reserved
+    code anchors all such rows for every projection and payment path.
+    """
+    from app.services.constants import OPEN_KHATA_CODE, OPEN_KHATA_NAME
+    if not OPEN_KHATA_CODE:
+        return None
+    client = Client.query.filter(
+        func.lower(func.trim(Client.code)) == str(OPEN_KHATA_CODE).strip().lower()
+    ).order_by(Client.id.asc()).first()
+    if client:
+        if not client.name or client.name == OPEN_KHATA_CODE:
+            client.name = OPEN_KHATA_NAME or "Walk-in Customers (Open Khata)"
+        return client
+    client = Client(
+        code=str(OPEN_KHATA_CODE).strip(),
+        name=OPEN_KHATA_NAME or "Walk-in Customers (Open Khata)",
+        category="Open Khata",
+        is_active=True,
+    )
+    db.session.add(client)
+    try:
+        db.session.flush()
+    except Exception:
+        db.session.rollback()
+        return None
+    return client
+
+
 # Indexes that make the hot transaction paths bounded instead of full-scan:
 #   * bill-number lookups (find_bill_conflict, _max_used_auto_bill_seq, GRN
 #     save, sale save, duplicate-manual-bill checks)
@@ -766,6 +838,14 @@ def _bootstrap_database():
         pass
     try:
         _ensure_direct_sale_idempotency_index()
+    except Exception:
+        pass
+    try:
+        _ensure_auto_bill_unique_indexes()
+    except Exception:
+        pass
+    try:
+        ensure_open_khata_client()
     except Exception:
         pass
     try:

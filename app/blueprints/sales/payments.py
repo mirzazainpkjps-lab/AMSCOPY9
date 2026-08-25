@@ -147,10 +147,10 @@ def add_payment():
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
-        logging.exception('Payment create failed')
-        flash(f'Unable to save payment: {exc}', 'danger')
+        logging.getLogger('payments').exception('Payment create failed')
+        flash('Unable to save payment: the payment could not be saved. Please check the details and try again.', 'danger')
     return redirect(url_for('accounts.client_payments'))
 
 
@@ -188,8 +188,8 @@ def edit_payment(id):
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
-        logging.exception('Payment edit failed')
-        flash(f'Unable to update payment: {exc}', 'danger')
+        logging.getLogger('payments').exception('Payment edit failed')
+        flash('Unable to update payment: the payment could not be saved. Please check the details and try again.', 'danger')
     return redirect(url_for('accounts.client_payments', show='active'))

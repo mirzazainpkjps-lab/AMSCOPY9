@@ -227,17 +227,42 @@ def peek_next_bill_no(namespace=AUTO_BILL_NS_DEFAULT):
 
 
 def get_next_bill_no(namespace=AUTO_BILL_NS_DEFAULT):
-    """Generate and increment the next auto bill number."""
+    """Generate and increment the next auto bill number atomically.
+
+    SQLite allows any number of concurrent readers, so the historical
+    read-MAX-then-write implementation could hand the SAME ``SB-<NS>-####``
+    to two simultaneous requests (both read the same MAX before either
+    commits).  This implementation opens the write lock first — the
+    ``INSERT OR IGNORE`` is a write statement even when the row already
+    exists — which serialises every allocator for this namespace across
+    threads AND processes.  All reads below then observe committed state
+    and the final counter UPDATE is atomic.  The caller's surrounding
+    transaction owns the lock until it commits.
+    """
     ns = _normalize_namespace(namespace)
-    counter = _get_or_create_bill_counter(ns)
-    current = _sync_bill_counter_with_db(ns)
+    conn = db.session.connection()
+    conn.execute(
+        text("INSERT OR IGNORE INTO bill_counter (namespace, count) VALUES (:ns, :base)"),
+        {"ns": ns, "base": 1000},
+    )
+    row = conn.execute(
+        text("SELECT count FROM bill_counter WHERE namespace = :ns"),
+        {"ns": ns},
+    ).fetchone()
+    current = int(row[0] or 1000) if row else 1000
+    max_used = _max_used_auto_bill_seq(ns)
+    required_next = max(1000, max_used + 1)
+    if current < required_next:
+        current = required_next
     bill_no = _format_bill_no(current, namespace=ns)
     # Auto bills must be globally unique per tenant across main bill-bearing modules.
     while find_bill_conflict(bill_no):
         current += 1
         bill_no = _format_bill_no(current, namespace=ns)
-    counter.count = current + 1
-    db.session.flush()
+    conn.execute(
+        text("UPDATE bill_counter SET count = :next WHERE namespace = :ns"),
+        {"ns": ns, "next": current + 1},
+    )
     return bill_no
 
 

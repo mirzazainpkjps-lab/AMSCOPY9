@@ -10,9 +10,26 @@ import sqlite3
 
 ADMIN = {"username": "Admin", "password": "Admin@fbm12345"}
 
+# Login is protected by the same session-bound CSRF gate as every other
+# mutating route; the login template carries the token.
+_CSRF = "login-flow-test-csrf"
+
 
 def _login(client):
-    return client.post("/login", data=ADMIN, follow_redirects=False)
+    with client.session_transaction() as sess:
+        sess["_csrf_token"] = _CSRF
+    data = dict(ADMIN)
+    data["_csrf_token"] = _CSRF
+    return client.post("/login", data=data, follow_redirects=False)
+
+
+def _raw_login_post(raw_client):
+    """Login via a raw (non-proxied) test client, seeding the token first."""
+    with raw_client.session_transaction() as sess:
+        sess["_csrf_token"] = _CSRF
+    data = dict(ADMIN)
+    data["_csrf_token"] = _CSRF
+    return raw_client.post("/login", data=data)
 
 
 def test_login_then_dashboard_on_fresh_database(client):
@@ -31,7 +48,7 @@ def test_bootstrap_recovers_from_empty_database_file(app_factory, tmp_path):
     assert db_file.exists()
 
     app = app_factory(db_file)
-    resp = app.test_client().post("/login", data=ADMIN)
+    resp = _raw_login_post(app.test_client())
     assert resp.status_code == 302
     assert app.config.get("AMS_BOOTSTRAP_ERROR") is None
 
@@ -39,10 +56,10 @@ def test_bootstrap_recovers_from_empty_database_file(app_factory, tmp_path):
 def test_second_start_on_existing_database_still_logs_in(app_factory, tmp_path):
     db_file = tmp_path / "reused.db"
     first = app_factory(db_file)
-    assert first.test_client().post("/login", data=ADMIN).status_code == 302
+    assert _raw_login_post(first.test_client()).status_code == 302
 
     second = app_factory(db_file)
-    assert second.test_client().post("/login", data=ADMIN).status_code == 302
+    assert _raw_login_post(second.test_client()).status_code == 302
     assert second.config.get("AMS_BOOTSTRAP_ERROR") is None
 
 

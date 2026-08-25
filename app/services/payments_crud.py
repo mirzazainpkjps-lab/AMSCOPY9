@@ -26,6 +26,8 @@ from models import (
 )
 from utils.accounting_audit import record_accounting_audit
 from utils.money import decimal_money, from_minor, money_float, to_minor
+from app.services.constants import OPEN_KHATA_CODE
+from app.services.time_money import pk_now
 
 _EPS_MINOR = 0
 _ALLOWED_METHODS = {
@@ -55,6 +57,36 @@ def _normalise_key(value):
     if len(key) > 64 or not re.fullmatch(r"[A-Za-z0-9_.:-]+", key):
         raise ValueError("Invalid submission identifier.")
     return key
+
+
+def _payment_payload_hash(*, client_code="", client_name="", amount=0, discount=0,
+                          method="", payment_type=None, payment_account_id=None,
+                          manual_bill_no="", date_posted=None, note="", **_):
+    """Deterministic fingerprint binding an idempotency key to its payload."""
+    import hashlib
+    def _norm(v):
+        return str(v or "").strip()
+    try:
+        amt = round(float(amount or 0), 2)
+    except (TypeError, ValueError):
+        amt = 0.0
+    try:
+        disc = round(float(discount or 0), 2)
+    except (TypeError, ValueError):
+        disc = 0.0
+    parts = [
+        _norm(client_code).upper(),
+        _norm(client_name).lower(),
+        f"{amt:.2f}",
+        f"{disc:.2f}",
+        _norm(method).lower(),
+        _norm(payment_type).lower(),
+        str(payment_account_id or ""),
+        _norm(manual_bill_no).upper(),
+        _norm(date_posted),
+        _norm(note).lower(),
+    ]
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
 def _normalise_method(value, *, legacy_refund=False):
@@ -249,6 +281,18 @@ def save_client_payment(
     if not payment_id and key:
         replay = Payment.query.filter_by(idempotency_key=key).first()
         if replay:
+            payload_hash = _payment_payload_hash(
+                client_code=client_code, client_name=client_name, amount=amount,
+                discount=discount, method=method, payment_type=payment_type,
+                payment_account_id=payment_account_id, manual_bill_no=manual_bill_no,
+                date_posted=date_posted, note=note,
+            )
+            stored = getattr(replay, "idempotency_payload_hash", None)
+            if stored and stored != payload_hash:
+                raise ValueError(
+                    "This form token was already used for a different payment. "
+                    "Reload the page and submit again."
+                )
             replay._idempotent_replay = True
             return replay, False
 
@@ -308,6 +352,17 @@ def save_client_payment(
     if discount_minor > 0 and not (discount_reason or "").strip():
         raise ValueError("Discount reason is required when a discount is entered.")
 
+    # Open-Khata rows are keyed by the reserved code and a free-text walk-in
+    # name.  Materialise the shared master row (idempotent) so the receivable
+    # is always settleable — the ledger projections already group every
+    # OPEN-KHATA row against that master.
+    if (client_code or "").strip().upper() == str(OPEN_KHATA_CODE).upper():
+        try:
+            from app.services.schema import ensure_open_khata_client
+            ensure_open_khata_client()
+        except Exception:
+            pass
+
     # Historical client remains valid when unchanged; suspended clients cannot
     # be selected for a new or changed relationship.
     client_obj = _resolve_client(client_code, client_name)
@@ -354,6 +409,14 @@ def save_client_payment(
             raise ValueError(f"Manual bill '{manual_bill_no}' already exists in {conflict[0]} #{conflict[1]}.")
 
     posted = resolve_posted_datetime(date_posted, fallback_dt=(payment.date_posted if not created else None))
+    if posted and posted > pk_now():
+        if created or not payment.date_posted or payment.date_posted != posted:
+            raise ValueError("The transaction date cannot be in the future.")
+    if created and payment_account_id:
+        # Finalised reconciliation periods are immutable — the same guard the
+        # edit branch has always applied must also hold on the create path,
+        # otherwise a post-close receipt silently rewrites a closed period.
+        _assert_period_open(payment_account_id, posted, operation="posted")
     if not created:
         accounting_changed = any((
             old["amount"] != float(from_minor(amount_minor)),
@@ -389,6 +452,15 @@ def save_client_payment(
         payment.photo_path = photo_path
     payment.is_void = False
     payment.idempotency_key = key if created else payment.idempotency_key
+    if created and key:
+        payment.idempotency_payload_hash = _payment_payload_hash(
+            client_code=payment.client_code, client_name=payment.client_name,
+            amount=payment.amount, discount=payment.discount,
+            method=payment.method, payment_type=payment.payment_type,
+            payment_account_id=payment.payment_account_id,
+            manual_bill_no=payment.manual_bill_no,
+            date_posted=payment.date_posted, note=payment.note,
+        )
     payment.updated_by = _actor(actor)
     payment.revision = revision + 1
     if created:
@@ -502,6 +574,17 @@ def save_supplier_payment(
     if not payment_id and key:
         replay = SupplierPayment.query.filter_by(idempotency_key=key).first()
         if replay:
+            payload_hash = _payment_payload_hash(
+                client_code="", client_name="", amount=amount,
+                method=method, payment_account_id=payment_account_id,
+                manual_bill_no=manual_bill_no, date_posted=date_posted, note=note,
+            )
+            stored = getattr(replay, "idempotency_payload_hash", None)
+            if stored and stored != payload_hash:
+                raise ValueError(
+                    "This form token was already used for a different payment. "
+                    "Reload the page and submit again."
+                )
             replay._idempotent_replay = True
             return replay, False
 
@@ -567,6 +650,11 @@ def save_supplier_payment(
             raise ValueError(f"Manual bill '{manual_bill_no}' already exists in {conflict[0]} #{conflict[1]}.")
 
     posted = resolve_posted_datetime(date_posted, fallback_dt=(payment.date_posted if not created else None))
+    if posted and posted > pk_now():
+        if created or not payment.date_posted or payment.date_posted != posted:
+            raise ValueError("The transaction date cannot be in the future.")
+    if created:
+        _assert_period_open(account.id, posted, operation="posted")
     if not created:
         accounting_changed = any((
             old["amount"] != float(from_minor(amount_minor)),
@@ -593,6 +681,13 @@ def save_supplier_payment(
     payment.note = (note or "").strip()
     payment.is_void = False
     payment.idempotency_key = key if created else payment.idempotency_key
+    if created and key:
+        payment.idempotency_payload_hash = _payment_payload_hash(
+            amount=payment.amount, method=payment.method,
+            payment_account_id=payment.payment_account_id,
+            manual_bill_no=payment.manual_bill_no,
+            date_posted=payment.date_posted, note=payment.note,
+        )
     payment.updated_by = _actor(actor)
     payment.revision = revision + 1
     if created:
@@ -778,7 +873,13 @@ def reconcile_account(*, account_id, actual_balance, reconciliation_date=None, n
         incoming, outgoing = _transaction_sums(account.id, through=period_end)
         previous_minor = opening_minor
 
-    expected_minor = opening_minor + incoming - outgoing
+    # Movements dated AFTER the closing instant are already inside the live
+    # account balance (a future-dated receipt was applied to the balance as
+    # soon as it was posted).  Include them in the expected figure so the
+    # physically counted balance reconciles against the same ledger the GUI
+    # displays, and the closing adjustment can never manufacture money.
+    future_in, future_out = _transaction_sums(account.id, after=period_end)
+    expected_minor = opening_minor + incoming - outgoing + (future_in - future_out)
     difference_minor = actual_minor - expected_minor
     difference_type = "Matched" if difference_minor == 0 else ("Loss" if difference_minor < 0 else "Excess")
     ip_address, session_id = _request_metadata()

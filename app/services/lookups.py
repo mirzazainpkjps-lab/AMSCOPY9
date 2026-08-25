@@ -220,9 +220,35 @@ def get_or_create_delivery_person(name_input, phone=None):
     ).fetchone()
     if global_row:
         return None
-    dp = DeliveryPerson(name=name, phone=phone_value or None, is_active=True)
-    db.session.add(dp)
-    db.session.flush()
-    return dp
+    # Two simultaneous first-time sales can both see "no driver D" and race
+    # to create it.  The INSERT below — even when it ignores an existing row —
+    # takes SQLite's write lock FIRST, so concurrent creators serialise here:
+    # the first inserts the row, the waiters' inserts are ignored, and every
+    # caller then adopts the same committed row.
+    from app.services.time_money import pk_now
+    now = pk_now()
+    conn = db.session.connection()
+    conn.execute(
+        text(
+            "INSERT OR IGNORE INTO delivery_person "
+            "(name, phone, is_active, opening_balance, opening_balance_date, created_at) "
+            "VALUES (:n, :p, 1, 0, :now, :now)"
+        ),
+        {'n': name, 'p': phone_value or None, 'now': now},
+    )
+    row = conn.execute(
+        text("SELECT id FROM delivery_person WHERE lower(trim(name)) = :n LIMIT 1"),
+        {'n': name.lower()},
+    ).fetchone()
+    if not row:
+        return None
+    existing = db.session.get(DeliveryPerson, int(row[0]))
+    if existing is None:
+        return None
+    if not existing.is_active:
+        existing.is_active = True
+    if phone_value:
+        existing.phone = phone_value
+    return existing
 
 

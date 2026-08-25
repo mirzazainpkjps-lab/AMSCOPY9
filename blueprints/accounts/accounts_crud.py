@@ -160,10 +160,10 @@ def add_account():
             db.session.rollback()
             flash(str(exc), 'danger')
             return redirect(url_for('accounts.add_account'))
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
             logger.exception('Add account failed')
-            flash(f'Unable to add account: {exc}', 'danger')
+            flash('Unable to add account: the account could not be created. Please check the details and try again.', 'danger')
             return redirect(url_for('accounts.add_account'))
 
     return render_template(
@@ -401,10 +401,10 @@ def edit_account(account_id):
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
             logger.exception('Edit account failed')
-            flash(f'Unable to update account: {exc}', 'danger')
+            flash('Unable to update account: the account could not be updated. Please check the details and try again.', 'danger')
 
         # On validation failure, fall through to re-render the edit page so the
         # user keeps their entered values and sees the flash message.
@@ -651,10 +651,10 @@ def delete_account(account_id):
             db.session.delete(a)
             db.session.commit()
             flash('Unreferenced account deleted.', 'success')
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception('Delete account failed')
-        flash(f'Unable to delete account safely: {exc}', 'danger')
+        flash('Unable to delete account safely: the account could not be deleted. Please try again.', 'danger')
     return redirect(url_for('accounts.manage_accounts'))
 
 
@@ -737,10 +737,10 @@ def reconcile_account(account_id):
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
             logger.exception('Account reconciliation failed')
-            flash(f'Unable to reconcile account: {exc}', 'danger')
+            flash('Unable to reconcile account: the reconciliation could not be completed. Please try again.', 'danger')
 
     return render_template('accounts/reconcile_account.html', account=account,
                            expected=expected, recent=recent,

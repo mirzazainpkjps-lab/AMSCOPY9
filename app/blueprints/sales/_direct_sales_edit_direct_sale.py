@@ -543,10 +543,10 @@ def edit_direct_sale(id):
             download_client_code=resolved_client_code,
             download_client_name=sale.client_name
         ))
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        logging.error(f"Direct Sale Edit Error: {str(e)}")
-        flash(f"Error updating sale: {str(e)}", "danger")
+        logging.getLogger('sales').exception('Direct sale edit failed')
+        flash('Error updating sale: the sale could not be updated. Please check the details and try again.', 'danger')
         _stash_direct_sale_form_draft(request.form, mode='edit', sale_id=id)
         return redirect(url_for('direct_sales_page', resume='edit', sale_id=id))
 
