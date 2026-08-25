@@ -42,7 +42,8 @@ def financial_details():
                 'client': p.client_name,
                 'amount': p.amount,
                 'type': 'Payment',
-                'ref': p.manual_bill_no or p.auto_bill_no or f'PAY-{p.id}'
+                'ref': p.manual_bill_no or p.auto_bill_no or f'PAY-{p.id}',
+                'note': (p.note or '').strip()
             })
 
         # 2. Booking Advances
@@ -60,7 +61,8 @@ def financial_details():
                 'client': b.client_name,
                 'amount': b.paid_amount,
                 'type': 'Booking Advance',
-                'ref': b.manual_bill_no or b.auto_bill_no or f'BK-{b.id}'
+                'ref': b.manual_bill_no or b.auto_bill_no or f'BK-{b.id}',
+                'note': (b.note or '').strip()
             })
 
         # 3. Direct Sale Cash
@@ -78,7 +80,8 @@ def financial_details():
                 'client': s.client_name,
                 'amount': s.paid_amount,
                 'type': 'Direct Sale',
-                'ref': s.manual_bill_no or s.auto_bill_no or f'DS-{s.id}'
+                'ref': s.manual_bill_no or s.auto_bill_no or f'DS-{s.id}',
+                'note': (s.note or '').strip()
             })
 
     elif type_filter == 'credit':
@@ -98,7 +101,8 @@ def financial_details():
                 'client': b.client_name,
                 'amount': credit,
                 'type': 'Booking Credit',
-                'ref': b.manual_bill_no or b.auto_bill_no or f'BK-{b.id}'
+                'ref': b.manual_bill_no or b.auto_bill_no or f'BK-{b.id}',
+                'note': (b.note or '').strip()
             })
 
         # 2. Direct Sale Credit
@@ -117,7 +121,8 @@ def financial_details():
                 'client': s.client_name,
                 'amount': credit,
                 'type': 'Direct Sale Credit',
-                'ref': s.manual_bill_no or s.auto_bill_no or f'DS-{s.id}'
+                'ref': s.manual_bill_no or s.auto_bill_no or f'DS-{s.id}',
+                'note': (s.note or '').strip()
             })
 
     transactions.sort(key=lambda x: x['date'], reverse=True)

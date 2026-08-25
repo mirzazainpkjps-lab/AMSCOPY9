@@ -31,6 +31,12 @@
                     <label class="text-white-50 small fw-bold mb-1 d-block">REASON</label>
                     <div class="p-2 bg-dark rounded border border-secondary">{{ bill.reason or '---' }}</div>
                 </div>
+                {% if bill.note %}
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1 d-block">NOTES</label>
+                    <div class="p-2 bg-dark rounded border border-secondary">{{ bill.note }}</div>
+                </div>
+                {% endif %}
                 <div class="mb-3" id="cement-content-{{ bill.id }}" style="display: none;">
                     <label class="text-white-50 small fw-bold mb-1 d-block">CEMENT CONTENT</label>
                     <div class="p-2 bg-dark rounded border border-secondary text-info fw-bold" id="cement-info-{{ bill.id }}"></div>
@@ -104,6 +110,10 @@
                 <div class="mb-3">
                     <label class="text-white-50 small fw-bold mb-1">REASON</label>
                     <textarea name="reason" class="form-control bg-dark text-white border-secondary" rows="2">{{ bill.reason }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">NOTES</label>
+                    <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Add bill notes...">{{ bill.note or '' }}</textarea>
                 </div>
                 <div class="mb-3">
                     <label class="text-white-50 small fw-bold mb-1">PHOTO URL (Google Drive)</label>

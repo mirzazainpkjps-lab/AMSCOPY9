@@ -80,6 +80,9 @@
                     <td class="py-3">{{ t.client }}</td>
                     <td class="py-3">
                         {{ t.material }}
+                        {% if t.note %}
+                        <div class="small text-white-50">Note: {{ t.note }}</div>
+                        {% endif %}
                         {% if t.source == 'Direct Sale' and t.grn_bill %}
                         <div class="small text-info">GRN: <span class="text-warning fw-bold">{{ t.grn_bill }}</span></div>
                         {% endif %}

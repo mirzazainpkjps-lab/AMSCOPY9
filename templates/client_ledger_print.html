@@ -235,6 +235,9 @@
                     <td>{{ row.date_display or '' }}</td>
                     <td>
                         {{ row.description }}
+                        {% if row.note %}
+                        <div style="font-size:9px; color:#444; font-weight:600;">Note: {{ row.note }}</div>
+                        {% endif %}
                         {% if row.is_cancel_entry %}
                         <div style="font-size:9px; color:#555;">Audit row{% if row.cancel_amount is not none %}, Rs.{{ "{:,.2f}".format(row.cancel_amount) }}{% endif %}</div>
                         {% endif %}
@@ -270,7 +273,12 @@
                     <td class="{{ '' if b.bill_no else 'text-center' }}">{{ b.bill_no or '-' }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(b.amount or 0) }}</td>
                     <td>{{ 'Paid' if b.is_paid else 'Pending' }}</td>
-                    <td>{{ b.reason or '' }}</td>
+                    <td>
+                        {{ b.reason or '' }}
+                        {% if b.note %}
+                        <div style="font-size:8.5px; color:#444; font-weight:600;">Note: {{ b.note }}</div>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -297,7 +305,12 @@
                     <tr>
                         <td>{{ m.date or '' }}</td>
                         <td class="bill-no {{ '' if m.bill_no else 'text-center' }}">{{ m.bill_no or '-' }}</td>
-                        <td>{{ m.material_display or material_name }}</td>
+                        <td>
+                            {{ m.material_display or material_name }}
+                            {% if m.note %}
+                            <div style="font-size:8.5px; color:#444; font-weight:600;">Note: {{ m.note }}</div>
+                            {% endif %}
+                        </td>
                         <td class="{{ 'text-end' if (m.qty_added or 0) > 0 else 'text-center' }}">{{ "{:,.2f}".format(m.qty_added or 0) if (m.qty_added or 0) > 0 else '-' }}</td>
                         <td class="{{ 'text-end' if (m.qty_dispatched or 0) > 0 else 'text-center' }}">{{ "{:,.2f}".format(m.qty_dispatched or 0) if (m.qty_dispatched or 0) > 0 else '-' }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(m.balance or 0) }}</td>

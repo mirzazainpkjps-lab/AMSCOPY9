@@ -117,6 +117,7 @@
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Bill Ref</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Client Name</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Reason</th>
+                    <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Notes</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Amount</th>
                     <th class="fw-bold py-3 border-bottom border-secondary text-white-50">Status</th>
                     <th class="fw-bold py-3 text-end pe-4 border-bottom border-secondary text-white-50">Actions</th>
@@ -143,6 +144,7 @@
                         {% endif %}
                     </td>
                     <td class="text-white-50 small">{{ bill.reason or '---' }}</td>
+                    <td class="text-white-50 small"><span class="small text-white-50" title="{{ bill.note or '' }}">{{ bill.note or '—' }}</span></td>
                     <td class="text-danger fw-bold">{{ "%.2f"|format(bill.amount or 0) }}</td>
                     <td>
                         {% if not client or client.category == 'Walking-Customer' or client.category == 'Cash' or client.category == 'Open Khata' %}
@@ -176,7 +178,7 @@
                 {% endfor %}
                 {% if not bills %}
                 <tr>
-                    <td colspan="5" class="text-center py-5 text-white-50">
+                    <td colspan="8" class="text-center py-5 text-white-50">
                         <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                         No pending bills found
                     </td>
@@ -301,6 +303,10 @@
                 <div class="mb-3">
                     <label class="text-white-50 small fw-bold mb-1">REASON</label>
                     <textarea name="reason" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Reason for pending bill"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="text-white-50 small fw-bold mb-1">NOTES</label>
+                    <textarea name="note" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Add bill notes..."></textarea>
                 </div>
                 <div class="mb-3">
                     <label class="text-white-50 small fw-bold mb-1">PHOTO URL (Google Drive)</label>

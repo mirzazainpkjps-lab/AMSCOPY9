@@ -69,6 +69,7 @@
                     <th class="py-3 text-white-50">Client</th>
                     <th class="py-3 text-white-50">Type</th>
                     <th class="py-3 text-white-50 fd-col-ref">Reference</th>
+                    <th class="py-3 text-white-50">Notes</th>
                     <th class="py-3 text-end pe-4 text-white-50">Amount</th>
                 </tr>
             </thead>
@@ -86,19 +87,20 @@
                         </span>
                     </td>
                     <td class="text-white-50 fd-ref-cell" data-label="Reference">{{ t.ref }}</td>
+                    <td class="text-white-50 small" data-label="Notes">{{ t.note or '—' }}</td>
                     <td class="text-end pe-4 fw-bold fs-5 {{ 'text-success' if type == 'cash' else 'text-danger' }}" data-label="Amount">
                         Rs. {{ "{:,.0f}".format(t.amount) }}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" class="text-center py-5 text-white-50 stack-no-label">No transactions found for the selected criteria.</td>
+                    <td colspan="6" class="text-center py-5 text-white-50 stack-no-label">No transactions found for the selected criteria.</td>
                 </tr>
                 {% endfor %}
             </tbody>
             <tfoot style="background: #0f172a;">
                 <tr>
-                    <td colspan="4" class="text-end py-3 fw-bold text-white stack-no-label">TOTAL</td>
+                    <td colspan="5" class="text-end py-3 fw-bold text-white stack-no-label">TOTAL</td>
                     <td class="text-end pe-4 fw-bold fs-4 text-white">
                         {% set total = transactions|sum(attribute='amount') %}
                         Rs. {{ "{:,.0f}".format(total) }}

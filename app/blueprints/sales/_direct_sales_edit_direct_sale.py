@@ -425,6 +425,17 @@ def edit_direct_sale(id):
         sale.account_name = account_name
         sale.account_no = account_no
 
+        if getattr(sale, 'invoice_id', None):
+            inv = db.session.get(Invoice, sale.invoice_id)
+            if inv:
+                inv.note = note
+                inv.client_code = sale.client_code
+                inv.client_name = sale.client_name
+                inv.total_amount = sale.amount
+                inv.balance = max(0.0, (sale.amount or 0) - (sale.discount or 0) - (sale.paid_amount or 0))
+                inv.status = 'PAID' if inv.balance <= 0 else ('PARTIAL' if (sale.paid_amount or 0) > 0 else 'OPEN')
+                inv.is_cash = (category == 'Cash')
+
         sale.photo_url = request.form.get('photo_url', '').strip()
         new_photo = save_photo(request.files.get('photo'))
         if new_photo:

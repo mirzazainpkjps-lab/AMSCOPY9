@@ -186,6 +186,9 @@
                         {% else %}
                         <span class="supplier-ledger-line text-info fw-bold">{{ row.description }}</span>
                         {% endif %}
+                        {% if row.note %}
+                        <div class="small text-white-50">{{ row.note }}</div>
+                        {% endif %}
                     </td>
                     <td class="{{ 'text-center' if not row.bill_no else '' }}" data-label="Bill #">{{ row.bill_no or '-' }}</td>
                     <td class="text-end" data-label="Qty">

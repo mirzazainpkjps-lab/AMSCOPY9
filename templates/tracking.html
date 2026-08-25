@@ -201,6 +201,7 @@
                     <th class="text-white-50">Auto Bill</th>
                     <th class="text-white-50">Manual Bill</th>
                     <th class="text-white-50">Nimbus No</th>
+                    <th class="text-white-50">Notes</th>
                     <th class="text-white-50">Unit Rate</th>
                     <th class="text-white-50">By</th>
                     <th class="text-end pe-3 text-white-50 action-cell">Action</th>
@@ -263,6 +264,7 @@
                         {% endif %}
                     </td>
                     <td class="text-white-50">{{ e.nimbus_no or '---' }}</td>
+                    <td class="text-white-50 small"><span class="small text-white-50" title="{{ e.note or '' }}">{{ e.note or '—' }}</span></td>
                     <td class="text-warning fw-bold">{% if e.unit_rate %}Rs. {{ "{:,.0f}".format(e.unit_rate) }}{% else %}<span class="text-white-50 small">---</span>{% endif %}</td>
                     <td class="text-info small fw-bold">{{ e.created_by or 'System' }}</td>
                     <td class="text-end pe-3 action-cell">
@@ -408,6 +410,10 @@
                                         <div class="col-md-6">
                                             <label class="form-label small fw-bold text-uppercase text-white">Driver Name</label>
                                             <input type="text" name="driver_name" value="{{ e.driver_name or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Required for OUT dispatch">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-bold text-uppercase text-white">Notes</label>
+                                            <input type="text" name="note" value="{{ e.note or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Optional notes">
                                         </div>
                                     </div>
                                 </div>

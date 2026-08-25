@@ -33,6 +33,7 @@
                         <th class="ps-3">DATE</th>
                         <th>ITEM</th>
                         <th>BILL NO</th>
+                        <th>NOTES</th>
                         <th class="text-end">ADD</th>
                         <th class="text-end">DELIVERED</th>
                         <th class="text-end pe-3">BALANCE</th>
@@ -44,6 +45,7 @@
                         <td class="ps-3">{{ item.date }}</td>
                         <td>{{ item.item }}</td>
                         <td>{{ item.bill_no }}</td>
+                        <td>{{ item.note or '-' }}</td>
                         <td class="text-end text-success">{{ item.add if item.add > 0 else "-" }}</td>
                         <td class="text-end text-danger">{{ item.delivered if item.delivered > 0 else "-" }}</td>
                         <td class="text-end pe-3 fw-bold">{{ item.balance }}</td>

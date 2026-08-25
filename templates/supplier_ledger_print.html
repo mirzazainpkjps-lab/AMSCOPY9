@@ -231,6 +231,9 @@
                         {% else %}
                         {{ row.description }}{% if row.ref %} ({{ row.ref }}){% endif %}
                         {% endif %}
+                        {% if row.note %}
+                        <div style="font-size:8px; color:#444; font-weight:600;">Note: {{ row.note }}</div>
+                        {% endif %}
                     </td>
                     <td class="{{ 'text-center' if not row.bill_no else '' }}">{{ row.bill_no or '-' }}</td>
                     <td class="{{ 'text-end' if (row.type == 'GRN' and row.item_lines) else 'text-center' }}">
