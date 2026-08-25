@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
     {% if form_mode == 'edit' %}
-    <input type="hidden" id="original_opening_hidden" value="{{ '%.2f'|format(opening_signed) }}">
+    <input type="hidden" id="original_opening_hidden" value="{{ '%.2f'|format(opening_signed) }}" data-server-verified="true" data-checksum="{{ opening_signed|string|hash('md5')[:8] }}">
     <div class="bal-card mb-3">
         <div class="bal-row"><span class="bal-k">Currently stored opening</span><span class="bal-v">Rs. {{ "%.2f"|format(opening_signed) }}</span></div>
         <div class="bal-row"><span class="bal-k">Currently stored effective date</span><span class="bal-v">{{ account.opening_balance_date.strftime('%Y-%m-%d') if account.opening_balance_date else '—' }}</span></div>

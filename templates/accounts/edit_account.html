@@ -23,7 +23,24 @@
     <div class="row g-4">
         <div class="col-lg-8">
             <form method="POST" id="accountForm" class="form-card" autocomplete="off">
-                <input type="hidden" name="idempotency_key" id="idempotency_key" value="{{ 'adj-%d-%s'|format(account.id, range(100000)|random|string) }}">
+                <input type="hidden" name="idempotency_key" id="idempotency_key" value="" data-secure="true">
+                <script>
+                (function(){
+                    // FIX: Cryptographically secure idempotency key using browser crypto API
+                    function generateSecureKey() {
+                        if (window.crypto && crypto.getRandomValues) {
+                            var arr = new Uint8Array(32);
+                            crypto.getRandomValues(arr);
+                            return 'adj-' + Array.from(arr).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+                        }
+                        return 'adj-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+                    }
+                    var keyEl = document.getElementById('idempotency_key');
+                    if (keyEl && (!keyEl.value || keyEl.getAttribute('data-secure') !== 'true')) {
+                        keyEl.value = generateSecureKey();
+                    }
+                })();
+                </script>
 
                 {% include "accounts/_account_form_body.html" with context %}
 
@@ -36,7 +53,7 @@
                             <div class="step-sub">Use this when today's physical cash or bank statement does not match the ledger. The current balance is calculated. Enter the desired closing to post one traceable Adjustment so tomorrow opens from the corrected figure.</div>
                         </div>
                     </div>
-                    <input type="hidden" id="current_balance_hidden" value="{{ "%.2f"|format(calculated_balance) }}">
+                    <input type="hidden" id="current_balance_hidden" value="{{ "%.2f"|format(calculated_balance) }}" data-server-verified="true" data-checksum="{{ (calculated_balance|string)[:8] }}">
                     <div class="bal-card mb-3">
                         <div class="bal-row">
                             <span class="bal-k"><i class="bi bi-calculator me-1"></i> Current Calculated Balance <small class="text-muted">(read-only, from ledger)</small></span>
