@@ -16,7 +16,6 @@ from flask import jsonify, request
 
 from app import create_app
 
-
 app = create_app()
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -24,9 +23,8 @@ GITHUB_REPO = "https://github.com/mirzazainpkjps-lab/AMSCOPY9.git"
 GITHUB_BRANCH = "main"
 WEBHOOK_SECRET = (os.environ.get("AMS_WEBHOOK_SECRET") or "").strip()
 
-# PythonAnywhere API settings. API_TOKEN is provided automatically by
-# PythonAnywhere to webapps after an API token has been created, but we also
-# accept PA_API_TOKEN for explicit configuration.
+# PythonAnywhere API settings. PythonAnywhere automatically exposes the
+# account API token as API_TOKEN to webapps after an API token is created.
 PA_USERNAME = (os.environ.get("PA_USERNAME") or "mirzazain90").strip()
 PA_DOMAIN = (os.environ.get("PA_DOMAIN") or "mirzazain90.pythonanywhere.com").strip()
 PA_API_TOKEN = (
@@ -50,7 +48,6 @@ logger = logging.getLogger("AMS-GitHub")
 
 
 def run_command(command: list[str], timeout: int = 300):
-    """Run a command in the deployed repository and log its output."""
     logger.info("RUNNING: %s", " ".join(command))
     try:
         result = subprocess.run(
@@ -70,7 +67,6 @@ def run_command(command: list[str], timeout: int = 300):
 
 
 def preserve_instance_data() -> bool:
-    """Preserve ignored live database/data files before git reset."""
     if not INSTANCE_DIR.exists():
         return True
     try:
@@ -85,7 +81,6 @@ def preserve_instance_data() -> bool:
 
 
 def restore_instance_data() -> None:
-    """Restore live instance data after the source checkout is updated."""
     if not PRESERVE_DIR.exists():
         return
     try:
@@ -103,11 +98,9 @@ def restore_instance_data() -> None:
 
 
 def reload_pythonanywhere() -> bool:
-    """Reload the PythonAnywhere webapp using the official API."""
+    """Reload this PythonAnywhere webapp through the official API."""
     if not PA_API_TOKEN:
-        logger.error(
-            "No PythonAnywhere API token. Set PA_API_TOKEN or API_TOKEN."
-        )
+        logger.error("No PythonAnywhere API token: API_TOKEN/PA_API_TOKEN missing")
         return False
 
     try:
@@ -116,22 +109,18 @@ def reload_pythonanywhere() -> bool:
         logger.exception("requests is not installed")
         return False
 
+    # Official PythonAnywhere v0 endpoint. PythonAnywhere documents this
+    # endpoint as POST /api/v0/user/{username}/webapps/{domain_name}/reload/.
     endpoint = (
-        f"https://{PA_API_HOST}/api/v1/user/{PA_USERNAME}/"
-        f"websites/{PA_DOMAIN}/reload/"
+        f"https://{PA_API_HOST}/api/v0/user/{PA_USERNAME}/"
+        f"webapps/{PA_DOMAIN}/reload/"
     )
-    headers = {
-        "Authorization": f"Token {PA_API_TOKEN}",
-    }
+    headers = {"Authorization": f"Token {PA_API_TOKEN}"}
 
     logger.info("Reloading PythonAnywhere webapp via API: %s", endpoint)
 
     try:
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            timeout=60,
-        )
+        response = requests.post(endpoint, headers=headers, timeout=60)
     except Exception:
         logger.exception("PythonAnywhere API request failed")
         return False
@@ -142,19 +131,15 @@ def reload_pythonanywhere() -> bool:
         response.text[:2000],
     )
 
-    if response.status_code == 200:
+    if 200 <= response.status_code < 300:
         logger.info("PythonAnywhere webapp reload successful")
         return True
 
-    logger.error(
-        "PythonAnywhere webapp reload failed: HTTP %s",
-        response.status_code,
-    )
+    logger.error("PythonAnywhere webapp reload failed: HTTP %s", response.status_code)
     return False
 
 
 def deploy() -> None:
-    """Fetch GitHub main, update code, install dependencies, reload webapp."""
     if not DEPLOYMENT_LOCK.acquire(blocking=False):
         logger.warning("Deployment already running")
         return
@@ -166,31 +151,22 @@ def deploy() -> None:
 
         preserved = preserve_instance_data()
 
-        # Always correct the server-side origin before fetching.
-        code, output = run_command(
-            ["git", "remote", "set-url", "origin", GITHUB_REPO]
-        )
+        code, output = run_command(["git", "remote", "set-url", "origin", GITHUB_REPO])
         if code != 0:
             raise RuntimeError("git remote set-url failed:\n" + output)
 
-        code, output = run_command(
-            ["git", "fetch", "--prune", "origin", GITHUB_BRANCH]
-        )
+        code, output = run_command(["git", "fetch", "--prune", "origin", GITHUB_BRANCH])
         if code != 0:
             raise RuntimeError("git fetch failed:\n" + output)
 
-        code, output = run_command(
-            [
-                "git", "checkout", "-B", GITHUB_BRANCH,
-                f"origin/{GITHUB_BRANCH}",
-            ]
-        )
+        code, output = run_command([
+            "git", "checkout", "-B", GITHUB_BRANCH,
+            f"origin/{GITHUB_BRANCH}",
+        ])
         if code != 0:
             raise RuntimeError("git checkout failed:\n" + output)
 
-        code, output = run_command(
-            ["git", "reset", "--hard", f"origin/{GITHUB_BRANCH}"]
-        )
+        code, output = run_command(["git", "reset", "--hard", f"origin/{GITHUB_BRANCH}"])
         if code != 0:
             raise RuntimeError("git reset failed:\n" + output)
 
@@ -199,30 +175,17 @@ def deploy() -> None:
 
         requirements = BASE_DIR / "requirements.txt"
         if requirements.exists():
-            code, output = run_command(
-                [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "--user",
-                    "-r",
-                    str(requirements),
-                ],
-                timeout=900,
-            )
+            code, output = run_command([
+                sys.executable, "-m", "pip", "install", "--user",
+                "-r", str(requirements),
+            ], timeout=900)
             if code != 0:
                 raise RuntimeError("pip install failed:\n" + output)
 
-        # Prefer the official PythonAnywhere API over touching the WSGI file.
-        # API reload is explicit and returns a success/error HTTP status.
+        # API reload is the primary reload mechanism.
         if not reload_pythonanywhere():
-            logger.warning(
-                "API reload failed. Falling back to WSGI touch."
-            )
-            wsgi_file = Path(
-                "/var/www/mirzazain90_pythonanywhere_com_wsgi.py"
-            )
+            logger.warning("API reload failed; trying WSGI touch fallback")
+            wsgi_file = Path("/var/www/mirzazain90_pythonanywhere_com_wsgi.py")
             if wsgi_file.exists():
                 wsgi_file.touch()
                 logger.info("Fallback WSGI reload triggered")
@@ -241,7 +204,6 @@ def deploy() -> None:
 
 
 def verify_github_signature() -> bool:
-    """Verify GitHub's HMAC SHA-256 webhook signature."""
     if not WEBHOOK_SECRET:
         logger.error("AMS_WEBHOOK_SECRET is not configured")
         return False
@@ -260,30 +222,21 @@ def verify_github_signature() -> bool:
 
 @app.route("/git-auto-pull", methods=["GET", "POST"])
 def git_auto_pull():
-    """GET health check; POST GitHub push webhook."""
     if request.method == "GET":
-        return jsonify(
-            {
-                "success": True,
-                "service": "AMS GitHub Auto Deploy",
-                "status": "online",
-            }
-        ), 200
+        return jsonify({
+            "success": True,
+            "service": "AMS GitHub Auto Deploy",
+            "status": "online",
+        }), 200
 
     event = request.headers.get("X-GitHub-Event", "")
     delivery = request.headers.get("X-GitHub-Delivery", "")
 
-    logger.info(
-        "GitHub webhook received: event=%s delivery=%s",
-        event,
-        delivery,
-    )
+    logger.info("GitHub webhook received: event=%s delivery=%s", event, delivery)
 
     if not verify_github_signature():
         logger.warning("Invalid GitHub webhook signature")
-        return jsonify(
-            {"success": False, "message": "Invalid signature"}
-        ), 403
+        return jsonify({"success": False, "message": "Invalid signature"}), 403
 
     if event != "push":
         return jsonify({"success": True, "message": "Event ignored"}), 200
@@ -293,30 +246,26 @@ def git_auto_pull():
     repository = payload.get("repository") or {}
     repository_name = repository.get("full_name", "")
 
+    logger.info("Webhook repository=%s ref=%s", repository_name, ref)
+
     if repository_name != "mirzazainpkjps-lab/AMSCOPY9":
-        return jsonify(
-            {"success": True, "message": "Repository ignored"}
-        ), 200
+        return jsonify({"success": True, "message": "Repository ignored"}), 200
 
     if ref != "refs/heads/main":
         return jsonify({"success": True, "message": "Branch ignored"}), 200
 
     if DEPLOYMENT_LOCK.locked():
-        return jsonify(
-            {"success": True, "message": "Deployment already running"}
-        ), 202
+        return jsonify({"success": True, "message": "Deployment already running"}), 202
 
     threading.Thread(target=deploy, daemon=True).start()
 
-    return jsonify(
-        {
-            "success": True,
-            "message": "Deployment started",
-            "repository": repository_name,
-            "branch": "main",
-            "delivery": delivery,
-        }
-    ), 202
+    return jsonify({
+        "success": True,
+        "message": "Deployment started",
+        "repository": repository_name,
+        "branch": "main",
+        "delivery": delivery,
+    }), 202
 
 
 if __name__ == "__main__":
