@@ -18,6 +18,26 @@ from app import create_app
 
 app = create_app()
 
+# The main application has session CSRF protection for browser POST/PUT/PATCH/
+# DELETE requests. GitHub webhooks do not have a browser session and cannot
+# provide that CSRF token. The webhook is protected separately by GitHub's
+# X-Hub-Signature-256 HMAC, so bypass only the browser-CSRF hook for this one
+# endpoint. Do not disable CSRF globally.
+for _before_request_list in app.before_request_funcs.values():
+    for _index, _hook in enumerate(list(_before_request_list)):
+        if getattr(_hook, "__name__", "") == "_protect_against_csrf":
+            _original_csrf_hook = _hook
+
+            def _webhook_aware_csrf_hook(
+                _original=_original_csrf_hook,
+            ):
+                if request.path == "/git-auto-pull":
+                    return None
+                return _original()
+
+            _before_request_list[_index] = _webhook_aware_csrf_hook
+            break
+
 BASE_DIR = Path(__file__).resolve().parent
 GITHUB_REPO = "https://github.com/mirzazainpkjps-lab/AMSCOPY9.git"
 GITHUB_BRANCH = "main"
@@ -109,8 +129,6 @@ def reload_pythonanywhere() -> bool:
         logger.exception("requests is not installed")
         return False
 
-    # Official PythonAnywhere v0 endpoint. PythonAnywhere documents this
-    # endpoint as POST /api/v0/user/{username}/webapps/{domain_name}/reload/.
     endpoint = (
         f"https://{PA_API_HOST}/api/v0/user/{PA_USERNAME}/"
         f"webapps/{PA_DOMAIN}/reload/"
@@ -182,15 +200,16 @@ def deploy() -> None:
             if code != 0:
                 raise RuntimeError("pip install failed:\n" + output)
 
-        # API reload is the primary reload mechanism.
         if not reload_pythonanywhere():
             logger.warning("API reload failed; trying WSGI touch fallback")
-            wsgi_file = Path("/var/www/mirzazain90_pythonanywhere_com_wsgi.py")
+            wsgi_file = Path("/var/www/mirzazain90.pythonanywhere.com_wsgi.py")
+            if not wsgi_file.exists():
+                wsgi_file = Path("/var/www/mirzazain90_pythonanywhere_com_wsgi.py")
             if wsgi_file.exists():
                 wsgi_file.touch()
                 logger.info("Fallback WSGI reload triggered")
             else:
-                logger.error("Fallback WSGI file not found: %s", wsgi_file)
+                logger.error("Fallback WSGI file not found")
 
         logger.info("GITHUB AUTO DEPLOY SUCCESS")
         logger.info("========================================")
