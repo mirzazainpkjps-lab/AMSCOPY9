@@ -724,10 +724,25 @@ def delete_cf_category(category_id):
     cat = db.session.get(CashFlowCategory, category_id)
     if not cat:
         raise ValueError('Category not found.')
+    linked_modules = []
+    if CashFlowEntry.query.filter(CashFlowEntry.category_id == cat.id).first():
+        linked_modules.append('CashFlowEntry')
+    sub_ids = [
+        row[0] for row in db.session.query(CashFlowSubcategory.id).filter(
+            CashFlowSubcategory.category_id == cat.id
+        ).all()
+    ]
+    if sub_ids:
+        if CashFlowEntry.query.filter(CashFlowEntry.subcategory_id.in_(sub_ids)).first():
+            linked_modules.append('CashFlowEntry (via subcategory)')
+        # If subcategories exist but are not directly linked to entries,
+        # deleting the category will cascade-remove them (clear link message)
+        if not linked_modules:
+            linked_modules.append('CashFlowSubcategory (will be removed with category)')
     if _cf_category_is_used(cat.id):
-        raise ValueError(
-            'This category is used by historical transactions and cannot be deleted. Disable it instead.'
-        )
+        msg = 'This category is linked to: ' + ', '.join(linked_modules) if linked_modules else 'This category is used by historical transactions.'
+        msg += ' Cannot delete — disable it instead, or delete from the linked modules first.'
+        raise ValueError(msg)
     CashFlowSubcategory.query.filter(CashFlowSubcategory.category_id == cat.id).delete(
         synchronize_session=False
     )
@@ -741,10 +756,13 @@ def delete_cf_subcategory(subcategory_id):
     sub = db.session.get(CashFlowSubcategory, subcategory_id)
     if not sub:
         raise ValueError('Sub-category not found.')
+    linked_modules = []
     if CashFlowEntry.query.filter(CashFlowEntry.subcategory_id == sub.id).first():
-        raise ValueError(
-            'This sub-category is used by historical transactions and cannot be deleted. Disable it instead.'
-        )
+        linked_modules.append('CashFlowEntry')
+    if linked_modules:
+        msg = 'This sub-category is linked to: ' + ', '.join(linked_modules)
+        msg += '. Cannot delete — disable it instead, or delete from the linked modules first.'
+        raise ValueError(msg)
     db.session.delete(sub)
     db.session.flush()
     return True
@@ -755,10 +773,13 @@ def delete_cf_party(party_id):
     party = db.session.get(CashFlowParty, party_id)
     if not party:
         raise ValueError('Party not found.')
+    linked_modules = []
     if CashFlowEntry.query.filter(CashFlowEntry.party_id == party.id).first():
-        raise ValueError(
-            'This party is used by historical transactions and cannot be deleted. Disable it instead.'
-        )
+        linked_modules.append('CashFlowEntry')
+    if linked_modules:
+        msg = 'This party is linked to: ' + ', '.join(linked_modules)
+        msg += '. Cannot delete — disable it instead, or delete from the linked modules first.'
+        raise ValueError(msg)
     db.session.delete(party)
     db.session.flush()
     return True

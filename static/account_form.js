@@ -20,8 +20,10 @@
     var PRESET = window.ACCOUNT_PRESET || {};
 
     var fmtMoney = function (n) {
-        var v = parseFloat(n || 0);
-        if (isNaN(v)) v = 0;
+        // FIX: Validate parseFloat results — NaN must never propagate
+        var rawStr = String(n == null ? '0' : n).trim().replace(/,/g, '');
+        var v = parseFloat(rawStr);
+        if (isNaN(v) || !isFinite(v)) v = 0;
         return 'Rs. ' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
@@ -220,7 +222,16 @@
         var map = { active: 'Active', inactive: 'Inactive', archived: 'Archived' };
         return map[s] || s || '—';
     }
-    function val(id) { var el = $(id); return el ? (el.value || '').trim() : ''; }
+    function val(id) {
+        var el = $(id);
+        if (!el) return '';
+        var raw = (el.value || '').trim();
+        // FIX: Reject clearly invalid numeric input; treat empty string as '' (not 0)
+        if (raw === '' || raw === '-') return '';
+        var parsed = parseFloat(raw);
+        if (isNaN(parsed) || !isFinite(parsed)) return '';
+        return raw;
+    }
     function radioVal(name) {
         var checked = document.querySelector('input[name="' + name + '"]:checked');
         return checked ? (checked.value || '').trim() : '';
@@ -281,7 +292,7 @@
         if (newEl) newEl.textContent = fmtMoney(des);
         // Reason is required only when an adjustment is actually happening.
         var reasonWrap = $('adjustment_reason_wrap');
-        if (reasonWrap) reasonWrap.style.display = (Math.abs(diff) < 0.005) ? 'none' : '';
+        if (reasonWrap) reasonWrap.style.display = (Math.abs(diff) < 0.01) ? 'none' : '';  // FIX: use stable threshold 0.01 instead of unstable 0.005
         var previewCur = $('pv_current_balance');
         if (previewCur) previewCur.textContent = fmtMoney(cur);
         var previewNew = $('pv_new_balance');

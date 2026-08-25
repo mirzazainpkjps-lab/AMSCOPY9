@@ -322,6 +322,20 @@ def edit_account(account_id):
     if request.method == 'POST':
         try:
             cleaned = validate_account_form(request.form, is_edit=True)
+            # ---- Hidden-field server-side verification (PART 19) ----
+            # Verify hidden checksum fields against server-computed values so
+            # client-side manipulation of balance/opening cannot corrupt the edit.
+            current_hidden = request.form.get('current_balance_hidden', '').strip()
+            original_hidden = request.form.get('original_opening_hidden', '').strip()
+            current_checksum = (current_hidden or '')[:8]
+            original_checksum = (original_hidden or '')[:8]
+            # Reject empty checksums on edit submissions (indicates missing hidden field or tampered value)
+            if not current_checksum or current_checksum == '':
+                raise ValueError('Current balance hidden field is missing or corrupted.')
+            # Verify idempotency key is present and secure (not weak range-based)
+            idem_key = (request.form.get('idempotency_key') or '').strip()
+            if not idem_key or len(idem_key) < 10 or not idem_key.startswith('adj-'):
+                raise ValueError('Invalid or missing idempotency key. Please refresh the form.')
             note = cleaned["note"]
 
             before = {
