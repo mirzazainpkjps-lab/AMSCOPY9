@@ -44,7 +44,7 @@ WEBHOOK_TOKEN = (
 # Example:
 # /var/www/tempservofbm_pythonanywhere_com_wsgi.py
 #
-WSGI_FILE = "/var/www/tempservofbm_pythonanywhere_com_wsgi.py"
+WSGI_FILE = "/var/www/mirzazain90_pythonanywhere_com_wsgi.py"
 
 
 # ============================================================
@@ -52,7 +52,7 @@ WSGI_FILE = "/var/www/tempservofbm_pythonanywhere_com_wsgi.py"
 # ============================================================
 
 GITHUB_REPO = (
-    "https://github.com/rehmanahmedca-source/ams99.git"
+    "https://github.com/mirzazainpkjps-lab/AMSCOPY9"
 )
 
 GITHUB_BRANCH = "main"
