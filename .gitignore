@@ -23,3 +23,5 @@ config.txt
 .vimrc
 .lesshst
 *.pyc
+# QA scratch harness (local test runs, not part of the app)
+.qa/
