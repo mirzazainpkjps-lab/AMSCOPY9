@@ -417,7 +417,8 @@ def financial_ledger(client_id):
                 'qty_dispatched': 0,
                 'bill_no': b.manual_bill_no or b.auto_bill_no or f"BK-{b.id}",
                 'nimbus_no': 'Booking',
-                'type': 'Booking'
+                'type': 'Booking',
+                'note': (b.note or '').strip()
             })
 
     # Process Deliveries/Entries
@@ -448,7 +449,8 @@ def financial_ledger(client_id):
                 'qty_dispatched': 0,
                 'bill_no': bill_ref,
                 'nimbus_no': d.nimbus_no or 'Material Return',
-                'type': 'Return'
+                'type': 'Return',
+                'note': (d.note or '').strip()
             })
             continue
 
@@ -474,7 +476,8 @@ def financial_ledger(client_id):
                 'qty_dispatched': d.qty,
                 'bill_no': bill_ref,
                 'nimbus_no': d.nimbus_no or 'Booking Cancel',
-                'type': 'Cancel'
+                'type': 'Cancel',
+                'note': (d.note or '').strip()
             })
             continue
 
@@ -503,7 +506,8 @@ def financial_ledger(client_id):
                 'qty_dispatched': d.qty,
                 'bill_no': bill_ref,
                 'nimbus_no': d.nimbus_no,
-                'type': 'Dispatch'
+                'type': 'Dispatch',
+                'note': (d.note or '').strip()
             })
             if bill_ref:
                 seen_material_bills.add(bill_ref)
@@ -555,7 +559,8 @@ def financial_ledger(client_id):
                 'qty_dispatched': item.qty,
                 'bill_no': bill_ref,
                 'nimbus_no': 'Direct Sale',
-                'type': 'Dispatch'
+                'type': 'Dispatch',
+                'note': (s.note or '').strip()
             })
 
     # Financial rows can also be appended during delivery processing (e.g., non-booking

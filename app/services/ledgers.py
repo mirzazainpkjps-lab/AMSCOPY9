@@ -226,6 +226,7 @@ def _build_client_ledger_rows(client):
             'date_display': _fmt_dt(b.date_posted),
             'description': booking_desc,
             'bill_no': booking_bill_ref,
+            'note': (b.note or '').strip(),
             'debit': debit,
             'credit': credit,
             'type': 'Booking',
@@ -241,6 +242,7 @@ def _build_client_ledger_rows(client):
                 'date_display': _fmt_dt(b.date_posted),
                 'description': discount_desc,
                 'bill_no': booking_bill_ref,
+                'note': discount_reason or (b.note or '').strip(),
                 'debit': 0,
                 'credit': float(discount or 0),
                 'type': None,
@@ -289,6 +291,7 @@ def _build_client_ledger_rows(client):
             'date_display': _fmt_dt(p.date_posted),
             'description': payment_desc,
             'bill_no': payment_bill_ref,
+            'note': (p.note or '').strip(),
             'debit': debit,
             'credit': credit,
             'type': 'Payment',
@@ -306,6 +309,7 @@ def _build_client_ledger_rows(client):
                     'date_display': _fmt_dt(w.date_posted or p.date_posted),
                     'description': w_desc,
                     'bill_no': w.bill_no or payment_bill_ref,
+                    'note': (w.reason or w.note or p.note or '').strip(),
                     'debit': 0,
                     'credit': float(w.amount or 0),
                     'type': None,
@@ -323,6 +327,7 @@ def _build_client_ledger_rows(client):
                     'date_display': _fmt_dt(p.date_posted),
                     'description': discount_desc,
                     'bill_no': payment_bill_ref,
+                    'note': discount_reason or (p.note or '').strip(),
                     'debit': 0,
                     'credit': p_discount,
                     'type': None,
@@ -350,6 +355,7 @@ def _build_client_ledger_rows(client):
             'date_display': _fmt_dt(w.date_posted),
             'description': w_desc,
             'bill_no': _waive_bill_ref(w),
+            'note': (w.reason or w.note or '').strip(),
             'debit': 0,
             'credit': float(w.amount or 0),
             'type': None,
@@ -383,6 +389,7 @@ def _build_client_ledger_rows(client):
                 'date_display': _fmt_dt(s.date_posted),
                 'description': sale_desc,
                 'bill_no': sale_bill_ref,
+                'note': (s.note or '').strip(),
                 'debit': debit,
                 'credit': credit,
                 'type': 'DirectSale',
@@ -398,6 +405,7 @@ def _build_client_ledger_rows(client):
                 'date_display': _fmt_dt(s.date_posted),
                 'description': discount_desc,
                 'bill_no': sale_bill_ref,
+                'note': discount_reason or (s.note or '').strip(),
                 'debit': 0,
                 'credit': float(discount or 0),
                 'type': None,
@@ -411,6 +419,7 @@ def _build_client_ledger_rows(client):
                 'date_display': _fmt_dt(s.date_posted),
                 'description': f'Delivery Rent Variance (Company Loss) Rs.{rent_loss:.2f}',
                 'bill_no': sale_bill_ref,
+                'note': (s.note or '').strip(),
                 'debit': 0,
                 'credit': 0,
                 'type': None,
@@ -441,6 +450,7 @@ def _build_client_ledger_rows(client):
             'date_display': _fmt_dt(cancel_dt),
             'description': desc,
             'bill_no': ce.bill_no or '',
+            'note': (ce.note or '').strip(),
             'debit': 0,
             'credit': float(amount or 0),
             'type': 'Entry',
@@ -463,6 +473,7 @@ def _build_client_ledger_rows(client):
             'date_display': _fmt_dt(opening_dt),
             'description': 'Opening Balance',
             'bill_no': 'OPENING',
+            'note': (getattr(client, 'opening_balance_note', None) or getattr(client, 'page_notes', None) or getattr(client, 'note', None) or '').strip(),
             'debit': opening_balance if opening_balance > 0 else 0,
             'credit': abs(opening_balance) if opening_balance < 0 else 0,
             'type': None,
@@ -522,6 +533,7 @@ def _build_client_ledger_rows(client):
                 'bill_no': b.manual_bill_no or b.auto_bill_no or f"BK-{b.id}",
                 'nimbus_no': 'Booking',
                 'type': 'Booking',
+                'note': (b.note or '').strip(),
                 'source_type': 'Booking',
                 'source_id': b.id
             })
@@ -555,6 +567,7 @@ def _build_client_ledger_rows(client):
             'bill_no': bill_ref,
             'nimbus_no': d.nimbus_no or 'Booking Cancel',
             'type': row_type,
+            'note': (d.note or '').strip(),
             'source_type': 'Entry',
             'source_id': d.id
         })
@@ -625,7 +638,8 @@ def _build_supplier_ledger_rows(supplier):
             'description': 'Opening Balance',
             'credit': opening_balance if opening_balance > 0 else 0,
             'debit': abs(opening_balance) if opening_balance < 0 else 0,
-            'id': 0
+            'id': 0,
+            'note': (getattr(supplier, 'opening_balance_note', None) or getattr(supplier, 'note', None) or '').strip()
         })
     for g in grns:
         total = calculate_grn_total(g)

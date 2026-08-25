@@ -359,14 +359,15 @@ function submitCancelSelection{{ client.id }}() {
                             <th>Material</th>
                             <th class="text-end">Qty Added</th>
                             <th class="text-end">Dispatched</th>
-                            <th class="text-end pe-3">Total Remaining</th>
+                            <th class="text-end">Total Remaining</th>
+                            <th>Notes</th>
                             <th class="text-end pe-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for material_name, items in material_history_grouped.items() %}
                         <tr style="background: #0b1220; border-top: 2px solid #334155; border-bottom: 1px solid #334155;">
-                            <td class="ps-3 py-2 fw-bold text-info stack-card-heading" colspan="7">
+                            <td class="ps-3 py-2 fw-bold text-info stack-card-heading" colspan="8">
                                 Material: {{ material_name }} <span class="text-white-50">({{ items|length }} rows)</span>
                             </td>
                         </tr>
@@ -392,12 +393,15 @@ function submitCancelSelection{{ client.id }}() {
                                 {% if m.type == 'Cancel' or m.nimbus_no == 'Booking Cancel' %}
                                 <td class="text-end text-warning fw-bold" data-label="Qty Added">booking cancelled</td>
                                 <td class="text-end text-warning fw-bold" data-label="Dispatched">{{ "{:,.3f}".format(m.qty_dispatched or 0).rstrip('0').rstrip('.') if m.qty_dispatched > 0 else '---' }}</td>
-                                <td class="text-end pe-3 fw-bold text-info" data-label="Total Remaining">{{ "{:,.3f}".format(m.balance or 0).rstrip('0').rstrip('.') }}</td>
+                                <td class="text-end fw-bold text-info" data-label="Total Remaining">{{ "{:,.3f}".format(m.balance or 0).rstrip('0').rstrip('.') }}</td>
                                 {% else %}
                                 <td class="text-end text-success fw-bold" data-label="Qty Added">{{ "{:,.3f}".format(m.qty_added or 0).rstrip('0').rstrip('.') if m.qty_added > 0 else '---' }}</td>
                                 <td class="text-end text-danger fw-bold" data-label="Dispatched">{{ "{:,.3f}".format(m.qty_dispatched or 0).rstrip('0').rstrip('.') if m.qty_dispatched > 0 else '---' }}</td>
-                                <td class="text-end pe-3 fw-bold text-info" data-label="Total Remaining">{{ "{:,.3f}".format(m.balance or 0).rstrip('0').rstrip('.') }}</td>
+                                <td class="text-end fw-bold text-info" data-label="Total Remaining">{{ "{:,.3f}".format(m.balance or 0).rstrip('0').rstrip('.') }}</td>
                                 {% endif %}
+                                <td class="text-white-50 small" data-label="Notes">
+                                    <span class="small text-white-50" title="{{ m.note or '' }}">{{ m.note or '—' }}</span>
+                                </td>
                                 <td class="text-end pe-3 stack-actions-cell" data-label="Actions">
                                     {% if m.source_type == 'Booking' and m.source_id %}
                                     <a href="{{ url_for('view_bill_detail', type='Booking', id=m.source_id) }}" class="btn btn-sm btn-outline-info me-1" title="View"><i class="bi bi-eye"></i></a>

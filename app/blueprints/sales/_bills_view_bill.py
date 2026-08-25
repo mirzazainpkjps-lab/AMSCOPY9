@@ -162,6 +162,9 @@ def view_bill(bill_no):
         tx_code, tx_label, tx_note = _resolve_transaction_type('Payment', payment, entry_hint_id=entry_hint_id)
         return render_template('payment_receipt.html', bill=payment, type='Payment', items=[], client=client, client_balance=client_balance, previous_balance=previous_balance, recent_deliveries=recent_deliveries, material_ledger_recent=material_ledger_recent, material_stock_summary=material_stock_summary, clients=all_clients, materials=all_materials, transaction_type_code=tx_code, transaction_type_label=tx_label, transaction_type_note=tx_note, pk_now=pk_now)
     if sale:
+        if not (getattr(sale, 'note', None) or '').strip():
+            if getattr(sale, 'invoice', None) and (getattr(sale.invoice, 'note', None) or '').strip():
+                sale.note = sale.invoice.note.strip()
         if not (sale.driver_name or '').strip():
             inferred_driver = _infer_driver_name_from_refs(_direct_sale_bill_refs(sale))
             if inferred_driver:
@@ -227,6 +230,14 @@ def view_bill(bill_no):
         tx_code, tx_label, tx_note = _resolve_transaction_type('DirectSale', sale, entry_hint_id=entry_hint_id)
         return render_template('view_bill.html', bill=sale, type='DirectSale', items=bill_items, client=client, client_balance=client_balance, previous_balance=previous_balance, recent_deliveries=recent_deliveries, material_ledger_recent=material_ledger_recent, material_stock_summary=material_stock_summary, clients=all_clients, materials=all_materials, transaction_type_code=tx_code, transaction_type_label=tx_label, transaction_type_note=tx_note, direct_sale_rent_reconciliation=direct_sale_rent_reconciliation, delivery_people=delivery_people, pk_now=pk_now)
     if invoice:
+        if not (getattr(invoice, 'note', None) or '').strip():
+            ds_notes = [ds.note.strip() for ds in (getattr(invoice, 'direct_sales', None) or []) if (getattr(ds, 'note', None) or '').strip()]
+            if ds_notes:
+                invoice.note = ' | '.join(dict.fromkeys(ds_notes))
+            elif getattr(invoice, 'entries', None):
+                entry_notes = [e.note.strip() for e in invoice.entries if (getattr(e, 'note', None) or '').strip()]
+                if entry_notes:
+                    invoice.note = ' | '.join(dict.fromkeys(entry_notes))
         invoice.amount = invoice.total_amount
         driver_name = ''
         if getattr(invoice, 'direct_sales', None):
@@ -306,7 +317,8 @@ def view_bill(bill_no):
             reason=pending.reason or '',
             nimbus_no=pending.nimbus_no or '',
             method='',
-            photo_path=''
+            photo_path='',
+            note=(pending.note or '').strip()
         )
         tx_code, tx_label, tx_note = _resolve_transaction_type('PendingBill', pending_bill_view, entry_hint_id=entry_hint_id)
         return render_template('view_bill.html', bill=pending_bill_view, type='PendingBill', items=[], client=client, client_balance=client_balance, previous_balance=previous_balance, recent_deliveries=recent_deliveries, material_ledger_recent=material_ledger_recent, material_stock_summary=material_stock_summary, clients=all_clients, materials=all_materials, transaction_type_code=tx_code, transaction_type_label=tx_label, transaction_type_note=tx_note, pk_now=pk_now)

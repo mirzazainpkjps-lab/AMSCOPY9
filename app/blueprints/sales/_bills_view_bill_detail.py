@@ -13,6 +13,9 @@ def view_bill_detail(type, id):
         bill = Payment.query.get_or_404(id)
     elif type == 'DirectSale':
         bill = DirectSale.query.get_or_404(id)
+        if not (getattr(bill, 'note', None) or '').strip():
+            if getattr(bill, 'invoice', None) and (getattr(bill.invoice, 'note', None) or '').strip():
+                bill.note = bill.invoice.note.strip()
         sale_entries = Entry.query.filter(
             Entry.source_module == 'sales',
             Entry.source_table == 'direct_sale',

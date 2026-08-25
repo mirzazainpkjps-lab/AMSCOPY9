@@ -296,6 +296,7 @@ def material_ledger_page(mat_id):
             'date': date_display,
             'item': e.material,
             'bill_no': e.bill_no or e.auto_bill_no or '',
+            'note': (e.note or '').strip(),
             'add': qty_add,
             'delivered': qty_delivered,
             'balance': running_balance

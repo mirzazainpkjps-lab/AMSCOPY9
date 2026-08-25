@@ -1123,6 +1123,10 @@ def rebuild_direct_sale_effects(sale, *, old_refs=None, old_client_code=None, ol
             e.driver_name = sale.driver_name
             e.note = sale.note
             _stamp_source(e, 'sales', 'direct_sale', sale.id, bill_ref, e.client_category or category)
+        if getattr(sale, 'invoice_id', None):
+            inv = db.session.get(Invoice, sale.invoice_id)
+            if inv:
+                inv.note = sale.note
         _sync_direct_sale_pending_bill(sale, (sale.items[0].product_name if sale.items else ''), extra_void_refs=refs)
         _sync_delivery_rent_for_sale(sale, rent_amount=float(getattr(sale, 'delivery_rent_cost', 0) or 0), rent_note='')
         _sync_direct_sale_waive_off(sale)
@@ -1141,6 +1145,10 @@ def rebuild_direct_sale_effects(sale, *, old_refs=None, old_client_code=None, ol
         client_code=client_code,
         client_name=client_name
     )
+    if getattr(sale, 'invoice_id', None):
+        inv = db.session.get(Invoice, sale.invoice_id)
+        if inv:
+            inv.note = sale.note
     _sync_direct_sale_pending_bill(sale, (sale.items[0].product_name if sale.items else ''), extra_void_refs=refs)
     _sync_delivery_rent_for_sale(sale, rent_amount=float(getattr(sale, 'delivery_rent_cost', 0) or 0), rent_note='')
     _sync_direct_sale_waive_off(sale)

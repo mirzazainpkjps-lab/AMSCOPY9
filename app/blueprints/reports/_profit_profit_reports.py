@@ -413,6 +413,7 @@ def profit_reports():
             'profit': profit,
             'is_loss': profit < 0,
             'cogs_known': cogs_known,
+            'note': (sale.note or '').strip(),
             'grn_item_id': (int(item.grn_item_id) if getattr(item, 'grn_item_id', None) else None),
             'grn_id': (int(grn_info.get('grn_id')) if grn_info else None),
             'grn_bill': (grn_info.get('grn_bill') if grn_info else None),

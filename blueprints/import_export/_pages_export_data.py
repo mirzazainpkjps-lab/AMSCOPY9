@@ -45,7 +45,7 @@ def export_data():
                 'CEMENT_BRAND': x.material,
                 'QTY': x.qty,
                 'NIMBUS': x.nimbus_no,
-                'NOTES': '',
+                'NOTES': x.note or '',
                 'SOURCE': 'CEMENT',
                 'MATCH_STATUS': match_status
             })
@@ -110,7 +110,8 @@ def export_data():
             'reason': x.reason,
             'nimbus': x.nimbus_no,
             'is_paid': x.is_paid,
-            'created_at': x.created_at
+            'created_at': x.created_at,
+            'note': x.note or ''
         } for x in bills]
     elif dataset == 'unpaid_transactions':
         query = PendingBill.query.filter(PendingBill.is_void == False)
@@ -157,7 +158,8 @@ def export_data():
             'reason': x.reason,
             'nimbus': x.nimbus_no,
             'is_paid': x.is_paid,
-            'created_at': x.created_at
+            'created_at': x.created_at,
+            'note': x.note or ''
         } for x in bills]
     else:
         return "Invalid dataset", 400

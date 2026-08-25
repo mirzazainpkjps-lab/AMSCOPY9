@@ -142,6 +142,9 @@ def download_invoice(bill_no):
     elif sale:
         bill_obj = sale
         bill_type = 'DirectSale'
+        if not (getattr(sale, 'note', None) or '').strip():
+            if getattr(sale, 'invoice', None) and (getattr(sale.invoice, 'note', None) or '').strip():
+                sale.note = sale.invoice.note.strip()
         sale_entries = Entry.query.filter(
             Entry.source_module == 'sales',
             Entry.source_table == 'direct_sale',
@@ -203,6 +206,14 @@ def download_invoice(bill_no):
         bill_obj = invoice
         bill_type = 'Invoice'
         invoice.amount = invoice.total_amount
+        if not (getattr(invoice, 'note', None) or '').strip():
+            ds_notes = [ds.note.strip() for ds in (getattr(invoice, 'direct_sales', None) or []) if (getattr(ds, 'note', None) or '').strip()]
+            if ds_notes:
+                invoice.note = ' | '.join(dict.fromkeys(ds_notes))
+            elif getattr(invoice, 'entries', None):
+                entry_notes = [e.note.strip() for e in invoice.entries if (getattr(e, 'note', None) or '').strip()]
+                if entry_notes:
+                    invoice.note = ' | '.join(dict.fromkeys(entry_notes))
         driver_name = ''
         if getattr(invoice, 'direct_sales', None):
             for ds in invoice.direct_sales:
@@ -278,7 +289,8 @@ def download_invoice(bill_no):
             reason=pending.reason or '',
             nimbus_no=pending.nimbus_no or '',
             method='',
-            photo_path=''
+            photo_path='',
+            note=(pending.note or '').strip()
         )
         bill_type = 'PendingBill'
         items = []

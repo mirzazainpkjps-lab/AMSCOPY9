@@ -57,6 +57,7 @@
                 <th>Client</th>
                 <th class="text-right">Qty</th>
                 <th>Bill/Nimbus</th>
+                <th>Notes</th>
             </tr>
         </thead>
         <tbody>
@@ -69,6 +70,7 @@
                 <td>{{ e.client or '---' }}</td>
                 <td class="text-right">{{ e.qty|int }}</td>
                 <td>{{ e.bill_no or '---' }} / {{ e.nimbus_no or '---' }}</td>
+                <td>{{ e.note or '—' }}</td>
             </tr>
             {% endfor %}
         </tbody>

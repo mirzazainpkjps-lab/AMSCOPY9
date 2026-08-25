@@ -79,6 +79,7 @@
                         <th>Type</th>
                         <th class="text-end">Qty</th>
                         <th>Bill No</th>
+                        <th>Notes</th>
                         <th class="pe-3">Photo</th>
                     </tr>
                 </thead>
@@ -118,6 +119,9 @@
                                 <span class="text-white-50">---</span>
                             {% endif %}
                         </td>
+                        <td>
+                            <span class="small text-white-50" title="{{ e.note or '' }}">{{ e.note or '—' }}</span>
+                        </td>
                         <td class="pe-3">
                             {% set _photo = pending_photos.get(e.bill_no) if pending_photos else None %}
                             {% if _photo %}
@@ -128,7 +132,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="7" class="text-center text-white-50 py-4">No movement records found for this client.</td></tr>
+                    <tr><td colspan="8" class="text-center text-white-50 py-4">No movement records found for this client.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

@@ -211,7 +211,7 @@ def _build_story(blocks, body_font, bold_font, small_size):
 
     normal = ParagraphStyle(
         'pdfBody', fontName=body_font, fontSize=8.2, leading=10.4,
-        spaceAfter=3, wordWrap='CJK',
+        spaceAfter=3, wordWrap='LTR',
     )
     small = ParagraphStyle(
         'pdfSmall', parent=normal, fontSize=small_size, leading=small_size + 1.6,
@@ -225,7 +225,7 @@ def _build_story(blocks, body_font, bold_font, small_size):
         for tag, size in _HEADING_TAGS.items()
     }
     cell = ParagraphStyle(
-        'pdfCell', fontName=body_font, fontSize=7.4, leading=9.0, wordWrap='CJK',
+        'pdfCell', fontName=body_font, fontSize=7.4, leading=9.0, wordWrap='LTR',
     )
     cell_bold = ParagraphStyle('pdfCellBold', parent=cell, fontName=bold_font)
 

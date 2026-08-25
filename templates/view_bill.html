@@ -393,6 +393,7 @@
         </div>
 
         <!-- Transaction Details (if any) -->
+        {% set bill_note = (bill.note|default('', true)|string|trim) %}
         {% set has_tx_details =
             (bill.method is defined and bill.method) or
             (bill.payment_type is defined and bill.payment_type) or
@@ -401,7 +402,8 @@
             (bill.account_no is defined and bill.account_no) or
             (bill.supplier_invoice_no is defined and bill.supplier_invoice_no) or
             (bill.driver_name is defined and bill.driver_name) or
-            (bill.note is defined and bill.note)
+            (delivery_people is defined and delivery_people) or
+            (bill_note)
         %}
         {% if has_tx_details %}
         <div class="rcpt-section-title">Transaction Details</div>
@@ -429,10 +431,10 @@
             {% if bill.supplier_invoice_no is defined and bill.supplier_invoice_no %}
             <div class="rcpt-detail-row"><span class="rcpt-detail-label">Supplier Invoice #</span><span class="rcpt-detail-val">{{ bill.supplier_invoice_no }}</span></div>
             {% endif %}
-            {% if bill.note is defined and bill.note %}
+            {% if bill_note %}
             <div class="rcpt-detail-row" style="flex-direction:column; gap:2px;">
                 <span class="rcpt-detail-label">Notes</span>
-                <span style="font-weight:700;">{{ bill.note }}</span>
+                <span style="font-weight:700;">{{ bill_note }}</span>
             </div>
             {% endif %}
         </div>

@@ -192,6 +192,7 @@
                     <th style="width:75px;">Date/Time</th>
                     <th>Description</th>
                     <th style="width:75px;">Bill No</th>
+                    <th>Notes</th>
                     <th class="text-end" style="width:70px;">Debit</th>
                     <th class="text-end" style="width:70px;">Credit</th>
                     <th class="text-end" style="width:80px;">Balance</th>
@@ -203,10 +204,13 @@
                     <td>{{ row.date_display or '' }}</td>
                     <td>{{ row.description }}</td>
                     <td>{{ row.bill_no or '-' }}</td>
+                    <td>{{ row.note or '-' }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(row.debit) if row.debit else '-' }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(row.credit) if row.credit else '-' }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(row.balance or 0) }}</td>
                 </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center">No financial transaction records found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -223,11 +227,12 @@
                     <th class="text-end" style="width:70px;">Qty Added</th>
                     <th class="text-end" style="width:80px;">Qty Delivered</th>
                     <th class="text-end" style="width:80px;">Remaining</th>
+                    <th>Notes</th>
                 </tr>
             </thead>
             <tbody>
                 {% for material_name, rows in material_history_grouped.items() %}
-                <tr class="material-heading"><td colspan="6">{{ rows[0].material_display or rows[0].material or material_name }}</td></tr>
+                <tr class="material-heading"><td colspan="7">{{ rows[0].material_display or rows[0].material or material_name }}</td></tr>
                     {% for row in rows %}
                     <tr>
                         <td>{{ row.date or '' }}</td>
@@ -236,8 +241,11 @@
                         <td class="text-end">{{ "{:,.2f}".format(row.qty_added or 0) if row.qty_added else '-' }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(row.qty_dispatched or 0) if row.qty_dispatched else '-' }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(row.balance or 0) }}</td>
+                        <td>{{ row.note or '-' }}</td>
                     </tr>
                     {% endfor %}
+                {% else %}
+                <tr><td colspan="7" class="text-center">No material transaction records found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -252,6 +260,7 @@
                     <th class="text-end" style="width:85px;">Amount</th>
                     <th style="width:60px;">Status</th>
                     <th>Reason</th>
+                    <th>Notes</th>
                 </tr>
             </thead>
             <tbody>
@@ -261,9 +270,10 @@
                     <td class="text-end">{{ "{:,.2f}".format(bill.amount or 0) }}</td>
                     <td>{{ 'Paid' if bill.is_paid else 'Pending' }}</td>
                     <td>{{ bill.reason or '' }}</td>
+                    <td>{{ bill.note or '-' }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="4" class="text-center">No active pending/paid bill rows found.</td></tr>
+                <tr><td colspan="5" class="text-center">No active pending/paid bill rows found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
