@@ -53,7 +53,7 @@ def rename_material_label():
         flash(f'Updated "{old_label}" → "{target_mat.name}" ({total} rows). {details}', 'success')
     except Exception as exc:
         db.session.rollback()
-        flash(f'Label rename failed: {exc}', 'danger')
+        flash('Label rename failed: the label could not be renamed. Please try again.', 'danger')
 
     return redirect(url_for('materials'))
 

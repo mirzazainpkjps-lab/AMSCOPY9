@@ -42,6 +42,38 @@ def app(app_factory):
     return app_factory()
 
 
+def make_csrf_client(app):
+    """Flask test client that attaches the session CSRF token automatically.
+
+    The production app enforces session-bound CSRF on every mutating route;
+    this wrapper mirrors a real browser by injecting the token into form
+    posts.  Tests that explicitly exercise the CSRF gate should build their
+    own raw client via ``app.test_client()``.
+    """
+    raw = app.test_client()
+
+    class _ClientProxy:
+        def __getattr__(self, name):
+            return getattr(raw, name)
+
+        def post(self, *args, **kwargs):
+            data = kwargs.get("data")
+            if isinstance(data, dict) and "_csrf_token" not in data:
+                token = None
+                with raw.session_transaction() as sess:
+                    token = sess.get("_csrf_token")
+                if not token:
+                    token = "test-csrf-token"
+                    with raw.session_transaction() as sess:
+                        sess["_csrf_token"] = token
+                data = dict(data)
+                data["_csrf_token"] = token
+                kwargs["data"] = data
+            return raw.post(*args, **kwargs)
+
+    return _ClientProxy()
+
+
 @pytest.fixture()
 def client(app):
-    return app.test_client()
+    return make_csrf_client(app)

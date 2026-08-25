@@ -195,7 +195,7 @@ def pay_delivery_rent(alloc_id):
     except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('Delivery rent payment failed')
-        flash(f'Unable to record the delivery rent payment: {exc}', 'danger')
+        flash('Unable to record the delivery rent payment: the payment could not be saved. Please check the details and try again.', 'danger')
     return redirect(url_for('delivery_rents_page'))
 
 

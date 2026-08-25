@@ -267,10 +267,10 @@ def add_material_return():
         db.session.commit()
         flash('Material return saved successfully.', 'success')
         return redirect(url_for('material_returns_page'))
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        logging.error(f"Material Return Error: {str(e)}")
-        flash(f'Error processing material return: {str(e)}', 'danger')
+        logging.getLogger('returns').exception('Material return save failed')
+        flash('Error processing material return: the return could not be saved. Please check the details and try again.', 'danger')
         return redirect(url_for('material_returns_page'))
 
 
@@ -474,10 +474,10 @@ def edit_material_return(id):
         db.session.commit()
         flash('Material return updated successfully.', 'success')
         return redirect(url_for('material_returns_page'))
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        logging.error(f"Material Return Edit Error: {str(e)}")
-        flash(f'Error updating material return: {str(e)}', 'danger')
+        logging.getLogger('returns').exception('Material return edit failed')
+        flash('Error updating material return: the return could not be updated. Please check the details and try again.', 'danger')
         return redirect(url_for('material_returns_page', edit_id=id))
 
 

@@ -108,7 +108,7 @@ def import_dispatch_data():
         flash(f'Imported {count} dispatching entries successfully.', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Import failed: {str(e)}', 'danger')
+        flash('Import failed: the file could not be processed. No data was changed. Check the file format and try again.', 'danger')
 
     return redirect(url_for('import_export.import_export_page'))
 

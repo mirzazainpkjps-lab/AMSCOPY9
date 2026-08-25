@@ -304,7 +304,7 @@ def tenants_backup_history_restore(history_id):
         flash(f"Backup restored to tenant '{tenant_name}' successfully.", 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Backup restore failed: {e}', 'danger')
+        flash('Backup restore failed: the backup could not be restored. Please try again.', 'danger')
 
     return redirect(url_for('tenants_backup_history', tenant_id=tenant_id))
 

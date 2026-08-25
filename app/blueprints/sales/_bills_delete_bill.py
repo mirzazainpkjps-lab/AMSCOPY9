@@ -17,7 +17,7 @@ def delete_bill(type, id):
             flash('Record not found', 'danger')
     except Exception as exc:
         db.session.rollback()
-        flash(f'Unable to delete: {exc}', 'danger')
+        flash('Unable to delete: the record could not be deleted. Please try again.', 'danger')
 
     if type == 'Booking':
         return redirect(url_for('bookings_page'))

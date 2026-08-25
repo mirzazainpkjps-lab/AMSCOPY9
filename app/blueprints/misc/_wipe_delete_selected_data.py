@@ -116,9 +116,9 @@ def delete_selected_data():
 
     try:
         backup_info = _create_pre_wipe_safety_backups(targets)
-    except Exception as e:
+    except Exception:
         logging.getLogger('app').exception('Pre-wipe safety backup failed.')
-        flash(f'Pre-wipe backup failed. Wipe blocked: {e}', 'danger')
+        flash('Pre-wipe backup failed, so the wipe was blocked. No data was changed. Please try again.', 'danger')
         return redirect(url_for('settings'))
 
     _RESET_CONTEXT = 'granular_wipe'
@@ -149,12 +149,15 @@ def delete_selected_data():
             _tq(DeliveryItem).delete()
             _tq(Delivery).delete()
             _tq(Entry).delete()
-            _tq(GRNItem).delete()
-            _tq(GRN).delete()
-            # --- allocation rows referencing sales/booking/grn items ---
+            # --- allocation rows reference sale items AND grn items, so they
+            #     go first; then sale line items (which reference GRN lots
+            #     via grn_item_id) before the lots themselves ---
             _tq(GRNAllocation).delete()
             _tq(BookingAllocationRepairArchive).delete()
             _tq(BookingAllocation).delete()
+            _tq(DirectSaleItem).delete()
+            _tq(GRNItem).delete()
+            _tq(GRN).delete()
             # --- driver payments: void their ledger rows, then remove rows ---
             _purge_driver_payment_ledger(_tq(DeliveryPersonPayment))
             _tq(DeliveryPersonPayment).delete()
@@ -166,8 +169,7 @@ def delete_selected_data():
             _tq(MaterialReturn).delete()
             _tq(Payment).delete()
             _tq(SupplierPayment).delete()
-            # --- sales & bookings (children first, invoice last of the group) ---
-            _tq(DirectSaleItem).delete()
+            # --- sales & bookings (children already gone; invoice last) ---
             _tq(DirectSale).delete()
             _tq(DirectSaleDraft).delete()
             _tq(BookingItem).delete()
@@ -184,6 +186,10 @@ def delete_selected_data():
             _tq(CashFlowEntryAudit).delete()
             _tq(CashFlowEntry).delete()
             _tq(AccountTransaction).delete()
+            # Reconciliation chains link to their predecessor via a self-FK;
+            # null the chain before the bulk delete so SQLite's immediate
+            # FK checks never abort mid-wipe.
+            _tq(AccountReconciliation).update({'previous_reconciliation_id': None}, synchronize_session=False)
             _tq(AccountReconciliation).delete()
             _tq(FbmCashDrawerEntry).delete()
             _tq(FbmCashDrawerCategory).delete()
@@ -237,9 +243,16 @@ def delete_selected_data():
         if 'grn' in targets:
             # FIFO allocation rows reference grn items — clear them first.
             _tq(GRNAllocation).delete()
+            # Sale line items may reference GRN lots (grn_item_id → grn_item).
+            # Unlink before deleting the lots, or the FK gate aborts the wipe.
+            _tq(DirectSaleItem).update({'grn_item_id': None}, synchronize_session=False)
             _tq(GRNItem).delete()
             _tq(GRN).delete()
             deleted_info.append('GRN Records')
+
+        if 'entry' in targets:
+            _tq(Entry).delete()
+            deleted_info.append('Stock Entries')
 
         if 'supplier_payments' in targets:
             _tq(SupplierPayment).delete()
@@ -509,22 +522,31 @@ def delete_selected_data():
         if orphan_invoice_count:
             deleted_info.append(f'Orphan Invoices ({orphan_invoice_count})')
 
+        # Any dataset that removed stock movements (entries, sales, GRNs,
+        # materials) leaves material totals stale; recompute them from the
+        # surviving entries so the wiped store stays internally consistent.
+        if set(targets).intersection({'entry', 'direct_sales', 'grn', 'materials', 'material_returns'}):
+            _rebuild_material_totals()
+
         if history_row:
             history_row.wipe_status = 'completed'
             history_row.note = f'Completed selective wipe. Targets: {", ".join(sorted(set(targets)))}'
         db.session.commit()
         _complete_intentional_wipe_workflow(targets, deleted_info, backup_info, 'selective')
         flash(f'Data Wiped: {", ".join(deleted_info)}', 'danger')
-    except Exception as e:
+    except Exception as exc:
         db.session.rollback()
+        # Log the full technical detail server-side; the user gets a clean
+        # message (never SQL, table names or driver URLs).
+        logging.getLogger('wipe').exception('Data wipe failed')
         if history_row:
             try:
                 history_row.wipe_status = 'failed'
-                history_row.note = f'Wipe failed after snapshot: {e}'
+                history_row.note = f'Wipe failed after snapshot: {type(exc).__name__}'
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-        flash(f'Wipe failed: {str(e)}', 'danger')
+        flash('Wipe failed: the operation could not be completed and no data was changed. Please try again; if the problem persists, contact support.', 'danger')
     finally:
         _RESET_CONTEXT = None
 

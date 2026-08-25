@@ -246,10 +246,10 @@ def client_payment_void(id):
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception('Client payment delete failed')
-        flash(f'Unable to delete payment: {exc}', 'danger')
+        flash('Unable to delete payment: the payment could not be deleted. Please try again.', 'danger')
 
     return redirect(request.referrer or url_for('accounts.client_payments'))
 
@@ -272,10 +272,10 @@ def client_payment_restore(id):
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception('Client payment restore failed')
-        flash(f'Unable to restore payment: {exc}', 'danger')
+        flash('Unable to restore payment: the payment could not be restored. Please try again.', 'danger')
 
     return redirect(request.referrer or url_for('accounts.client_payments'))
 
@@ -477,10 +477,10 @@ def client_payment_save():
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception('Client payment save failed')
-        flash(f'Unable to save payment: {exc}', 'danger')
+        flash('Unable to save payment: the payment could not be saved. Please check the details and try again.', 'danger')
     return redirect(url_for('accounts.client_payments', show=show_mode))
 
 
@@ -563,10 +563,10 @@ def supplier_payment_save():
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception('Supplier payment save failed')
-        flash(f'Unable to save supplier payment: {exc}', 'danger')
+        flash('Unable to save supplier payment: the payment could not be saved. Please check the details and try again.', 'danger')
     return redirect(url_for('accounts.supplier_payments', show=show_mode))
 
 
@@ -618,10 +618,10 @@ def supplier_payment_delete(id):
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception('Supplier payment delete failed')
-        flash(f'Unable to delete supplier payment: {exc}', 'danger')
+        flash('Unable to delete supplier payment: the payment could not be deleted. Please try again.', 'danger')
     return redirect(request.referrer or url_for('accounts.supplier_payments'))
 
 

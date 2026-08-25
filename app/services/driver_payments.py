@@ -203,7 +203,7 @@ def save_driver_payment(
     """Create or edit one driver payment and its single financial transaction."""
     from app.services.accounting import _sync_delivery_person_payment_accounting
     from app.services.payments_crud import _assert_period_open
-    from app.services.time_money import resolve_posted_datetime
+    from app.services.time_money import resolve_posted_datetime, pk_now
 
     key = _normalise_key(idempotency_key)
     if not payment_id and key:
@@ -302,6 +302,14 @@ def save_driver_payment(
         allocation = _pick_allocation(person.id)
 
     posted = resolve_posted_datetime(date_posted, fallback_dt=(payment.date_posted if not created else None))
+    if posted and posted > pk_now():
+        if created or not payment.date_posted or payment.date_posted != posted:
+            raise ValueError("The transaction date cannot be in the future.")
+    if created and account:
+        # The create path must honour the same reconciled-period guard as
+        # edits; otherwise a post-close driver settlement rewrites a closed
+        # period.
+        _assert_period_open(account.id, posted, operation="posted")
 
     if not created:
         accounting_changed = any((

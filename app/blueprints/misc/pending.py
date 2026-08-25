@@ -161,9 +161,10 @@ def import_pending_bills():
             f"Skipped: {report['skipped']}, Errors: {report['errors']}",
             'success'
         )
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        flash(f'Import failed: {str(e)}', 'danger')
+        logging.getLogger('pending_bills').exception('Pending bills import failed')
+        flash('Import failed: the file could not be processed. No data was changed. Check the file format and try again.', 'danger')
 
     return redirect(url_for('pending_bills'))
 
@@ -176,11 +177,67 @@ def edit_grn(id):
     restricted = _enforce_grn_backdate_policy(grn_obj.date_posted, 'Edit GRN')
     if restricted:
         return restricted
-    
+
+    def _grn_submitted_item_lines_unchanged(grn):
+        """True when the submitted item lines exactly match the stored items.
+
+        Used to permit header-only edits (supplier, freight, note, …) on a
+        GRN whose lots are locked by cash/credit sales: stock-affecting
+        fields stay blocked, non-stock fields remain editable.
+        """
+        item_ids = request.form.getlist('grn_item_id[]')
+        mat_names = request.form.getlist('mat_name[]')
+        qtys = request.form.getlist('qty[]')
+        prices = request.form.getlist('price[]')
+        existing = {
+            int(i.id): i
+            for i in (grn.items or [])
+            if getattr(i, 'id', None) is not None and not bool(getattr(i, 'is_void', False))
+        }
+        submitted = {}
+        for idx in range(max(len(mat_names), len(qtys), len(prices), len(item_ids))):
+            name = (mat_names[idx] if idx < len(mat_names) else '') or ''
+            qty = (qtys[idx] if idx < len(qtys) else '') or ''
+            price = (prices[idx] if idx < len(prices) else '') or ''
+            raw_id = (item_ids[idx] if idx < len(item_ids) else '') or ''
+            name = name.strip()
+            if not name:
+                continue
+            if not str(raw_id).strip().isdigit():
+                return False
+            submitted[int(str(raw_id).strip())] = (name, qty, price)
+        if set(submitted.keys()) != set(existing.keys()):
+            return False
+        for iid, (name, qty, price) in submitted.items():
+            item = existing[iid]
+            try:
+                qty_f = float(qty or 0)
+            except Exception:
+                qty_f = 0.0
+            try:
+                price_f = float(price or 0)
+            except Exception:
+                price_f = 0.0
+            if (
+                (item.mat_name or '').strip() != name
+                or abs(float(item.qty or 0) - qty_f) > 1e-9
+                or abs(float(item.price_at_time or 0) - price_f) > 1e-9
+            ):
+                return False
+        return True
+
     if request.method == 'POST':
+        header_only_edit = False
         if _grn_has_locked_lots(grn_obj):
-            flash('This GRN has locked lots used by cash/credit sales. Delete those sales before changing item qty/rate.', 'danger')
-            return redirect(url_for('edit_grn', id=grn_obj.id))
+            if not _grn_submitted_item_lines_unchanged(grn_obj):
+                flash(
+                    'This GRN has locked lots used by cash/credit sales. '
+                    'Changing item quantity/rate, adding or removing items is blocked — '
+                    'delete those sales first. No changes were saved.',
+                    'danger'
+                )
+                return redirect(url_for('edit_grn', id=grn_obj.id))
+            header_only_edit = True
         old_supplier_id = grn_obj.supplier_id
         old_auto_pay = _find_grn_auto_supplier_payment(grn_obj)
         old_pay_account_id = None
@@ -188,17 +245,18 @@ def edit_grn(id):
         if old_auto_pay and not bool(getattr(old_auto_pay, 'is_void', False)):
             old_pay_account_id = getattr(old_auto_pay, 'payment_account_id', None)
             old_pay_amount = float(getattr(old_auto_pay, 'amount', 0) or 0)
-        # 1. Reverse Stock for existing items (only active items)
-        for item in [i for i in (grn_obj.items or []) if not bool(getattr(i, 'is_void', False))]:
-            mat = Material.query.filter_by(name=item.mat_name).first()
-            if mat:
-                mat.total = (mat.total or 0) - (item.qty or 0)
-        
-        # 2. Void old items and entries (preserve audit trail)
-        for item in (grn_obj.items or []):
-            item.is_void = True
-        for e in Entry.query.filter(Entry.auto_bill_no == grn_obj.auto_bill_no, Entry.type == 'IN').all():
-            e.is_void = True
+        if not header_only_edit:
+            # 1. Reverse Stock for existing items (only active items)
+            for item in [i for i in (grn_obj.items or []) if not bool(getattr(i, 'is_void', False))]:
+                mat = Material.query.filter_by(name=item.mat_name).first()
+                if mat:
+                    mat.total = (mat.total or 0) - (item.qty or 0)
+
+            # 2. Void old items and entries (preserve audit trail)
+            for item in (grn_obj.items or []):
+                item.is_void = True
+            for e in Entry.query.filter(Entry.auto_bill_no == grn_obj.auto_bill_no, Entry.type == 'IN').all():
+                e.is_void = True
         
         # 3. Update GRN fields
         supplier_input = request.form.get('supplier', '').strip()
@@ -346,73 +404,76 @@ def edit_grn(id):
             except ValueError:
                 pass
 
-        # 4. Add / update items (preserve GRNItem IDs so linked DirectSaleItem.grn_item_id stays valid)
-        item_ids = request.form.getlist('grn_item_id[]')
-        mat_names = request.form.getlist('mat_name[]')
-        qtys = request.form.getlist('qty[]')
-        prices = request.form.getlist('price[]')
-        edit_skipped_lines = []
+        if not header_only_edit:
+            # 4. Add / update items (preserve GRNItem IDs so linked DirectSaleItem.grn_item_id stays valid)
+            item_ids = request.form.getlist('grn_item_id[]')
+            mat_names = request.form.getlist('mat_name[]')
+            qtys = request.form.getlist('qty[]')
+            prices = request.form.getlist('price[]')
+            edit_skipped_lines = []
 
-        existing_by_id = {
-            int(i.id): i
-            for i in (grn_obj.items or [])
-            if getattr(i, 'id', None) is not None
-        }
+            existing_by_id = {
+                int(i.id): i
+                for i in (grn_obj.items or [])
+                if getattr(i, 'id', None) is not None
+            }
 
-        for idx in range(max(len(mat_names), len(qtys), len(prices), len(item_ids))):
-            name = (mat_names[idx] if idx < len(mat_names) else '') or ''
-            qty = (qtys[idx] if idx < len(qtys) else '') or ''
-            price = (prices[idx] if idx < len(prices) else '') or ''
-            raw_id = (item_ids[idx] if idx < len(item_ids) else '') or ''
+            for idx in range(max(len(mat_names), len(qtys), len(prices), len(item_ids))):
+                name = (mat_names[idx] if idx < len(mat_names) else '') or ''
+                qty = (qtys[idx] if idx < len(qtys) else '') or ''
+                price = (prices[idx] if idx < len(prices) else '') or ''
+                raw_id = (item_ids[idx] if idx < len(item_ids) else '') or ''
 
-            name = name.strip()
-            try:
-                qty_val = float(qty or 0)
-            except Exception:
-                qty_val = 0.0
-            try:
-                price_val = float(price or 0)
-            except Exception:
-                price_val = 0.0
+                name = name.strip()
+                try:
+                    qty_val = float(qty or 0)
+                except Exception:
+                    qty_val = 0.0
+                try:
+                    price_val = float(price or 0)
+                except Exception:
+                    price_val = 0.0
 
-            if not name or qty_val <= 0:
-                if name and qty_val <= 0:
-                    edit_skipped_lines.append(f"{name} (qty={qty or 0})")
-                continue
+                if not name or qty_val <= 0:
+                    if name and qty_val <= 0:
+                        edit_skipped_lines.append(f"{name} (qty={qty or 0})")
+                    continue
 
-            item_obj = None
-            if str(raw_id).strip().isdigit():
-                iid = int(str(raw_id).strip())
-                candidate = existing_by_id.get(iid)
-                if candidate and candidate.grn_id == grn_obj.id:
-                    item_obj = candidate
+                item_obj = None
+                if str(raw_id).strip().isdigit():
+                    iid = int(str(raw_id).strip())
+                    candidate = existing_by_id.get(iid)
+                    if candidate and candidate.grn_id == grn_obj.id:
+                        item_obj = candidate
 
-            if item_obj is None:
-                item_obj = GRNItem(grn_id=grn_obj.id)
-                db.session.add(item_obj)
+                if item_obj is None:
+                    item_obj = GRNItem(grn_id=grn_obj.id)
+                    db.session.add(item_obj)
 
-            item_obj.is_void = False
-            item_obj.mat_name = name
-            item_obj.qty = qty_val
-            item_obj.price_at_time = price_val
+                item_obj.is_void = False
+                item_obj.mat_name = name
+                item_obj.qty = qty_val
+                item_obj.price_at_time = price_val
 
-            mat = Material.query.filter_by(name=name).first()
-            if mat:
-                mat.total = (mat.total or 0) + qty_val
+                mat = Material.query.filter_by(name=name).first()
+                if mat:
+                    mat.total = (mat.total or 0) + qty_val
 
-            entry = Entry(
-                date=grn_obj.date_posted.strftime('%Y-%m-%d'),
-                time=grn_obj.date_posted.strftime('%H:%M:%S'),
-                type='IN',
-                material=name,
-                client=grn_obj.supplier,
-                qty=qty_val,
-                bill_no=grn_obj.manual_bill_no or '',
-                auto_bill_no=grn_obj.auto_bill_no,
-                created_by=current_user.username,
-                note=grn_obj.note
-            )
-            db.session.add(entry)
+                entry = Entry(
+                    date=grn_obj.date_posted.strftime('%Y-%m-%d'),
+                    time=grn_obj.date_posted.strftime('%H:%M:%S'),
+                    type='IN',
+                    material=name,
+                    client=grn_obj.supplier,
+                    qty=qty_val,
+                    bill_no=grn_obj.manual_bill_no or '',
+                    auto_bill_no=grn_obj.auto_bill_no,
+                    created_by=current_user.username,
+                    note=grn_obj.note
+                )
+                db.session.add(entry)
+        else:
+            edit_skipped_lines = []
 
         _sync_grn_auto_supplier_payment(grn_obj, old_supplier_id=old_supplier_id)
         
