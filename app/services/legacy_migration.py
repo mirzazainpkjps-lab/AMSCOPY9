@@ -108,7 +108,13 @@ def import_run(run):
         elif run.template_type=='SUPPLIERS': obj=Supplier(name=d['Supplier Name'],phone=d['Phone'] or None,address=d['Address'] or None)
         elif run.template_type=='MATERIALS':
             cat=None
-            if d['Category']: cat=MaterialCategory.query.filter(func.lower(MaterialCategory.name)==norm(d['Category'])).first()
+            cat_name=(d.get('Category') or '').strip()
+            if cat_name:
+                cat=MaterialCategory.query.filter(func.lower(MaterialCategory.name)==norm(cat_name)).first()
+                if not cat:
+                    cat=MaterialCategory(name=cat_name, is_active=True)
+                    db.session.add(cat)
+                    db.session.flush()
             obj=Material(code='MIG-'+str(uuid.uuid4())[:8].upper(),name=d['Material Name'],category_id=cat.id if cat else None,unit=d['Unit'] or 'Bags',unit_price=float(d['Unit Price'] or 0))
         else: obj=Account(name=d['Account Name'],type=d['Account Type'],account_type=d['Account Type'],category=d['Category'],balance=float(d['Opening Balance'] or 0),opening_balance=float(d['Opening Balance'] or 0),bank_name=d['Bank Name'] or None,account_number=d['Account Number'] or None)
         db.session.add(obj); db.session.flush(); row.status='IMPORTED'; row.entity_type=run.template_type[:-1].title(); row.new_entity_id=obj.id; row.imported_at=datetime.utcnow(); db.session.add(MigrationMapping(template_type=run.template_type,legacy_reference=ref,entity_type=row.entity_type,entity_id=obj.id,run_id=run.id)); created+=1

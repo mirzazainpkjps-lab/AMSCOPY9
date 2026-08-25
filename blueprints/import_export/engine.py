@@ -263,6 +263,41 @@ def _full_import_report_dir():
     return str(reports_dir())
 
 
+def _tables_in_fk_order(tables):
+    """Order tables so parents are inserted before children (and deleted after).
+
+    Full-raw import previously followed Excel sheet order.  With
+    ``PRAGMA foreign_keys=ON`` that aborts the whole replace/import when a
+    child sheet (``material``, ``direct_sale_item``, …) appears before its
+    parent — the failure the user sees as “schema failing on import”.
+    SQLAlchemy's ``sorted_tables`` already encodes the FK DAG.
+    """
+    wanted = {table.name: table for table in tables}
+    return [table for table in db.metadata.sorted_tables if table.name in wanted]
+
+
+def _remember_import_report(report_name, report_meta):
+    """Store the import report name in the Flask session when one exists.
+
+    Job/CLI callers have no request context; touching ``session`` there used
+    to crash *after* a successful commit and look like a failed import.
+    """
+    try:
+        from flask import has_request_context
+        if not has_request_context():
+            return
+        if report_name:
+            session['full_raw_import_report'] = report_name
+        else:
+            session.pop('full_raw_import_report', None)
+        session['full_raw_import_report_meta'] = report_meta
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).debug(
+            'Import report could not be stored in the HTTP session', exc_info=True
+        )
+
+
 def _write_full_import_report(report, issue_rows, mode, scope_ctx, source_file_name):
     """Persist an issue-only CSV plus metadata; report creation cannot undo data."""
     stamp = pk_now().strftime('%Y%m%d_%H%M%S_%f')
@@ -326,6 +361,7 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name, al
     ]
     if allowed is not None:
         selected_tables = [t for t in selected_tables if t.name in allowed]
+    selected_tables = _tables_in_fk_order(selected_tables)
     if not selected_tables:
         if not_selected_tables:
             raise ValueError(
@@ -402,13 +438,23 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name, al
     if mode == 'replace_tenant_data':
         # Clear only tables actually supplied by the workbook. Missing sheets
         # remain untouched, which makes older/partial backups recoverable.
-        for table in reversed(selected_tables):
-            if table.name in WIPE_PROTECTED_TABLES or table.name == 'user':
-                continue
-            if scope_ctx.get('scope') == 'tenant' and 'tenant_id' in table.c:
-                db.session.execute(table.delete().where(table.c.tenant_id == target_tenant_id))
-            else:
-                db.session.execute(table.delete())
+        # Children are deleted first (reverse FK order) so SQLite foreign-key
+        # enforcement does not abort the whole import.
+        try:
+            for table in reversed(selected_tables):
+                if table.name in WIPE_PROTECTED_TABLES or table.name == 'user':
+                    continue
+                if scope_ctx.get('scope') == 'tenant' and 'tenant_id' in table.c:
+                    db.session.execute(table.delete().where(table.c.tenant_id == target_tenant_id))
+                else:
+                    db.session.execute(table.delete())
+        except Exception as exc:
+            db.session.rollback()
+            raise ValueError(
+                'Overwrite import could not clear existing rows because other '
+                'records still reference them. Import the parent module as well, '
+                f'or use append mode. ({_short_import_error(exc)})'
+            ) from exc
 
     user_restore = _restore_users_from_excel(xls)
     report['users'] = user_restore.get('people') or []
@@ -584,8 +630,7 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name, al
             report_name, report_meta = _write_full_import_report(
                 report, issue_rows, mode, scope_ctx, source_file_name
             )
-            session['full_raw_import_report'] = report_name
-            session['full_raw_import_report_meta'] = report_meta
+            _remember_import_report(report_name, report_meta)
         except Exception as exc:
             report['warnings'] += 1
             report['status'] = 'warning' if report['status'] == 'ok' else report['status']
@@ -596,8 +641,7 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name, al
             })
     else:
         # Success: summary stays in the DB/session payload; files are disposable.
-        session.pop('full_raw_import_report', None)
-        session['full_raw_import_report_meta'] = {
+        _remember_import_report(None, {
             'name': None,
             'created_at': pk_now().strftime('%Y-%m-%d %H:%M:%S'),
             'mode': mode,
@@ -612,7 +656,7 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name, al
             'source_file': source_file_name,
             'issue_rows_count': 0,
             'persisted_file': False,
-        }
+        })
         discard_import_artifacts()
     purge_expired_failed_artifacts()
     return report, report_name
