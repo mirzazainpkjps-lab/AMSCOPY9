@@ -141,7 +141,7 @@ EXPORT_MODULES = {
     },
     'materials': {
         'label': 'Materials & Categories',
-        'tables': ['material', 'material_category'],
+        'tables': ['material_category', 'material'],
     },
     'direct_sales': {
         'label': 'Direct Sales, Invoices & Driver Payments',

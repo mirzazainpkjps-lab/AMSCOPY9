@@ -108,7 +108,7 @@ def _ensure_user_password_column():
 
 def _ensure_model_columns():
     """Add any missing columns declared in models but missing in the DB."""
-    from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, Text, Boolean
+    from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, Text, BigInteger, Numeric
 
     try:
         for table in db.metadata.sorted_tables:
@@ -120,9 +120,11 @@ def _ensure_model_columns():
                     sqltype = 'VARCHAR(200)'
                     if isinstance(coltype, (String, Text)):
                         sqltype = 'VARCHAR(200)'
+                    elif isinstance(coltype, BigInteger) or str(coltype).upper().startswith('BIGINT'):
+                        sqltype = 'BIGINT'
                     elif isinstance(coltype, (Integer, Boolean)) or str(coltype) == 'BOOLEAN':
                         sqltype = 'INTEGER'
-                    elif isinstance(coltype, Float):
+                    elif isinstance(coltype, (Float, Numeric)):
                         sqltype = 'REAL'
                     elif isinstance(coltype, Date):
                         sqltype = 'DATE'
@@ -565,9 +567,14 @@ def _ensure_auto_bill_unique_indexes():
                     table, dup,
                 )
                 continue
+            # Recreate so blank strings are not treated as a real bill number.
+            # The previous WHERE (IS NOT NULL) made every empty auto_bill_no
+            # collide, which aborted imports and blocked new writes.
+            db.session.execute(text(f"DROP INDEX IF EXISTS uq_{table}_auto_bill_no"))
             db.session.execute(text(
                 f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{table}_auto_bill_no "
-                f"ON {table}(auto_bill_no) WHERE auto_bill_no IS NOT NULL"
+                f"ON {table}(auto_bill_no) WHERE auto_bill_no IS NOT NULL "
+                f"AND TRIM(auto_bill_no) <> ''"
             ))
             db.session.commit()
         except Exception:

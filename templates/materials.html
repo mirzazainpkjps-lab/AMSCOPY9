@@ -294,6 +294,7 @@ async function generateMaterialAutoCode() {
 <div class="modal fade" id="mModal" tabindex="-1">
     <div class="modal-dialog">
         <form action="/add_material" method="POST" class="modal-content border-secondary" style="background: #1e293b; border-radius: 15px;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <div class="modal-header border-0">
                 <h5 class="text-warning fw-bold">Add New Material Brand</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

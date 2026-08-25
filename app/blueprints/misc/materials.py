@@ -98,9 +98,24 @@ def add_material():
     if Material.query.filter_by(code=code).first():
         flash(f'Material code "{code}" already exists', 'danger')
         return redirect(url_for('materials'))
-    new_mat = Material(name=name, code=code, category_id=category.id if category else None, unit=unit)
-    db.session.add(new_mat)
-    db.session.commit()
+    try:
+        new_mat = Material(
+            name=name,
+            code=code,
+            category_id=category.id if category else None,
+            unit=unit,
+        )
+        db.session.add(new_mat)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logging.getLogger(__name__).exception('add_material failed for %r / %r', name, code)
+        flash(
+            'The material could not be saved. Check that the category still '
+            'exists, the name/code are unique, then try again.',
+            'danger',
+        )
+        return redirect(url_for('materials'))
     if request.args.get('ajax'):
         return jsonify({'success': True, 'id': new_mat.id, 'name': new_mat.name, 'code': new_mat.code, 'price': new_mat.unit_price, 'unit': new_mat.unit})
     flash('Brand Added', 'success')
