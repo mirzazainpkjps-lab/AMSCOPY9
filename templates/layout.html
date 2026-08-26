@@ -206,6 +206,48 @@
         .combobox-item:hover, .combobox-item.active { background: #dcfce7; color:#052e16; outline:none; }
         .combobox-item:last-child { border-bottom: none; }
 
+        /* Empty-state note inside a combobox list. Without it a list with no
+           visible items collapses to a thin colored line (just the border),
+           which looks like a broken dropdown. */
+        .combobox-empty-note {
+            display: block;
+            padding: 10px 12px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            line-height: 1.35;
+            color: #92400e;
+        }
+        .combobox-list .combobox-empty-note[hidden] { display: none; }
+        /* Opt-in disabled items (e.g. clients without booking balance while
+           the Booked Sale type is selected). Still listed, but not pickable. */
+        .combobox-item.combo-disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .combobox-item.combo-disabled:hover,
+        .combobox-item.combo-disabled.active {
+            background: transparent;
+            color: #1f2937;
+        }
+        .combobox-item .combo-tag {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 1px 7px;
+            border-radius: 999px;
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            border: 1px solid currentColor;
+            vertical-align: middle;
+        }
+        .combobox-item .combo-tag.tag-booked { color: #047857; background: #d1fae5; }
+        .combobox-item .combo-tag.tag-nobooking { color: #9a3412; background: #ffedd5; }
+        .ui-v2 .combobox-list .combobox-empty-note,
+        .combobox-list.ui-combobox-v2 .combobox-empty-note {
+            color: var(--ui-text-muted, inherit);
+        }
+
         /* Mobile Adjustments */
         .mobile-header {
             display: none;
@@ -1465,6 +1507,7 @@ function toggleNavGroup(groupId, btn) {
         if (input) input.setAttribute('aria-expanded', list.style.display === 'block' ? 'true' : 'false');
         if (list.style.display === 'block') {
             positionCombobox(inputId, listId);
+            refreshComboboxEmptyNote(list);
             input.focus();
         }
     }
@@ -1478,6 +1521,7 @@ function toggleNavGroup(groupId, btn) {
         const input = document.getElementById(inputId);
         if (input) input.setAttribute('aria-expanded', 'true');
         positionCombobox(inputId, listId);
+        refreshComboboxEmptyNote(list);
     }
 
     function filterCombobox(inputId, listId, displayId) {
@@ -1504,6 +1548,28 @@ function toggleNavGroup(groupId, btn) {
             items[i].style.display = text.includes(filter) ? "" : "none";
             items[i].classList.remove('active');
             items[i].setAttribute('aria-selected', 'false');
+        }
+        refreshComboboxEmptyNote(list);
+    }
+
+    /* Show the .combobox-empty-note child of a list when no selectable item
+       is visible, so an "empty" dropdown explains itself instead of
+       rendering as a thin colored line. Text comes from the list's
+       data-empty-text attribute (set per context by the page) with a
+       generic fallback. Idempotent; lists without the note are untouched. */
+    function refreshComboboxEmptyNote(list) {
+        if (!list) return;
+        const note = list.querySelector('.combobox-empty-note');
+        if (!note) return;
+        const anySelectable = Array.from(list.querySelectorAll('.combobox-item')).some(function (item) {
+            return item.style.display !== 'none' && item.getAttribute('data-combo-disabled') !== '1';
+        });
+        if (anySelectable) {
+            note.hidden = true;
+            note.textContent = '';
+        } else {
+            note.textContent = list.dataset.emptyText || 'No matches found.';
+            note.hidden = false;
         }
     }
 
@@ -1540,6 +1606,7 @@ function toggleNavGroup(groupId, btn) {
     window.toggleCombobox = toggleCombobox;
     window.selectComboboxItem = selectComboboxItem;
     window.positionCombobox = positionCombobox;
+    window.refreshComboboxEmptyNote = refreshComboboxEmptyNote;
 
     function comboIdsFromEl(el) {
         if (!el) return null;
@@ -1582,7 +1649,7 @@ function toggleNavGroup(groupId, btn) {
             return;
         }
         const visible = Array.from(list.querySelectorAll('.combobox-item')).filter(function (item) {
-            return item.style.display !== 'none';
+            return item.style.display !== 'none' && item.getAttribute('data-combo-disabled') !== '1';
         });
         if (!visible.length) return;
         let idx = Number(list.dataset.activeIndex || -1);
@@ -1615,6 +1682,10 @@ function toggleNavGroup(groupId, btn) {
         const item = e.target.closest('.combobox-item[data-combo-code]');
         if (!item) return;
         e.preventDefault();
+        // Items flagged as disabled (e.g. a client without booking balance
+        // while a booked-only sale type is selected) stay listed but are not
+        // selectable. Keep the list open so the user can pick another row.
+        if (item.getAttribute('data-combo-disabled') === '1') return;
         const list = item.closest('.combobox-list');
         if (!list) return;
         const inputId = list.dataset.anchorInput || item.getAttribute('data-combo-input');

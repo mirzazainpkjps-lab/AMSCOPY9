@@ -557,6 +557,7 @@
                                     <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
                                 </div>
                                 {% endfor %}
+                                <div class="combobox-empty-note" hidden></div>
                             </div>
                             <div id="addSaleClientNameDisplay" class="text-info small mt-1 fw-bold"></div>
                         </div>
@@ -575,6 +576,7 @@
                                     <span class="ms-2 text-white-50 small name-span">{{ client.name }}</span>
                                 </div>
                                 {% endfor %}
+                                <div class="combobox-empty-note" hidden></div>
                             </div>
                             <div id="addSaleManualClientDisplay" class="text-info small mt-1 fw-bold"></div>
                         </div>
@@ -1836,21 +1838,54 @@ function filterAddSaleClientsByCategory() {
 
     const mode = categorySelect.value;
     const bookedOnly = (mode === 'Booking Delivery' || mode === 'Mixed Transaction');
-    const filterText = (input && input.value ? input.value : '').toLowerCase();
+    const filterText = (input && input.value ? input.value : '').trim().toLowerCase();
+    let eligibleCount = 0;
+
     list.querySelectorAll('.combobox-item').forEach(item => {
         const code = (item.getAttribute('data-client-code') || '').trim();
         const isBookedClient = bookedEligibleClientCodes.has(code);
-        const allowed = bookedOnly ? isBookedClient : true;
-        if (!allowed) {
-            item.dataset.bookedFilterHidden = '1';
-            item.style.display = 'none';
-            return;
+        // Search against code + name attributes (NOT innerText — badge text
+        // added below would otherwise pollute the search).
+        const searchable = ((code || '') + ' ' + (item.getAttribute('data-combo-name') || '')).trim().toLowerCase();
+        const matches = !filterText || searchable.includes(filterText);
+
+        let tag = item.querySelector('.combo-tag');
+        if (bookedOnly) {
+            if (!tag) {
+                tag = document.createElement('span');
+                item.appendChild(tag);
+            }
+            if (isBookedClient) {
+                eligibleCount++;
+                item.classList.remove('combo-disabled');
+                item.removeAttribute('data-combo-disabled');
+                item.removeAttribute('aria-disabled');
+                tag.className = 'combo-tag tag-booked';
+                tag.textContent = 'Booked ✓';
+            } else {
+                // Keep the client VISIBLE but clearly not selectable. Hiding
+                // them made the dropdown open as an empty box (a thin colored
+                // line) whenever no client had a booking balance.
+                item.classList.add('combo-disabled');
+                item.setAttribute('data-combo-disabled', '1');
+                item.setAttribute('aria-disabled', 'true');
+                tag.className = 'combo-tag tag-nobooking';
+                tag.textContent = 'No booking balance';
+            }
+        } else {
+            item.classList.remove('combo-disabled');
+            item.removeAttribute('data-combo-disabled');
+            item.removeAttribute('aria-disabled');
+            if (tag) tag.remove();
         }
-        item.dataset.bookedFilterHidden = '0';
-        const text = (item.innerText || '').toLowerCase();
-        const matches = !filterText || text.includes(filterText);
+
         item.style.display = matches ? '' : 'none';
     });
+
+    list.dataset.emptyText = (bookedOnly && eligibleCount === 0)
+        ? 'No client has a booking balance right now. Booked Sale / Booked + Due need a client with an undelivered booking — switch the Sale Type to Due Sale or Cash Sale, or create the booking first.'
+        : 'No client matches your search.';
+    if (typeof refreshComboboxEmptyNote === 'function') refreshComboboxEmptyNote(list);
 
     if (bookedOnly && input && input.value) {
         const raw = input.value.trim();
@@ -1867,6 +1902,17 @@ function filterAddSaleClientsByCategory() {
         }
     }
 }
+
+// Clicking a dimmed (no-booking-balance) client explains itself instead of
+// silently doing nothing; the global combobox handler blocks the selection.
+document.addEventListener('click', function (e) {
+    const disabledItem = e.target.closest('#addSaleCombobox .combobox-item.combo-disabled');
+    if (!disabledItem) return;
+    const bookingContainer = document.getElementById('bookingStatusContainer');
+    if (bookingContainer) {
+        bookingContainer.innerHTML = '<p class="text-white-50 text-center mt-5">Only clients with booking balance are allowed for this sale type. Clients marked "No booking balance" cannot be selected — switch to Due Sale / Cash Sale, or create the booking first.</p>';
+    }
+});
 
 function checkItemBookingStatus(row) {
     const materialInput = row.querySelector('.price-trigger');
